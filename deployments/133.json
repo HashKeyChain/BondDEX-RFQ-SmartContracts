@@ -1,0 +1,20 @@
+{
+  "version": "0.1.0-draft",
+  "chainId": 133,
+  "network": "testnet",
+  "deployer": null,
+  "safeAdmin": null,
+  "settlementToken": null,
+  "contracts": {
+    "complianceImplementation": null,
+    "bondIssuanceImplementation": null,
+    "bondIssuance": null,
+    "rfqSettlementImplementation": null,
+    "rfqSettlement": null,
+    "bondFactory": null
+  },
+  "handoff": {
+    "status": "template-ready",
+    "roleMatrixPath": "QUICKSTART.md"
+  }
+}

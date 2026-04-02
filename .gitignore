@@ -1,0 +1,26 @@
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.idea/
+.vscode/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Foundry build outputs
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+
+# Local deployment and export scratch files
+abi-export/**/*.local.json
+deployments/*.local.json
+
+.cursor/
+.specify/

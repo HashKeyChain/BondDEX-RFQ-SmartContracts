@@ -1,0 +1,9 @@
+{
+  "chainId": 177,
+  "network": "mainnet",
+  "BondFactory": null,
+  "BondIssuance": null,
+  "RFQSettlement": null,
+  "ComplianceModule": null,
+  "BondToken": "per-bond deployment"
+}

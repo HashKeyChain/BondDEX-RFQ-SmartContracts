@@ -1,0 +1,18 @@
+{
+  "version": "0.1.0-draft",
+  "contractCommit": "UNSET_COMMIT",
+  "exportedAt": "1",
+  "contracts": [
+    "BondFactory",
+    "BondToken",
+    "BondIssuance",
+    "RFQSettlement",
+    "ComplianceModule"
+  ],
+  "networks": {
+    "133": "../addresses/133.json",
+    "177": "../addresses/177.json"
+  },
+  "eventInterface": "event-interface.md",
+  "notes": "Update contractCommit and production addresses after promotion."
+}
