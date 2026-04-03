@@ -3,12 +3,21 @@ pragma solidity ^0.8.28;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {AccessControlUpgradeable} from
-    "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {
+    IERC20Metadata
+} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {
+    SafeERC20
+} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {
+    AccessControlUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {
+    Initializable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {
+    UUPSUpgradeable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import {DomainPausable} from "./abstracts/DomainPausable.sol";
 import {RoleManaged} from "./abstracts/RoleManaged.sol";
@@ -28,8 +37,17 @@ import {
 import {IComplianceModule} from "./interfaces/IComplianceModule.sol";
 import {IBondIssuance} from "./interfaces/IBondIssuance.sol";
 import {IBondToken} from "./interfaces/IBondToken.sol";
-import {PauseDomain, Role, SubscriptionStatus, SubscriptionTerms} from "./types/BondTypes.sol";
+import {
+    PauseDomain,
+    Role,
+    SubscriptionStatus,
+    SubscriptionTerms
+} from "./types/BondTypes.sol";
 
+/// @title BondIssuance
+/// @notice Primary-market and redemption controller for issued bond tokens.
+/// @dev This contract manages subscription offers, settlement-token policy, redemption funding,
+/// and direct or delegated claims after maturity. It is deployed behind a UUPS proxy.
 contract BondIssuance is
     Initializable,
     AccessControlUpgradeable,
@@ -40,30 +58,49 @@ contract BondIssuance is
 {
     using SafeERC20 for IERC20;
 
+    /// @dev Tracks which lifecycle phases are enabled for one settlement token.
     struct SettlementTokenPolicy {
+        /// @dev True when the token may be used for subscriptions.
         bool issuanceEnabled;
+        /// @dev True when the token may be used for secondary settlement.
         bool settlementEnabled;
+        /// @dev True when the token may be used for redemption funding and payouts.
         bool redemptionEnabled;
     }
 
+    /// @dev Stores the issuer-defined terms for one subscription window.
     struct SubscriptionOffer {
+        /// @dev Issuer that owns and can update the offer.
         address issuer;
+        /// @dev Bond token offered in the subscription window.
         address bondToken;
+        /// @dev Settlement token used to pay for subscribed bond units.
         address settlementToken;
+        /// @dev Price per whole bond unit expressed in settlement-token smallest units.
         uint256 unitPrice;
+        /// @dev Hard cap on total bond units sold through the offer.
         uint256 maxUnits;
+        /// @dev Bond units already subscribed.
         uint256 soldUnits;
+        /// @dev Opening timestamp for the offer.
         uint256 opensAt;
+        /// @dev Closing timestamp for the offer; zero means no explicit end.
         uint256 closesAt;
+        /// @dev Current status of the offer.
         SubscriptionStatus status;
     }
 
+    /// @dev Tracks cumulative redemption funding and payouts for one bond token.
     struct RedemptionState {
+        /// @dev Total settlement tokens deposited by the issuer.
         uint256 fundedAmount;
+        /// @dev Total settlement tokens already paid out to holders.
         uint256 claimedAmount;
+        /// @dev Timestamp of the latest funding event.
         uint256 lastFundingAt;
     }
 
+    /// @notice Emitted when governance updates lifecycle permissions for a settlement token.
     event SettlementTokenPolicyUpdated(
         address indexed token,
         bool issuanceEnabled,
@@ -71,6 +108,8 @@ contract BondIssuance is
         bool redemptionEnabled,
         address operator
     );
+
+    /// @notice Emitted when an issuer opens a new subscription offer.
     event SubscriptionCreated(
         bytes32 indexed offerId,
         address indexed bondToken,
@@ -81,6 +120,8 @@ contract BondIssuance is
         uint256 opensAt,
         uint256 closesAt
     );
+
+    /// @notice Emitted when an issuer updates the economic or timing terms of an active offer.
     event SubscriptionUpdated(
         bytes32 indexed offerId,
         address indexed bondToken,
@@ -91,6 +132,8 @@ contract BondIssuance is
         uint256 opensAt,
         uint256 closesAt
     );
+
+    /// @notice Emitted when a market maker successfully subscribes for bond units.
     event Subscribed(
         bytes32 indexed offerId,
         address indexed bondToken,
@@ -99,6 +142,8 @@ contract BondIssuance is
         uint256 units,
         uint256 cost
     );
+
+    /// @notice Emitted when an issuer deposits redemption funds for a matured bond.
     event RedemptionDeposited(
         address indexed bondToken,
         address indexed issuer,
@@ -106,6 +151,8 @@ contract BondIssuance is
         uint256 amount,
         uint256 cumulativeFundedAmount
     );
+
+    /// @notice Emitted when a holder claim burns bond units and releases payout.
     event RedemptionClaimed(
         address indexed bondToken,
         address indexed holder,
@@ -113,16 +160,39 @@ contract BondIssuance is
         uint256 bondAmount,
         uint256 payout
     );
-    event ClaimDelegateSet(address indexed holder, address indexed delegate, address operator);
 
+    /// @notice Emitted when a holder sets or clears a claim delegate.
+    event ClaimDelegateSet(
+        address indexed holder,
+        address indexed delegate,
+        address operator
+    );
+
+    /// @dev Monotonic counter used to derive subscription offer identifiers.
     uint256 private _nextOfferId;
+
+    /// @dev Reentrancy status flag where 1 means unlocked and 2 means entered.
     uint256 private _reentrancyStatus;
-    mapping(address token => SettlementTokenPolicy policy) private _settlementTokenPolicies;
-    mapping(bytes32 offerId => SubscriptionOffer offer) private _subscriptionOffers;
+
+    /// @dev Lifecycle permissions keyed by settlement-token address.
+    mapping(address token => SettlementTokenPolicy policy)
+        private _settlementTokenPolicies;
+
+    /// @dev Subscription offers keyed by their offer identifier.
+    mapping(bytes32 offerId => SubscriptionOffer offer)
+        private _subscriptionOffers;
+
+    /// @dev Optional claim delegate keyed by holder address.
     mapping(address holder => address delegate) private _claimDelegates;
-    mapping(address bondToken => RedemptionState state) private _redemptionStates;
+
+    /// @dev Redemption accounting keyed by bond-token address.
+    mapping(address bondToken => RedemptionState state)
+        private _redemptionStates;
+
+    /// @dev Reserved storage gap for future upgrades.
     uint256[43] private __gap;
 
+    /// @dev Locks the implementation contract and forces use through a proxy.
     constructor() {
         _disableInitializers();
     }
@@ -143,7 +213,10 @@ contract BondIssuance is
     }
 
     /// @inheritdoc IBondIssuance
-    function createSubscription(SubscriptionTerms calldata terms) external returns (bytes32 offerId) {
+    /// @dev Creates one issuer-owned subscription window after validating token policy and issuer role.
+    function createSubscription(
+        SubscriptionTerms calldata terms
+    ) external returns (bytes32 offerId) {
         _requireDomainActive(PauseDomain.SUBSCRIPTION);
         _requireIssuanceTokenEnabled(terms.settlementToken);
 
@@ -180,7 +253,11 @@ contract BondIssuance is
     }
 
     /// @inheritdoc IBondIssuance
-    function updateSubscription(bytes32 offerId, SubscriptionTerms calldata terms) external {
+    /// @dev Updates the mutable terms of one active subscription owned by the caller.
+    function updateSubscription(
+        bytes32 offerId,
+        SubscriptionTerms calldata terms
+    ) external {
         SubscriptionOffer storage offer = _subscriptionOffers[offerId];
         if (offer.status != SubscriptionStatus.ACTIVE) {
             revert SubscriptionNotActive(offerId);
@@ -209,6 +286,7 @@ contract BondIssuance is
     }
 
     /// @inheritdoc IBondIssuance
+    /// @dev Closes one subscription so no further bond units can be sold through it.
     function closeSubscription(bytes32 offerId) external {
         SubscriptionOffer storage offer = _subscriptionOffers[offerId];
         if (offer.issuer != msg.sender) {
@@ -219,6 +297,7 @@ contract BondIssuance is
     }
 
     /// @inheritdoc IBondIssuance
+    /// @dev Pulls settlement tokens from a market maker, forwards them to the issuer, and mints bonds.
     function subscribe(bytes32 offerId, uint256 units) external nonReentrant {
         _requireDomainActive(PauseDomain.SUBSCRIPTION);
 
@@ -227,14 +306,19 @@ contract BondIssuance is
             revert SubscriptionNotActive(offerId);
         }
 
-        if (block.timestamp < offer.opensAt || (offer.closesAt != 0 && block.timestamp > offer.closesAt)) {
+        if (
+            block.timestamp < offer.opensAt ||
+            (offer.closesAt != 0 && block.timestamp > offer.closesAt)
+        ) {
             revert SubscriptionWindowClosed(offerId, block.timestamp);
         }
 
         _requireIssuanceTokenEnabled(offer.settlementToken);
 
         IBondToken bondToken = IBondToken(offer.bondToken);
-        IComplianceModule complianceModule = IComplianceModule(bondToken.complianceModule());
+        IComplianceModule complianceModule = IComplianceModule(
+            bondToken.complianceModule()
+        );
         _requireMaker(complianceModule, msg.sender);
 
         uint256 remainingUnits = offer.maxUnits - offer.soldUnits;
@@ -243,20 +327,38 @@ contract BondIssuance is
         }
 
         uint8 bondDecimals = IERC20Metadata(offer.bondToken).decimals();
-        uint256 cost = _quoteSubscriptionCost(units, offer.unitPrice, bondDecimals);
+        uint256 cost = _quoteSubscriptionCost(
+            units,
+            offer.unitPrice,
+            bondDecimals
+        );
 
+        // Update sold units before any external token interaction.
         offer.soldUnits += units;
         if (offer.soldUnits == offer.maxUnits) {
             offer.status = SubscriptionStatus.CLOSED;
         }
 
-        IERC20(offer.settlementToken).safeTransferFrom(msg.sender, bondToken.issuer(), cost);
+        // Funds move directly to the issuer while newly issued bonds go to the subscriber.
+        IERC20(offer.settlementToken).safeTransferFrom(
+            msg.sender,
+            bondToken.issuer(),
+            cost
+        );
         bondToken.mint(msg.sender, units);
 
-        emit Subscribed(offerId, offer.bondToken, msg.sender, offer.settlementToken, units, cost);
+        emit Subscribed(
+            offerId,
+            offer.bondToken,
+            msg.sender,
+            offer.settlementToken,
+            units,
+            cost
+        );
     }
 
     /// @inheritdoc IBondIssuance
+    /// @dev Updates the allowed lifecycle usage flags for one settlement token.
     function setSettlementTokenPolicy(
         address token,
         bool enabledForIssuance,
@@ -274,12 +376,20 @@ contract BondIssuance is
         });
 
         emit SettlementTokenPolicyUpdated(
-            token, enabledForIssuance, enabledForSettlement, enabledForRedemption, msg.sender
+            token,
+            enabledForIssuance,
+            enabledForSettlement,
+            enabledForRedemption,
+            msg.sender
         );
     }
 
     /// @inheritdoc IBondIssuance
-    function depositRedemption(address bondTokenAddress, uint256 amount) external nonReentrant {
+    /// @dev Pulls redemption funds from the issuer and records cumulative funding.
+    function depositRedemption(
+        address bondTokenAddress,
+        uint256 amount
+    ) external nonReentrant {
         _requireDomainActive(PauseDomain.REDEMPTION_FUNDING);
 
         IBondToken bondToken = IBondToken(bondTokenAddress);
@@ -290,36 +400,57 @@ contract BondIssuance is
         state.fundedAmount += amount;
         state.lastFundingAt = block.timestamp;
 
-        IERC20(bondToken.settlementToken()).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(bondToken.settlementToken()).safeTransferFrom(
+            msg.sender,
+            address(this),
+            amount
+        );
 
         emit RedemptionDeposited(
-            bondTokenAddress, msg.sender, bondToken.settlementToken(), amount, state.fundedAmount
+            bondTokenAddress,
+            msg.sender,
+            bondToken.settlementToken(),
+            amount,
+            state.fundedAmount
         );
     }
 
     /// @inheritdoc IBondIssuance
+    /// @dev Claims matured redemption for the caller and pays the caller directly.
     function claim(address bondTokenAddress) external nonReentrant {
         _claimFor(bondTokenAddress, msg.sender, msg.sender);
     }
 
     /// @inheritdoc IBondIssuance
-    function claimFor(address bondTokenAddress, address holder) external nonReentrant {
+    /// @dev Claims matured redemption on behalf of one holder while always paying the holder.
+    function claimFor(
+        address bondTokenAddress,
+        address holder
+    ) external nonReentrant {
         _claimFor(bondTokenAddress, holder, msg.sender);
     }
 
     /// @inheritdoc IBondIssuance
+    /// @dev Sets or clears the delegate allowed to trigger claims for the caller.
     function setClaimDelegate(address delegate) external {
         _claimDelegates[msg.sender] = delegate;
         emit ClaimDelegateSet(msg.sender, delegate, msg.sender);
     }
 
     /// @inheritdoc IBondIssuance
-    function pauseDomain(PauseDomain domain, bool paused) external onlyRole(PAUSER_ROLE) {
+    /// @dev Toggles one issuance-controlled pause domain.
+    function pauseDomain(
+        PauseDomain domain,
+        bool paused
+    ) external onlyRole(PAUSER_ROLE) {
         _setDomainPaused(domain, paused);
     }
 
     /// @inheritdoc IBondIssuance
-    function getSubscription(bytes32 offerId)
+    /// @dev Returns the stored subscription terms and current fill status for one offer.
+    function getSubscription(
+        bytes32 offerId
+    )
         external
         view
         returns (
@@ -347,42 +478,54 @@ contract BondIssuance is
     }
 
     /// @inheritdoc IBondIssuance
+    /// @dev Returns the configured delegate that may trigger claims for one holder.
     function getClaimDelegate(address holder) external view returns (address) {
         return _claimDelegates[holder];
     }
 
     /// @inheritdoc IBondIssuance
-    function getRedemptionState(address bondToken)
+    /// @dev Returns cumulative redemption funding and payout state for one bond token.
+    function getRedemptionState(
+        address bondToken
+    )
         external
         view
-        returns (uint256 fundedAmount, uint256 claimedAmount, uint256 lastFundingAt)
+        returns (
+            uint256 fundedAmount,
+            uint256 claimedAmount,
+            uint256 lastFundingAt
+        )
     {
         RedemptionState memory state = _redemptionStates[bondToken];
         return (state.fundedAmount, state.claimedAmount, state.lastFundingAt);
     }
 
     /// @inheritdoc IBondIssuance
-    function isDomainPaused(PauseDomain domain)
-        public
-        view
-        override(DomainPausable, IBondIssuance)
-        returns (bool)
-    {
+    /// @dev Exposes the inherited pause state for off-chain monitoring and interface compliance.
+    function isDomainPaused(
+        PauseDomain domain
+    ) public view override(DomainPausable, IBondIssuance) returns (bool) {
         return super.isDomainPaused(domain);
     }
 
     /// @inheritdoc IBondIssuance
-    function isSettlementTokenEnabled(address token) public view returns (bool) {
+    /// @dev Returns true when the token is enabled for at least one lifecycle phase.
+    function isSettlementTokenEnabled(
+        address token
+    ) public view returns (bool) {
         SettlementTokenPolicy memory policy = _settlementTokenPolicies[token];
-        return policy.issuanceEnabled || policy.settlementEnabled || policy.redemptionEnabled;
+        return
+            policy.issuanceEnabled ||
+            policy.settlementEnabled ||
+            policy.redemptionEnabled;
     }
 
     /// @dev Shared quote-cost helper used by tests and the subscription flow.
-    function _quoteSubscriptionCost(uint256 units, uint256 unitPrice, uint8 bondDecimals)
-        internal
-        pure
-        returns (uint256)
-    {
+    function _quoteSubscriptionCost(
+        uint256 units,
+        uint256 unitPrice,
+        uint8 bondDecimals
+    ) internal pure returns (uint256) {
         return Math.mulDiv(unitPrice, units, 10 ** uint256(bondDecimals));
     }
 
@@ -393,25 +536,37 @@ contract BondIssuance is
         uint256 couponRateBps,
         uint8 bondDecimals
     ) internal pure returns (uint256) {
-        uint256 principal = Math.mulDiv(bondAmount, faceValue, 10 ** uint256(bondDecimals));
+        uint256 principal = Math.mulDiv(
+            bondAmount,
+            faceValue,
+            10 ** uint256(bondDecimals)
+        );
         uint256 interest = Math.mulDiv(principal, couponRateBps, 10_000);
         return principal + interest;
     }
 
+    /// @dev Reverts when a token is not enabled for subscription creation and fills.
     function _requireIssuanceTokenEnabled(address token) internal view {
         if (!_settlementTokenPolicies[token].issuanceEnabled) {
             revert UnsupportedSettlementToken(token);
         }
     }
 
+    /// @dev Reverts when a token is not enabled for redemption funding and payout.
     function _requireRedemptionTokenEnabled(address token) internal view {
         if (!_settlementTokenPolicies[token].redemptionEnabled) {
             revert UnsupportedSettlementToken(token);
         }
     }
 
-    function _requireIssuer(IBondToken bondToken, address account) internal view {
-        IComplianceModule complianceModule = IComplianceModule(bondToken.complianceModule());
+    /// @dev Reverts unless the account is both whitelisted and registered as the bond issuer.
+    function _requireIssuer(
+        IBondToken bondToken,
+        address account
+    ) internal view {
+        IComplianceModule complianceModule = IComplianceModule(
+            bondToken.complianceModule()
+        );
         if (!complianceModule.isWhitelisted(account)) {
             revert NotWhitelisted(account);
         }
@@ -422,27 +577,48 @@ contract BondIssuance is
         }
     }
 
-    function _requireMaker(IComplianceModule complianceModule, address account) internal view {
+    /// @dev Reverts unless the account is whitelisted and registered as a market maker.
+    function _requireMaker(
+        IComplianceModule complianceModule,
+        address account
+    ) internal view {
         if (!complianceModule.isWhitelisted(account)) {
             revert NotWhitelisted(account);
         }
 
         Role actualRole = complianceModule.roleOf(account);
         if (actualRole != Role.MARKET_MAKER) {
-            revert InvalidParticipantRole(account, Role.MARKET_MAKER, actualRole);
+            revert InvalidParticipantRole(
+                account,
+                Role.MARKET_MAKER,
+                actualRole
+            );
         }
     }
 
-    function _claimFor(address bondTokenAddress, address holder, address caller) internal {
+    /// @dev Shared redemption path used by direct and delegated claims.
+    function _claimFor(
+        address bondTokenAddress,
+        address holder,
+        address caller
+    ) internal {
         _requireDomainActive(PauseDomain.CLAIMS);
 
         if (caller != holder && caller != _claimDelegates[holder]) {
-            revert UnauthorizedClaimCaller(caller, holder, _claimDelegates[holder]);
+            revert UnauthorizedClaimCaller(
+                caller,
+                holder,
+                _claimDelegates[holder]
+            );
         }
 
         IBondToken bondToken = IBondToken(bondTokenAddress);
         if (block.timestamp <= bondToken.maturityTimestamp()) {
-            revert BondNotMatured(bondTokenAddress, bondToken.maturityTimestamp(), block.timestamp);
+            revert BondNotMatured(
+                bondTokenAddress,
+                bondToken.maturityTimestamp(),
+                block.timestamp
+            );
         }
 
         _requireRedemptionTokenEnabled(bondToken.settlementToken());
@@ -453,25 +629,43 @@ contract BondIssuance is
         }
 
         uint8 bondDecimals = IERC20Metadata(bondTokenAddress).decimals();
-        uint256 payout =
-            _quoteRedemptionPayout(bondAmount, bondToken.faceValue(), bondToken.couponRateBps(), bondDecimals);
+        uint256 payout = _quoteRedemptionPayout(
+            bondAmount,
+            bondToken.faceValue(),
+            bondToken.couponRateBps(),
+            bondDecimals
+        );
 
         RedemptionState storage state = _redemptionStates[bondTokenAddress];
         uint256 availableAmount = state.fundedAmount - state.claimedAmount;
         if (availableAmount < payout) {
-            revert InsufficientRedemptionFunding(bondTokenAddress, availableAmount, payout);
+            revert InsufficientRedemptionFunding(
+                bondTokenAddress,
+                availableAmount,
+                payout
+            );
         }
 
+        // Burn first, then transfer payout so the holder cannot re-use the same bond balance.
         state.claimedAmount += payout;
         bondToken.burn(holder, bondAmount);
         IERC20(bondToken.settlementToken()).safeTransfer(holder, payout);
 
-        emit RedemptionClaimed(bondTokenAddress, holder, caller, bondAmount, payout);
+        emit RedemptionClaimed(
+            bondTokenAddress,
+            holder,
+            caller,
+            bondAmount,
+            payout
+        );
     }
 
     /// @dev Restricts UUPS upgrades to the configured upgrader role.
-    function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(UPGRADER_ROLE) {}
 
+    /// @dev Minimal reentrancy guard for subscription and redemption state transitions.
     modifier nonReentrant() {
         require(_reentrancyStatus != 2, "REENTRANT_CALL");
         _reentrancyStatus = 2;

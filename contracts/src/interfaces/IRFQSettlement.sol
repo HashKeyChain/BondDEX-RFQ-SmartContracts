@@ -3,6 +3,8 @@ pragma solidity ^0.8.28;
 
 import {FeeConfig, Order, PauseDomain} from "../types/BondTypes.sol";
 
+/// @title IRFQSettlement
+/// @notice Interface for signed RFQ order execution, cancellation, nonce management, and fee policy.
 interface IRFQSettlement {
     /// @dev Executes one final signed order.
     /// @param order Final EIP-712 order payload.
@@ -12,7 +14,10 @@ interface IRFQSettlement {
     /// @dev Executes multiple final signed orders atomically.
     /// @param orders Final EIP-712 order payloads.
     /// @param signatures Maker signatures aligned by index.
-    function batchFillOrders(Order[] calldata orders, bytes[] calldata signatures) external;
+    function batchFillOrders(
+        Order[] calldata orders,
+        bytes[] calldata signatures
+    ) external;
 
     /// @dev Cancels one signed order by hashable payload.
     /// @param order Final EIP-712 order payload.
@@ -65,7 +70,9 @@ interface IRFQSettlement {
     /// @dev Returns whether one settlement token is enabled.
     /// @param token Settlement token address.
     /// @return enabled True when the token is enabled.
-    function isSettlementTokenEnabled(address token) external view returns (bool);
+    function isSettlementTokenEnabled(
+        address token
+    ) external view returns (bool);
 
     /// @dev Returns whether one domain is paused.
     /// @param domain Domain to inspect.

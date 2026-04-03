@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+/// @title IBondToken
+/// @notice Interface for immutable bond tokens with controller-gated mint/burn and compliance checks.
 interface IBondToken {
     /// @dev Mints bond units to one account from the authorized issuance controller.
     /// @param to Recipient address.
@@ -45,16 +47,16 @@ interface IBondToken {
     /// @param to Receiver address.
     /// @param amount Transfer amount in smallest bond units.
     /// @return restrictionCode Numeric restriction code where zero means success.
-    function detectTransferRestriction(address from, address to, uint256 amount)
-        external
-        view
-        returns (uint8);
+    function detectTransferRestriction(
+        address from,
+        address to,
+        uint256 amount
+    ) external view returns (uint8);
 
     /// @dev Returns the stable human-readable message for one restriction code.
     /// @param restrictionCode Numeric restriction code.
     /// @return message Restriction message string.
-    function messageForTransferRestriction(uint8 restrictionCode)
-        external
-        pure
-        returns (string memory);
+    function messageForTransferRestriction(
+        uint8 restrictionCode
+    ) external pure returns (string memory);
 }

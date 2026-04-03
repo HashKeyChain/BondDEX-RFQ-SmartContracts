@@ -3,16 +3,23 @@ pragma solidity ^0.8.28;
 
 import {PauseDomain, SubscriptionTerms} from "../types/BondTypes.sol";
 
+/// @title IBondIssuance
+/// @notice Interface for primary-market subscription management and post-maturity redemption flows.
 interface IBondIssuance {
     /// @dev Creates one issuer-controlled subscription offer.
     /// @param terms Subscription configuration payload.
     /// @return offerId Created subscription offer identifier.
-    function createSubscription(SubscriptionTerms calldata terms) external returns (bytes32 offerId);
+    function createSubscription(
+        SubscriptionTerms calldata terms
+    ) external returns (bytes32 offerId);
 
     /// @dev Updates one active subscription offer.
     /// @param offerId Subscription offer identifier.
     /// @param terms Updated subscription configuration payload.
-    function updateSubscription(bytes32 offerId, SubscriptionTerms calldata terms) external;
+    function updateSubscription(
+        bytes32 offerId,
+        SubscriptionTerms calldata terms
+    ) external;
 
     /// @dev Closes one subscription offer so it cannot accept further fills.
     /// @param offerId Subscription offer identifier.
@@ -68,7 +75,9 @@ interface IBondIssuance {
     /// @return opensAt Opening timestamp.
     /// @return closesAt Closing timestamp.
     /// @return status Offer status enum value.
-    function getSubscription(bytes32 offerId)
+    function getSubscription(
+        bytes32 offerId
+    )
         external
         view
         returns (
@@ -92,15 +101,23 @@ interface IBondIssuance {
     /// @return fundedAmount Total deposited amount.
     /// @return claimedAmount Total claimed amount.
     /// @return lastFundingAt Latest deposit timestamp.
-    function getRedemptionState(address bondToken)
+    function getRedemptionState(
+        address bondToken
+    )
         external
         view
-        returns (uint256 fundedAmount, uint256 claimedAmount, uint256 lastFundingAt);
+        returns (
+            uint256 fundedAmount,
+            uint256 claimedAmount,
+            uint256 lastFundingAt
+        );
 
     /// @dev Returns whether one token is enabled in any issuance-controlled flow.
     /// @param token Settlement token address.
     /// @return enabled True when the token is enabled for at least one flow.
-    function isSettlementTokenEnabled(address token) external view returns (bool);
+    function isSettlementTokenEnabled(
+        address token
+    ) external view returns (bool);
 
     /// @dev Returns whether one domain is paused.
     /// @param domain Domain to inspect.
