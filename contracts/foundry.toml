@@ -11,6 +11,7 @@ optimizer_runs = 200
 ffi = true
 fs_permissions = [
   { access = "read", path = "out" },
+  { access = "read", path = "../config" },
   { access = "read-write", path = "../abi-export" },
   { access = "read-write", path = "../deployments" }
 ]

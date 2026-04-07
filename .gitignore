@@ -24,3 +24,5 @@ deployments/*.local.json
 
 .cursor/
 .specify/
+docs/
+specs/

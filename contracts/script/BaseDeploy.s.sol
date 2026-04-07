@@ -28,77 +28,85 @@ abstract contract BaseDeploy is BaseConfig {
         }
     }
 
-    function _deploymentFile(uint256 chainId) internal pure returns (string memory) {
-        return string.concat(DEPLOYMENTS_ROOT, "/", chainId.toString(), ".json");
+    function _deploymentFile(
+        uint256 chainId
+    ) internal pure returns (string memory) {
+        return
+            string.concat(DEPLOYMENTS_ROOT, "/", chainId.toString(), ".json");
     }
 
-    function _defaultRecord(address safeAdmin) internal view returns (DeploymentRecord memory) {
-        return DeploymentRecord({
-            chainId: block.chainid,
-            bondFactory: address(0),
-            bondIssuance: address(0),
-            rfqSettlement: address(0),
-            complianceImplementation: address(0),
-            bondIssuanceImplementation: address(0),
-            rfqSettlementImplementation: address(0),
-            settlementToken: address(0),
-            deployer: address(0),
-            safeAdmin: safeAdmin
-        });
+    function _defaultRecord(
+        address safeAdmin
+    ) internal view returns (DeploymentRecord memory) {
+        return
+            DeploymentRecord({
+                chainId: block.chainid,
+                bondFactory: address(0),
+                bondIssuance: address(0),
+                rfqSettlement: address(0),
+                complianceImplementation: address(0),
+                bondIssuanceImplementation: address(0),
+                rfqSettlementImplementation: address(0),
+                settlementToken: address(0),
+                deployer: address(0),
+                safeAdmin: safeAdmin
+            });
     }
 
-    function _addressOrNull(address account) internal pure returns (string memory) {
+    function _addressOrNull(
+        address account
+    ) internal pure returns (string memory) {
         if (account == address(0)) {
             return "null";
         }
 
-        return string.concat("\"", vm.toString(account), "\"");
+        return string.concat('"', vm.toString(account), '"');
     }
 
     function _writeDeploymentRecord(DeploymentRecord memory record) internal {
         string memory json = string.concat(
             "{\n",
-            "  \"version\": \"",
+            '  "version": "',
             RELEASE_VERSION,
-            "\",\n",
-            "  \"chainId\": ",
+            '",\n',
+            '  "chainId": ',
             record.chainId.toString(),
             ",\n",
-            "  \"network\": \"",
+            '  "network": "',
             _networkLabel(record.chainId),
-            "\",\n",
-            "  \"deployer\": ",
+            '",\n',
+            '  "deployer": ',
             _addressOrNull(record.deployer),
             ",\n",
-            "  \"safeAdmin\": ",
+            '  "safeAdmin": ',
             _addressOrNull(record.safeAdmin),
             ",\n",
-            "  \"settlementToken\": ",
+            '  "settlementToken": ',
             _addressOrNull(record.settlementToken),
             ",\n",
-            "  \"contracts\": {\n",
-            "    \"complianceImplementation\": ",
+            '  "contracts": {\n',
+            '    "complianceImplementation": ',
             _addressOrNull(record.complianceImplementation),
             ",\n",
-            "    \"bondIssuanceImplementation\": ",
+            '    "bondIssuanceImplementation": ',
             _addressOrNull(record.bondIssuanceImplementation),
             ",\n",
-            "    \"bondIssuance\": ",
+            '    "bondIssuance": ',
             _addressOrNull(record.bondIssuance),
             ",\n",
-            "    \"rfqSettlementImplementation\": ",
+            '    "rfqSettlementImplementation": ',
             _addressOrNull(record.rfqSettlementImplementation),
             ",\n",
-            "    \"rfqSettlement\": ",
+            '    "rfqSettlement": ',
             _addressOrNull(record.rfqSettlement),
             ",\n",
-            "    \"bondFactory\": ",
+            '    "bondFactory": ',
             _addressOrNull(record.bondFactory),
             "\n",
             "  },\n",
-            "  \"handoff\": {\n",
-            "    \"status\": \"pending\",\n",
-            "    \"roleMatrixPath\": \"QUICKSTART.md\"\n",
+            '  "handoff": {\n',
+            '    "status": "pending",\n',
+            '    "roleMatrixPath": "QUICKSTART.md"\n',
             "  }\n",
             "}\n"
         );
