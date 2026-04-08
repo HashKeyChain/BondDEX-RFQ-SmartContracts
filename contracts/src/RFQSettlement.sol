@@ -28,6 +28,7 @@ import {
     InvalidOrderTaker,
     InvalidParticipantRole,
     InvalidSignature,
+    InvestorToInvestorRestricted,
     OrderAlreadyCancelled,
     OrderAlreadyConsumed,
     UnauthorizedOrderMaker,
@@ -369,7 +370,7 @@ contract RFQSettlement is
         _requireParticipantRoles(order, taker);
     }
 
-    /// @dev Requires the maker to be a whitelisted market maker and the taker to be a whitelisted investor.
+    /// @dev Requires both parties to be whitelisted with valid roles and blocks investor-to-investor trades.
     function _requireParticipantRoles(
         Order calldata order,
         address taker
@@ -382,8 +383,14 @@ contract RFQSettlement is
             revert NotWhitelisted(order.maker);
         }
 
+        if (!complianceModule.isWhitelisted(taker)) {
+            revert NotWhitelisted(taker);
+        }
+
         Role makerRole = complianceModule.roleOf(order.maker);
-        if (makerRole != Role.MARKET_MAKER) {
+        Role takerRole = complianceModule.roleOf(taker);
+
+        if (makerRole != Role.MARKET_MAKER && makerRole != Role.INVESTOR) {
             revert InvalidParticipantRole(
                 order.maker,
                 Role.MARKET_MAKER,
@@ -391,13 +398,16 @@ contract RFQSettlement is
             );
         }
 
-        if (!complianceModule.isWhitelisted(taker)) {
-            revert NotWhitelisted(taker);
+        if (takerRole != Role.MARKET_MAKER && takerRole != Role.INVESTOR) {
+            revert InvalidParticipantRole(
+                taker,
+                Role.INVESTOR,
+                takerRole
+            );
         }
 
-        Role takerRole = complianceModule.roleOf(taker);
-        if (takerRole != Role.INVESTOR) {
-            revert InvalidParticipantRole(taker, Role.INVESTOR, takerRole);
+        if (makerRole == Role.INVESTOR && takerRole == Role.INVESTOR) {
+            revert InvestorToInvestorRestricted(order.maker, taker);
         }
     }
 

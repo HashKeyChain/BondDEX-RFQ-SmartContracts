@@ -121,3 +121,6 @@ error UnauthorizedOrderMaker(address caller, address maker);
 
 /// @notice Thrown when fee configuration violates the configured basis-point bounds.
 error InvalidFeeConfig(uint256 currentFeeBps, uint256 maxFeeBps);
+
+/// @notice Thrown when both parties in a trade are investors.
+error InvestorToInvestorRestricted(address partyA, address partyB);

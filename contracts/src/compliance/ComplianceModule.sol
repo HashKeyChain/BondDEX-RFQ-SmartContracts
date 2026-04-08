@@ -296,11 +296,7 @@ contract ComplianceModule is
             return INVALID_RECEIVER_ROLE_CODE;
         }
 
-        bool validDirection = (fromRole == Role.MARKET_MAKER &&
-            toRole == Role.INVESTOR) ||
-            (fromRole == Role.INVESTOR && toRole == Role.MARKET_MAKER);
-
-        if (!validDirection) {
+        if (fromRole == Role.INVESTOR && toRole == Role.INVESTOR) {
             return INVALID_DIRECTION_CODE;
         }
 
