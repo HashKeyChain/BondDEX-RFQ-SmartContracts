@@ -13,7 +13,7 @@
 当前仓库的核心能力可以按 3 条主流程理解：
 
 - `US1 - Launch and Subscribe`：平台审批发行，发行人创建债券，配置合规模块，做市商或合格参与方完成一级认购
-- `US2 - RFQ Settlement`：做市商签名 EIP-712 订单，投资者按单成交，支持批量成交、订单取消、nonce 管理和手续费收取
+- `US2 - RFQ Settlement`：做市商或投资者签名 EIP-712 订单，对手方按单成交（禁止投资者对投资者），支持批量成交、订单取消、nonce 管理和手续费收取
 - `US3 - Redemption and Claims`：债券到期后由发行人注入赎回资金，持有人直接领取或通过代理人代领
 
 这 3 条主流程分别在 `contracts/test/integration/US1_LaunchAndSubscribe.t.sol`、`contracts/test/integration/US2_RfqSettlement.t.sol` 和 `contracts/test/integration/US3_RedemptionAndClaims.t.sol` 中有对应的集成测试覆盖，并由 `contracts/test/integration/BondLifecycleE2E.t.sol` 串成完整生命周期。
