@@ -1,5 +1,7 @@
 # Quickstart
 
+BondDEX RFQ 是面向 HashKey Chain 的合规债券协议，覆盖发行审批、一级认购、二级 RFQ 成交与到期赎回。详见 `README.md`。
+
 这份 quickstart 的目标是让你在最短路径内完成 4 件事：
 
 - 确认仓库能正常编译
@@ -64,9 +66,9 @@ make build
 分别验证 3 条主流程：
 
 ```bash
-make test-us1
-make test-us2
-make test-us3
+make test-us1   # 发行审批 + 一级认购
+make test-us2   # RFQ 二级成交、批量成交、手续费
+make test-us3   # 赎回注资 + 持有人兑付
 ```
 
 完整生命周期 E2E 测试：
@@ -75,7 +77,7 @@ make test-us3
 make test-e2e
 ```
 
-全量回归：
+全量回归（包含 unit / fuzz / invariant / integration / fork 共 70+ 用例）：
 
 ```bash
 make test
@@ -98,7 +100,7 @@ make deploy-anvil
 说明：
 
 - 自动从 `config/anvil.json` 读取全部配置（含 Anvil 默认私钥）
-- 自动部署 `Mock USDC`、`BondIssuance`、`RFQSettlement`、`BondFactory` 和 `ComplianceModule`
+- 自动部署 Mock USDC、`BondIssuance`（UUPS 代理）、`RFQSettlement`（UUPS 代理）、`BondFactory`，以及 `ComplianceModule` 实现模板（每只债券的合规模块实例由 `BondFactory.createBond` 在发行时按需创建）
 - 零环境变量，直接运行
 
 ## 4. 导出 ABI

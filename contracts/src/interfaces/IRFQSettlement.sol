@@ -78,4 +78,18 @@ interface IRFQSettlement {
     /// @param domain Domain to inspect.
     /// @return paused True when the domain is paused.
     function isDomainPaused(PauseDomain domain) external view returns (bool);
+
+    /// @dev Quotes the protocol fee for a trade between two parties on a given bond.
+    /// Returns 0 when both parties are market makers.
+    /// @param bondToken Bond token address used to resolve the compliance module.
+    /// @param partyA First participant address.
+    /// @param partyB Second participant address.
+    /// @param quoteAmount The payer's total input amount.
+    /// @return feeAmount Estimated fee deducted from quoteAmount.
+    function quoteFee(
+        address bondToken,
+        address partyA,
+        address partyB,
+        uint256 quoteAmount
+    ) external view returns (uint256 feeAmount);
 }

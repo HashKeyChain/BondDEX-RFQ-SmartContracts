@@ -13,7 +13,7 @@
 当前仓库的核心能力可以按 3 条主流程理解：
 
 - `US1 - Launch and Subscribe`：平台审批发行，发行人创建债券，配置合规模块，做市商或合格参与方完成一级认购
-- `US2 - RFQ Settlement`：做市商或投资者签名 EIP-712 订单，对手方按单成交（禁止投资者对投资者），支持批量成交、订单取消、nonce 管理和手续费收取
+- `US2 - RFQ Settlement`：做市商或投资者签名 EIP-712 订单，对手方按单成交，支持批量成交、订单取消、nonce 管理和手续费收取。交易方向限制为做市商↔投资者和做市商↔做市商，禁止投资者↔投资者。手续费始终由做市商侧承担，做市商之间交易免手续费
 - `US3 - Redemption and Claims`：债券到期后由发行人注入赎回资金，持有人直接领取或通过代理人代领
 
 这 3 条主流程分别在 `contracts/test/integration/US1_LaunchAndSubscribe.t.sol`、`contracts/test/integration/US2_RfqSettlement.t.sol` 和 `contracts/test/integration/US3_RedemptionAndClaims.t.sol` 中有对应的集成测试覆盖，并由 `contracts/test/integration/BondLifecycleE2E.t.sol` 串成完整生命周期。
@@ -24,17 +24,30 @@
 | --- | --- |
 | `BondFactory` | 负责发行审批、合规实现注册，以及创建 `BondToken` 和每只债对应的 `ComplianceModule` 实例 |
 | `BondToken` | 债券 ERC-20 资产本体，记录发行人、面值、票息、到期时间和结算币；转账限制委托给合规模块判断 |
-| `ComplianceModule` | 负责白名单、角色矩阵、策略元数据与暂停域控制，限制债券转账方向和参与方身份 |
+| `ComplianceModule` | 负责白名单、角色矩阵、策略元数据与暂停域控制，限制债券转账方向（禁止投资者↔投资者）和参与方身份 |
 | `BondIssuance` | 负责一级市场认购、认购窗口管理、赎回资金注入、直接领取与代理领取 |
-| `RFQSettlement` | 负责二级市场 RFQ 订单的签名校验、撮合成交、批量成交、取消、nonce floor 与手续费策略 |
+| `RFQSettlement` | 负责二级市场 RFQ 订单的签名校验、撮合成交、批量成交、取消、nonce floor、手续费策略与 `quoteFee` 查询 |
+
+## 手续费模型
+
+RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不受手续费影响：
+
+| 场景 | 资金流（以 30 bps 为例） |
+| --- | --- |
+| 做市商卖出债券 / 投资者买入 | 投资者付 10,000 USDC → 做市商收 9,970 → 平台收 30 |
+| 做市商买入债券 / 投资者卖出 | 做市商付 10,030 USDC → 投资者收 10,000 → 平台收 30 |
+| 做市商之间交易 | 做市商 B 付 10,000 USDC → 做市商 A 收 10,000 → 平台不收 |
+
+`quoteFee(bondToken, partyA, partyB, quoteAmount)` 提供链上手续费预估查询，做市商可在链下构造订单前调用。
 
 ## 协议特性
 
 - 目标链为 HashKey Chain，内置测试网 `133` 与主网 `177` 的部署配置
 - 关键控制平面采用 `AccessControl` + 角色治理，支持部署后向 Safe 交接权限
-- `BondIssuance`、`RFQSettlement` 与每债券实例级的 `ComplianceModule` 使用代理部署模式
+- `BondIssuance`、`RFQSettlement` 与每债券实例级的 `ComplianceModule` 使用 UUPS 代理部署模式
 - `BondToken` 将合规限制外部化到 `ComplianceModule`，便于按债券实例独立配置白名单与角色
 - 二级结算使用 EIP-712 typed data，对订单哈希、签名与 nonce 作严格校验
+- 手续费路由根据参与方角色自动判断，做市商之间免手续费
 - ABI 与事件接口采用 additive-first 的发布约定，方便前端、`abigen` 与 Subgraph 同步升级
 
 ## 仓库结构
@@ -43,12 +56,26 @@
 .
 ├── README.md
 ├── QUICKSTART.md
+├── Makefile
+├── config/
+│   ├── anvil.json      ← 本地 Anvil（已含默认私钥，无需修改）
+│   ├── testnet.json    ← 测试网（部署前需填入真实值）
+│   └── mainnet.json    ← 主网（部署前需填入真实值）
 ├── abi-export/
 │   ├── abi/                 # 导出的 ABI JSON
 │   ├── addresses/           # 链级地址清单
 │   └── metadata/            # 版本、事件接口、发布元数据
 ├── contracts/
 │   ├── src/                 # 核心合约
+│   │   ├── BondFactory.sol
+│   │   ├── BondToken.sol
+│   │   ├── BondIssuance.sol
+│   │   ├── RFQSettlement.sol
+│   │   ├── compliance/ComplianceModule.sol
+│   │   ├── abstracts/       # DomainPausable, RoleManaged
+│   │   ├── interfaces/      # IBondFactory, IBondToken, IBondIssuance, IComplianceModule, IRFQSettlement
+│   │   ├── libraries/       # BondErrors, BondMath, SettlementOrderEIP712
+│   │   └── types/BondTypes.sol
 │   ├── script/              # 部署、角色配置、Safe 交接、ABI 导出脚本
 │   ├── test/                # unit / fuzz / invariant / integration / fork
 │   ├── foundry.toml
@@ -61,17 +88,17 @@
 推荐按下面的顺序理解和使用仓库：
 
 1. 在 `contracts/` 中编译、运行单元测试和集成测试
-2. 使用 `DeployAnvil.s.sol` 在本地链验证部署路径
-3. 使用 `DeployTestnet.s.sol` 或 `DeployMainnet.s.sol` 写入 `deployments/<chainId>.json`
-4. 使用 `ConfigureRoles.s.sol` 给 Safe 配置角色并设置允许的结算币
-5. 使用 `HandoffToSafe.s.sol` 准备角色交接，必要时撤销部署者权限
-6. 使用 `ExportAbi.s.sol` 将 ABI 与发布元数据导出到 `abi-export/`
+2. 使用 `make deploy-anvil` 在本地链验证部署路径
+3. 使用 `make deploy-testnet` 或 `make deploy-mainnet` 写入 `deployments/<chainId>.json`
+4. 使用 `make configure-testnet` 给 Safe 配置角色并设置允许的结算币
+5. 使用 `make handoff-testnet` 准备角色交接，必要时撤销部署者权限
+6. 使用 `make export-abi` 将 ABI 与发布元数据导出到 `abi-export/`
 
 ## 测试分层
 
 仓库已经按 Foundry 常见分层组织测试：
 
-- `unit/`：聚焦单个模块行为，例如发行审批、订单填充、合规模块管理
+- `unit/`：聚焦单个模块行为，例如发行审批、订单填充、合规模块管理、手续费模型
 - `fuzz/`：聚焦数学与边界输入，例如认购与结算计价逻辑
 - `invariant/`：聚焦协议不变量，例如一级市场记账与 RFQ 结算状态一致性
 - `integration/`：按用户故事验证 `US1`、`US2`、`US3` 与完整生命周期

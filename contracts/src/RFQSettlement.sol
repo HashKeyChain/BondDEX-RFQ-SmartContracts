@@ -159,8 +159,12 @@ contract RFQSettlement is
     ) external nonReentrant {
         _requireDomainActive(PauseDomain.SETTLEMENT);
 
-        bytes32 orderHash = _validateOrder(order, signature, msg.sender);
-        _executeOrder(order, orderHash, msg.sender);
+        (bytes32 orderHash, Role makerRole, Role takerRole) = _validateOrder(
+            order,
+            signature,
+            msg.sender
+        );
+        _executeOrder(order, orderHash, msg.sender, makerRole, takerRole);
     }
 
     /// @inheritdoc IRFQSettlement
@@ -179,17 +183,27 @@ contract RFQSettlement is
             revert InvalidBatchSize(orders.length, MAX_BATCH_SIZE);
         }
 
-        bytes32[] memory orderHashes = new bytes32[](orders.length);
-        for (uint256 i = 0; i < orders.length; i++) {
-            orderHashes[i] = _validateOrder(
+        uint256 len = orders.length;
+        bytes32[] memory orderHashes = new bytes32[](len);
+        Role[] memory makerRoles = new Role[](len);
+        Role[] memory takerRoles = new Role[](len);
+
+        for (uint256 i = 0; i < len; i++) {
+            (orderHashes[i], makerRoles[i], takerRoles[i]) = _validateOrder(
                 orders[i],
                 signatures[i],
                 msg.sender
             );
         }
 
-        for (uint256 i = 0; i < orders.length; i++) {
-            _executeOrder(orders[i], orderHashes[i], msg.sender);
+        for (uint256 i = 0; i < len; i++) {
+            _executeOrder(
+                orders[i],
+                orderHashes[i],
+                msg.sender,
+                makerRoles[i],
+                takerRoles[i]
+            );
         }
     }
 
@@ -300,6 +314,27 @@ contract RFQSettlement is
     }
 
     /// @inheritdoc IRFQSettlement
+    /// @dev Quotes the protocol fee for a trade between two parties on a given bond.
+    /// Returns 0 when both parties are market makers (fee-exempt).
+    function quoteFee(
+        address bondToken,
+        address partyA,
+        address partyB,
+        uint256 quoteAmount
+    ) external view returns (uint256 feeAmount) {
+        IComplianceModule complianceModule = IComplianceModule(
+            IBondToken(bondToken).complianceModule()
+        );
+        Role roleA = complianceModule.roleOf(partyA);
+        Role roleB = complianceModule.roleOf(partyB);
+
+        if (roleA == Role.MARKET_MAKER && roleB == Role.MARKET_MAKER) {
+            return 0;
+        }
+        return _quoteFeeAmount(quoteAmount);
+    }
+
+    /// @inheritdoc IRFQSettlement
     /// @dev Exposes inherited pause state for interface compliance and monitoring.
     function isDomainPaused(
         PauseDomain domain
@@ -330,7 +365,11 @@ contract RFQSettlement is
         Order calldata order,
         bytes calldata signature,
         address taker
-    ) internal view returns (bytes32 orderHash) {
+    )
+        internal
+        view
+        returns (bytes32 orderHash, Role makerRole, Role takerRole)
+    {
         if (!isSettlementTokenEnabled(order.quoteToken)) {
             revert UnsupportedSettlementToken(order.quoteToken);
         }
@@ -367,14 +406,14 @@ contract RFQSettlement is
             revert InvalidSignature(order.maker, signer);
         }
 
-        _requireParticipantRoles(order, taker);
+        (makerRole, takerRole) = _requireParticipantRoles(order, taker);
     }
 
-    /// @dev Requires both parties to be whitelisted with valid roles and blocks investor-to-investor trades.
+    /// @dev Validates whitelist, roles, and direction. Returns roles for downstream fee logic.
     function _requireParticipantRoles(
         Order calldata order,
         address taker
-    ) internal view {
+    ) internal view returns (Role makerRole, Role takerRole) {
         IComplianceModule complianceModule = IComplianceModule(
             IBondToken(order.bondToken).complianceModule()
         );
@@ -387,8 +426,8 @@ contract RFQSettlement is
             revert NotWhitelisted(taker);
         }
 
-        Role makerRole = complianceModule.roleOf(order.maker);
-        Role takerRole = complianceModule.roleOf(taker);
+        makerRole = complianceModule.roleOf(order.maker);
+        takerRole = complianceModule.roleOf(taker);
 
         if (makerRole != Role.MARKET_MAKER && makerRole != Role.INVESTOR) {
             revert InvalidParticipantRole(
@@ -399,11 +438,7 @@ contract RFQSettlement is
         }
 
         if (takerRole != Role.MARKET_MAKER && takerRole != Role.INVESTOR) {
-            revert InvalidParticipantRole(
-                taker,
-                Role.INVESTOR,
-                takerRole
-            );
+            revert InvalidParticipantRole(taker, Role.INVESTOR, takerRole);
         }
 
         if (makerRole == Role.INVESTOR && takerRole == Role.INVESTOR) {
@@ -412,41 +447,71 @@ contract RFQSettlement is
     }
 
     /// @dev Executes token transfers for one validated order and emits the canonical fill event.
+    /// Fee is always charged to the market-maker side:
+    ///   - MM is quoteReceiver → MM receives quoteAmount - fee (deducted from income)
+    ///   - MM is quotePayer   → MM pays quoteAmount + fee (investor receives full quoteAmount)
+    ///   - MM ↔ MM            → fee exempt
     function _executeOrder(
         Order calldata order,
         bytes32 orderHash,
-        address taker
+        address taker,
+        Role makerRole,
+        Role takerRole
     ) internal {
         _consumedOrders[orderHash] = true;
 
-        uint256 feeAmount = _quoteFeeAmount(order.quoteAmount);
-        (
-            address quotePayer,
-            address quoteReceiver,
-            address bondPayer,
-            address bondReceiver
-        ) = _resolveSettlementParties(order, taker);
+        uint256 feeAmount = (makerRole == Role.MARKET_MAKER &&
+            takerRole == Role.MARKET_MAKER)
+            ? 0
+            : _quoteFeeAmount(order.quoteAmount);
 
-        // Quote tokens settle net of fees to the economic receiver.
-        IERC20(order.quoteToken).safeTransferFrom(
-            quotePayer,
-            quoteReceiver,
-            order.quoteAmount - feeAmount
-        );
-        if (feeAmount != 0) {
-            IERC20(order.quoteToken).safeTransferFrom(
-                quotePayer,
-                _feeConfig.feeRecipient,
-                feeAmount
+        {
+            (
+                address quotePayer,
+                address quoteReceiver,
+                address bondPayer,
+                address bondReceiver
+            ) = _resolveSettlementParties(order, taker);
+
+            // BUY: quoteReceiver = maker; SELL: quoteReceiver = taker.
+            // Fee deducted from quoteReceiver when quoteReceiver is MM;
+            // otherwise quoteReceiver (investor) gets full quoteAmount
+            // and quotePayer (MM) pays quoteAmount + fee.
+            if (
+                feeAmount == 0 ||
+                (
+                    order.side == OrderSide.BUY
+                        ? makerRole == Role.MARKET_MAKER
+                        : takerRole == Role.MARKET_MAKER
+                )
+            ) {
+                IERC20(order.quoteToken).safeTransferFrom(
+                    quotePayer,
+                    quoteReceiver,
+                    order.quoteAmount - feeAmount
+                );
+            } else {
+                IERC20(order.quoteToken).safeTransferFrom(
+                    quotePayer,
+                    quoteReceiver,
+                    order.quoteAmount
+                );
+            }
+
+            if (feeAmount != 0) {
+                IERC20(order.quoteToken).safeTransferFrom(
+                    quotePayer,
+                    _feeConfig.feeRecipient,
+                    feeAmount
+                );
+            }
+
+            IERC20(order.bondToken).safeTransferFrom(
+                bondPayer,
+                bondReceiver,
+                order.bondAmount
             );
         }
-
-        // Bond units move in the opposite direction of quote tokens.
-        IERC20(order.bondToken).safeTransferFrom(
-            bondPayer,
-            bondReceiver,
-            order.bondAmount
-        );
 
         emit OrderFilled(
             orderHash,
