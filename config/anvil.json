@@ -1,5 +1,41 @@
 {
   "rpcUrl": "http://127.0.0.1:8545",
-  "deployerPrivateKey": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-  "safeAdmin": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  "platformAdmin": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  "roles": {
+    "bondFactory": {
+      "admin": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "issuanceApprover": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "complianceAdmin": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "pauser": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+    },
+    "bondIssuance": {
+      "admin": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "settlementAdmin": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "pauser": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "upgrader": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+    },
+    "rfqSettlement": {
+      "admin": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "settlementAdmin": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "pauser": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "upgrader": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+    }
+  },
+  "settlementTokens": [
+    {
+      "token": "0x0000000000000000000000000000000000000000",
+      "bondIssuancePolicy": {
+        "issuanceEnabled": true,
+        "settlementEnabled": false,
+        "redemptionEnabled": true
+      },
+      "rfqSettlementEnabled": true
+    }
+  ],
+  "feeConfig": {
+    "feeRecipient": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "currentFeeBps": 30,
+    "maxFeeBps": 1000
+  },
+  "revokeDeployer": true
 }

@@ -6,7 +6,7 @@ BondDEX RFQ 是面向 HashKey Chain 的合规债券协议，覆盖发行审批�
 
 - 确认仓库能正常编译
 - 跑通 `US1 / US2 / US3` 三条核心业务主线
-- 在本地 Anvil 上验证部署脚本入口
+- 在本地 Anvil 上验证一站式部署脚本
 - 导出 ABI 产物给前端、后端或索引器消费
 
 ## 前置依赖
@@ -24,34 +24,100 @@ forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts OpenZeppe
 
 ## 配置文件说明
 
-所有配置集中在 `config/` 目录，**不需要设置任何环境变量**。
+角色地址与策略配置集中在 `config/` 目录；部署者私钥通过环境变量 `DEPLOYER_PRIVATE_KEY` 传入，**不存储在配置文件中**。每个角色、每条结算代币策略均可独立配置。
 
 ```
 config/
-├── anvil.json      ← 本地 Anvil（已含默认私钥，无需修改）
-├── testnet.json    ← 测试网（部署前需填入真实值）
-└── mainnet.json    ← 主网（部署前需填入真实值）
+├── anvil.json      ← 本地 Anvil（使用 Anvil 预置账户，token 零地址自动部署 MockERC20）
+├── testnet.json    ← 测试网（部署前必须填入全部真实值）
+└── mainnet.json    ← 主网（部署前必须填入全部真实值）
 ```
 
-配置文件格式（以 `testnet.json` 为例）：
+### 完整配置格式
 
 ```json
 {
   "rpcUrl": "https://testnet.hsk.xyz",
-  "deployerPrivateKey": "0x你的部署者私钥",
-  "safeAdmin": "0x你的Safe多签地址",
-  "settlementToken": "0x测试网USDC地址"
+
+  "platformAdmin": "0x新建ComplianceModule的初始管理员（通常为Safe多签）",
+
+  "roles": {
+    "bondFactory": {
+      "admin":            "0x工厂DEFAULT_ADMIN_ROLE持有者",
+      "issuanceApprover": "0x发行审批ISSUANCE_APPROVER_ROLE持有者",
+      "complianceAdmin":  "0x合规管理COMPLIANCE_ADMIN_ROLE持有者",
+      "pauser":           "0x暂停操作PAUSER_ROLE持有者"
+    },
+    "bondIssuance": {
+      "admin":            "0x一级市场DEFAULT_ADMIN_ROLE持有者",
+      "settlementAdmin":  "0x结算管理SETTLEMENT_ADMIN_ROLE持有者",
+      "pauser":           "0x暂停操作PAUSER_ROLE持有者",
+      "upgrader":         "0xUUPS升级UPGRADER_ROLE持有者"
+    },
+    "rfqSettlement": {
+      "admin":            "0x二级市场DEFAULT_ADMIN_ROLE持有者",
+      "settlementAdmin":  "0x结算管理SETTLEMENT_ADMIN_ROLE持有者",
+      "pauser":           "0x暂停操作PAUSER_ROLE持有者",
+      "upgrader":         "0xUUPS升级UPGRADER_ROLE持有者"
+    }
+  },
+
+  "settlementTokens": [
+    {
+      "token": "0x结算代币地址（如USDC）",
+      "bondIssuancePolicy": {
+        "issuanceEnabled": true,
+        "settlementEnabled": false,
+        "redemptionEnabled": true
+      },
+      "rfqSettlementEnabled": true
+    }
+  ],
+
+  "feeConfig": {
+    "feeRecipient": "0x手续费接收地址",
+    "currentFeeBps": 30,
+    "maxFeeBps": 1000
+  },
+
+  "revokeDeployer": true
 }
 ```
 
+### 配置项参考
+
 | 字段 | 说明 |
 | --- | --- |
-| `rpcUrl` | 该环境的 RPC 节点地址 |
-| `deployerPrivateKey` | 部署者私钥 |
-| `safeAdmin` | 接收治理权限的 Safe 多签地址 |
-| `settlementToken` | 结算代币地址（如 USDC），Anvil 环境会自动铸造 Mock |
+| `DEPLOYER_PRIVATE_KEY`（环境变量） | 部署者私钥，通过环境变量传入；testnet/mainnet 完成后可自动撤销全部角色 |
+| `platformAdmin` | 新建 ComplianceModule 代理的初始管理员，获得该模块的 DEFAULT_ADMIN / COMPLIANCE_ADMIN / PAUSER / UPGRADER |
+| **roles.bondFactory** | |
+| `.admin` | BondFactory 的 DEFAULT_ADMIN_ROLE — 可管理所有角色授予/撤销 |
+| `.issuanceApprover` | ISSUANCE_APPROVER_ROLE — 审批/撤销发行申请 |
+| `.complianceAdmin` | COMPLIANCE_ADMIN_ROLE — 注册/禁用合规实现模板 |
+| `.pauser` | PAUSER_ROLE — 暂停/恢复 Factory 域 |
+| **roles.bondIssuance** | |
+| `.admin` | BondIssuance 的 DEFAULT_ADMIN_ROLE — 管理所有角色 |
+| `.settlementAdmin` | SETTLEMENT_ADMIN_ROLE — 配置结算代币策略 |
+| `.pauser` | PAUSER_ROLE — 暂停/恢复认购、赎回等域 |
+| `.upgrader` | UPGRADER_ROLE — 执行 UUPS 代理升级 |
+| **roles.rfqSettlement** | |
+| `.admin` | RFQSettlement 的 DEFAULT_ADMIN_ROLE — 管理所有角色 |
+| `.settlementAdmin` | SETTLEMENT_ADMIN_ROLE — 配置结算代币策略 + 手续费 |
+| `.pauser` | PAUSER_ROLE — 暂停/恢复结算域 |
+| `.upgrader` | UPGRADER_ROLE — 执行 UUPS 代理升级 |
+| **settlementTokens[]** | 结算代币数组，支持多币种 |
+| `.token` | ERC20 代币地址（填 `0x0` 时自动部署 MockERC20，仅限本地测试） |
+| `.bondIssuancePolicy` | BondIssuance 三维策略：认购(issuance) / 结算(settlement) / 赎回(redemption) |
+| `.rfqSettlementEnabled` | RFQSettlement 该代币是否允许二级结算 |
+| **feeConfig** | |
+| `.feeRecipient` | RFQ 二级市场手续费接收地址 |
+| `.currentFeeBps` | 当前手续费率（基点，30 = 0.30%） |
+| `.maxFeeBps` | 手续费率上限（基点，1000 = 10%） |
+| `revokeDeployer` | 是否在配置完成后撤销 deployer 的全部角色（选择性撤销：已移交给他人的角色才撤销，deployer 仍持有的角色保留并输出警告） |
 
-> **安全提醒**：请勿将含有真实私钥的 `config/*.json` 提交到 Git 仓库。
+> **安全说明**：部署者私钥已从 config 文件中移除，仅通过 `DEPLOYER_PRIVATE_KEY` 环境变量传入，避免意外提交到 Git。
+>
+> **统一部署流程**：Anvil / Testnet / Mainnet 走完全相同的部署流水线，本地 Anvil 默认使用 Anvil 账户 #1 作为角色地址并启用 `revokeDeployer`，以真实测试权限移交流程。
 
 ## 1. 编译合约
 
@@ -59,49 +125,39 @@ config/
 make build
 ```
 
-成功后，构建产物会出现在 `contracts/out/`。
-
 ## 2. 跑最小验证路径
-
-分别验证 3 条主流程：
 
 ```bash
 make test-us1   # 发行审批 + 一级认购
 make test-us2   # RFQ 二级成交、批量成交、手续费
 make test-us3   # 赎回注资 + 持有人兑付
+make test-e2e   # 完整生命周期 E2E
+make test        # 全量回归（98 用例）
 ```
 
-完整生命周期 E2E 测试：
+## 3. 在本地 Anvil 上验证一站式部署
 
 ```bash
-make test-e2e
-```
-
-全量回归（包含 unit / fuzz / invariant / integration / fork 共 70+ 用例）：
-
-```bash
-make test
-```
-
-## 3. 在本地 Anvil 上验证部署脚本
-
-先在一个终端启动本地链：
-
-```bash
+# 终端 1：启动本地链
 anvil
+
+# 终端 2：一站式部署（Anvil 默认私钥）
+DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 make deploy-anvil
 ```
 
-再在另一个终端执行本地部署：
+**一条命令自动完成**（Anvil / Testnet / Mainnet 执行相同流水线）：
 
-```bash
-make deploy-anvil
-```
+1. 部署 MockERC20（token 为零地址时，仅本地测试触发）
+2. 校验配置（所有角色、代币、手续费地址必须非零）
+3. 部署 ComplianceModule 实现 → BondIssuance 代理 → RFQSettlement 代理 → BondFactory
+4. 注册 ComplianceModule 实现模板
+5. 配置全部结算代币策略
+6. 配置 RFQ 手续费
+7. 设置 platformAdmin
+8. 逐角色授权（每个合约的每个角色独立授予配置的地址）
+9. 选择性撤销 deployer 角色（`revokeDeployer=true` 时，已移交给他人的角色自动 renounce）
 
-说明：
-
-- 自动从 `config/anvil.json` 读取全部配置（含 Anvil 默认私钥）
-- 自动部署 Mock USDC、`BondIssuance`（UUPS 代理）、`RFQSettlement`（UUPS 代理）、`BondFactory`，以及 `ComplianceModule` 实现模板（每只债券的合规模块实例由 `BondFactory.createBond` 在发行时按需创建）
-- 零环境变量，直接运行
+部署完成后，完整清单写入 `deployments/{chainId}.json`。
 
 ## 4. 导出 ABI
 
@@ -109,86 +165,86 @@ make deploy-anvil
 make export-abi
 ```
 
-产物位于 `abi-export/` 目录：
+产物：`abi-export/abi/*.abi.json` + `abi-export/metadata/metadata.json`
 
-- `abi-export/abi/*.abi.json`
-- `abi-export/metadata/metadata.json`
+## 5. 推进到测试网
 
-## 5. 需要时再跑 fork 测试
+### 5.1 编辑 `config/testnet.json`
 
-```bash
-cd contracts
-export HSK_TESTNET_RPC_URL=https://testnet.hsk.xyz
-export HSK_TESTNET_FORK_BLOCK=123456
-forge test --match-contract RFQSettlementDomainForkTest
-forge test --match-contract DeploymentAndSafeHandoffForkTest
-```
-
-如果没有设置 `HSK_TESTNET_RPC_URL`，这两类 fork 测试会直接返回，不会真正建 fork。
-
-## 6. 推进到测试网部署
-
-### 6.1 编辑配置文件
-
-在 `config/testnet.json` 中填入所有真实值：
+填入所有真实地址（每个角色可以指向不同的 Safe 多签）：
 
 ```json
 {
   "rpcUrl": "https://testnet.hsk.xyz",
-  "deployerPrivateKey": "0x你的私钥",
-  "safeAdmin": "0x你的Safe地址",
-  "settlementToken": "0x测试网USDC地址"
+  "platformAdmin": "0xSafe地址A",
+  "roles": {
+    "bondFactory": {
+      "admin":            "0xSafe地址A",
+      "issuanceApprover": "0xSafe地址A",
+      "complianceAdmin":  "0xSafe地址A",
+      "pauser":           "0xSafe地址B（运维团队）"
+    },
+    "bondIssuance": {
+      "admin":            "0xSafe地址A",
+      "settlementAdmin":  "0xSafe地址A",
+      "pauser":           "0xSafe地址B",
+      "upgrader":         "0xSafe地址C（技术团队）"
+    },
+    "rfqSettlement": {
+      "admin":            "0xSafe地址A",
+      "settlementAdmin":  "0xSafe地址A",
+      "pauser":           "0xSafe地址B",
+      "upgrader":         "0xSafe地址C"
+    }
+  },
+  "settlementTokens": [
+    {
+      "token": "0x测试网USDC",
+      "bondIssuancePolicy": {
+        "issuanceEnabled": true,
+        "settlementEnabled": false,
+        "redemptionEnabled": true
+      },
+      "rfqSettlementEnabled": true
+    }
+  ],
+  "feeConfig": {
+    "feeRecipient": "0x国库Safe",
+    "currentFeeBps": 30,
+    "maxFeeBps": 1000
+  },
+  "revokeDeployer": true
 }
 ```
 
-### 6.2 部署
+### 5.2 一站式部署
 
 ```bash
-make deploy-testnet
+DEPLOYER_PRIVATE_KEY=0x你的私钥 make deploy-testnet
 ```
 
-成功后会自动更新 `deployments/133.json`。
+成功后自动更新 `deployments/133.json`（含完整合约地址、配置参数、角色矩阵、移交状态）。
 
-### 6.3 配置角色
+## 6. 主网部署
 
-```bash
-make configure-testnet
-```
+编辑 `config/mainnet.json` → `DEPLOYER_PRIVATE_KEY=0x... make deploy-mainnet` → 输出 `deployments/177.json`。
 
-### 6.4 完整移交（可选）
+## 部署输出文件说明
 
-如果要一步完成角色配置 + deployer 权限放弃：
+`deployments/{chainId}.json` 包含：
 
-```bash
-make handoff-testnet
-```
+| 字段 | 说明 |
+| --- | --- |
+| `deployer` / `platformAdmin` | 关键账户地址 |
+| `contracts` | 所有合约地址（代理 + 实现） |
+| `configuration.settlementTokens[]` | 每条代币的完整策略 |
+| `configuration.feeConfig` | 手续费率和接收地址 |
+| `roles.bondFactory` | BondFactory 每个角色的持有者 |
+| `roles.bondIssuance` | BondIssuance 每个角色的持有者 |
+| `roles.rfqSettlement` | RFQSettlement 每个角色的持有者 |
+| `handoff` | deployer 角色撤销状态 |
 
-## 7. 主网部署
-
-### 7.1 编辑配置文件
-
-在 `config/mainnet.json` 中填入所有真实值：
-
-```json
-{
-  "rpcUrl": "https://mainnet.hsk.xyz",
-  "deployerPrivateKey": "0x你的私钥",
-  "safeAdmin": "0x你的主网Safe地址",
-  "settlementToken": "0x主网USDC地址"
-}
-```
-
-### 7.2 部署 → 配置 → 移交
-
-```bash
-make deploy-mainnet
-make configure-mainnet
-make handoff-mainnet
-```
-
-成功后会自动更新 `deployments/177.json`。
-
-## 命令速查表
+## 命令速查
 
 | 命令 | 说明 |
 | --- | --- |
@@ -196,26 +252,7 @@ make handoff-mainnet
 | `make test` | 全量测试 |
 | `make test-us1` / `test-us2` / `test-us3` | 单条主线测试 |
 | `make test-e2e` | E2E 生命周期测试 |
-| `make deploy-anvil` | 本地 Anvil 部署 |
-| `make deploy-testnet` | 测试网部署 |
-| `make deploy-mainnet` | 主网部署 |
-| `make configure-testnet` / `configure-mainnet` | 授予 Safe 角色 + 配置结算代币 |
-| `make handoff-testnet` / `handoff-mainnet` | 配置 + deployer 放弃全部权限 |
+| `DEPLOYER_PRIVATE_KEY=0x... make deploy-anvil` | 本地 Anvil 一站式部署 |
+| `DEPLOYER_PRIVATE_KEY=0x... make deploy-testnet` | 测试网一站式部署 + 权限移交 |
+| `DEPLOYER_PRIVATE_KEY=0x... make deploy-mainnet` | 主网一站式部署 + 权限移交 |
 | `make export-abi` | 导出 ABI |
-
-## 常见问题
-
-- `forge build` 提示缺少依赖：先确认 `contracts/lib/` 是否完整，再执行上面的 `forge install`
-- `ExportAbi` 失败：通常是本机没有安装 `jq`，或者 `contracts/out/` 尚未生成构建产物
-- fork 测试没有真正执行：检查 `HSK_TESTNET_RPC_URL` 是否已设置
-- 脚本报配置文件读取失败：检查 `config/*.json` 是否已填入真实地址和私钥
-- PostDeploy 报文件找不到：确认已先执行 Deploy 并成功写入了 `deployments/{chainId}.json`
-- Makefile 报 `jq: command not found`：请先安装 `jq`（macOS: `brew install jq`）
-
-## 推荐下一步
-
-1. `make build` + `make test` 做一次全量回归
-2. `make deploy-anvil` 验证本地脚本
-3. `make export-abi` 导出 ABI
-4. 编辑 `config/testnet.json`，`make deploy-testnet` 推进到测试网
-5. `make configure-testnet` 或 `make handoff-testnet` 完成 Safe 交接

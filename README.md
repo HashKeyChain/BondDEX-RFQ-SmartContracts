@@ -58,9 +58,9 @@ RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不�
 ├── QUICKSTART.md
 ├── Makefile
 ├── config/
-│   ├── anvil.json      ← 本地 Anvil（已含默认私钥，无需修改）
-│   ├── testnet.json    ← 测试网（部署前需填入真实值）
-│   └── mainnet.json    ← 主网（部署前需填入真实值）
+│   ├── anvil.json      ← 本地 Anvil（Anvil 预置账户 + MockERC20，默认启用 revokeDeployer）
+│   ├── testnet.json    ← 测试网（需填入每个角色地址、代币、手续费等）
+│   └── mainnet.json    ← 主网（需填入每个角色地址、代币、手续费等）
 ├── abi-export/
 │   ├── abi/                 # 导出的 ABI JSON
 │   ├── addresses/           # 链级地址清单
@@ -76,7 +76,7 @@ RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不�
 │   │   ├── interfaces/      # IBondFactory, IBondToken, IBondIssuance, IComplianceModule, IRFQSettlement
 │   │   ├── libraries/       # BondErrors, BondMath, SettlementOrderEIP712
 │   │   └── types/BondTypes.sol
-│   ├── script/              # 部署、角色配置、Safe 交接、ABI 导出脚本
+│   ├── script/              # 部署脚本（FullDeploy + 配置解析 / JSON 输出 / 类型定义）、ABI 导出
 │   ├── test/                # unit / fuzz / invariant / integration / fork
 │   ├── foundry.toml
 │   └── remappings.txt
@@ -88,11 +88,12 @@ RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不�
 推荐按下面的顺序理解和使用仓库：
 
 1. 在 `contracts/` 中编译、运行单元测试和集成测试
-2. 使用 `make deploy-anvil` 在本地链验证部署路径
-3. 使用 `make deploy-testnet` 或 `make deploy-mainnet` 写入 `deployments/<chainId>.json`
-4. 使用 `make configure-testnet` 给 Safe 配置角色并设置允许的结算币
-5. 使用 `make handoff-testnet` 准备角色交接，必要时撤销部署者权限
-6. 使用 `make export-abi` 将 ABI 与发布元数据导出到 `abi-export/`
+2. 编辑 `config/{env}.json`，配置每个合约的角色地址、结算代币策略、手续费与移交策略
+3. 使用 `make deploy-anvil` 在本地链验证一站式部署
+4. 使用 `make deploy-testnet` 或 `make deploy-mainnet` 一站式完成部署 → 配置 → 角色授予 → 权限移交
+5. 使用 `make export-abi` 将 ABI 与发布元数据导出到 `abi-export/`
+
+一站式部署脚本 `FullDeploy.s.sol` 在单次广播中完成全部操作（部署、注册合规模板、配置结算代币策略与手续费、逐角色授权、选择性撤销 deployer 权限），Anvil / Testnet / Mainnet 走完全相同的部署流水线，部署结果写入 `deployments/{chainId}.json`。
 
 ## 测试分层
 
