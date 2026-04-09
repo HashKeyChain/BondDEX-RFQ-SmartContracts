@@ -570,6 +570,25 @@
   },
   {
     "type": "event",
+    "name": "BondTokenBound",
+    "inputs": [
+      {
+        "name": "bondToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "complianceModule",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Initialized",
     "inputs": [
       {

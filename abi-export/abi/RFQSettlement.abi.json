@@ -522,6 +522,25 @@
   },
   {
     "type": "function",
+    "name": "isOrderCancelled",
+    "inputs": [
+      {
+        "name": "orderHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isOrderConsumed",
     "inputs": [
       {
@@ -697,6 +716,19 @@
             "internalType": "uint16"
           }
         ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setMinimumNonce",
+    "inputs": [
+      {
+        "name": "newMinNonce",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -1364,6 +1396,11 @@
         "internalType": "bytes32"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
   },
   {
     "type": "error",

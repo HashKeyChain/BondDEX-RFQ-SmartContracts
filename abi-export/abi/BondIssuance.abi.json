@@ -408,6 +408,29 @@
   },
   {
     "type": "function",
+    "name": "rescueTokens",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "revokeRole",
     "inputs": [
       {
@@ -864,6 +887,31 @@
   },
   {
     "type": "event",
+    "name": "SubscriptionClosed",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "bondToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "issuer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "SubscriptionCreated",
     "inputs": [
       {
@@ -968,6 +1016,37 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TokensRescued",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "operator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -1135,6 +1214,27 @@
   },
   {
     "type": "error",
+    "name": "MaxUnitsBelowSoldUnits",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "newMaxUnits",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentSoldUnits",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "NoClaimableBalance",
     "inputs": [
       {
@@ -1164,6 +1264,11 @@
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
   },
   {
     "type": "error",
@@ -1275,6 +1380,11 @@
   {
     "type": "error",
     "name": "ZeroAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAmount",
     "inputs": []
   }
 ]

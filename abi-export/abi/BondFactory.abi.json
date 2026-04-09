@@ -838,6 +838,33 @@
   },
   {
     "type": "error",
+    "name": "InvalidBondConfig",
+    "inputs": [
+      {
+        "name": "reason",
+        "type": "string",
+        "internalType": "string"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UnauthorizedIssuer",
+    "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "expectedIssuer",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "UnsupportedInterface",
     "inputs": [
       {
