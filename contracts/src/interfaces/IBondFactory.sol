@@ -51,6 +51,11 @@ interface IBondFactory {
     /// @param paused Whether the domain should be paused.
     function pauseDomain(PauseDomain domain, bool paused) external;
 
+    /// @dev Updates the platform administrator and grants it DEFAULT_ADMIN_ROLE.
+    /// New ComplianceModules will be initialized with the updated admin.
+    /// @param newAdmin New platform administrator address.
+    function setPlatformAdmin(address newAdmin) external;
+
     /// @dev Returns one issuance approval record.
     /// @param approvalId Unique approval identifier.
     /// @return issuer Approved issuer address.

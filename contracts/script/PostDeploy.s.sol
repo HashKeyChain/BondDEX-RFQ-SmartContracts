@@ -131,8 +131,10 @@ contract PostDeploy is BaseConfig {
         RFQSettlement settlement,
         address safeAdmin
     ) internal {
+        // 将 platformAdmin 转移给 Safe，确保后续创建的 ComplianceModule 使用正确的 admin
+        factory.setPlatformAdmin(safeAdmin);
+
         // 给safeAdmin授予所有角色
-        factory.grantRole(0x00, safeAdmin);
         factory.grantRole(ISSUANCE_APPROVER_ROLE, safeAdmin);
         factory.grantRole(COMPLIANCE_ADMIN_ROLE, safeAdmin);
         factory.grantRole(PAUSER_ROLE, safeAdmin);

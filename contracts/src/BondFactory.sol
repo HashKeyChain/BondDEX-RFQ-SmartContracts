@@ -78,6 +78,13 @@ contract BondFactory is
         bool enabled
     );
 
+    /// @notice Emitted when governance updates the platform administrator.
+    event PlatformAdminUpdated(
+        address indexed previousAdmin,
+        address indexed newAdmin,
+        address indexed operator
+    );
+
     /// @notice Emitted when the factory successfully creates one bond series.
     event BondCreated(
         address indexed bondToken,
@@ -96,7 +103,7 @@ contract BondFactory is
     address public immutable issuanceController;
 
     /// @notice Platform administrator injected into each deployed compliance module.
-    address public immutable platformAdmin;
+    address public platformAdmin;
 
     /// @dev Approval packets keyed by approval identifier.
     mapping(bytes32 approvalId => IssuanceApprovalRecord record)
@@ -271,6 +278,24 @@ contract BondFactory is
         bool paused
     ) external onlyRole(PAUSER_ROLE) {
         _setDomainPaused(domain, paused);
+    }
+
+    /// @inheritdoc IBondFactory
+    /// @dev Updates the platform admin and simultaneously transfers DEFAULT_ADMIN_ROLE
+    /// so newly deployed ComplianceModules receive the correct governance address.
+    function setPlatformAdmin(
+        address newAdmin
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _ensureNonZero(newAdmin);
+
+        address previousAdmin = platformAdmin;
+        platformAdmin = newAdmin;
+
+        if (!hasRole(DEFAULT_ADMIN_ROLE, newAdmin)) {
+            _grantRole(DEFAULT_ADMIN_ROLE, newAdmin);
+        }
+
+        emit PlatformAdminUpdated(previousAdmin, newAdmin, msg.sender);
     }
 
     /// @inheritdoc IBondFactory
