@@ -10,6 +10,9 @@ import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {
+    ReentrancyGuard
+} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {
     AccessControlUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {
@@ -25,6 +28,7 @@ import {
     BondNotMatured,
     InvalidParticipantRole,
     InsufficientRedemptionFunding,
+    MaxUnitsBelowSoldUnits,
     NoClaimableBalance,
     NotWhitelisted,
     SubscriptionCapExceeded,
@@ -32,7 +36,8 @@ import {
     SubscriptionWindowClosed,
     UnsupportedSettlementToken,
     UnauthorizedClaimCaller,
-    ZeroAddress
+    ZeroAddress,
+    ZeroAmount
 } from "./libraries/BondErrors.sol";
 import {IComplianceModule} from "./interfaces/IComplianceModule.sol";
 import {IBondIssuance} from "./interfaces/IBondIssuance.sol";
@@ -52,6 +57,7 @@ contract BondIssuance is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable,
+    ReentrancyGuard,
     DomainPausable,
     RoleManaged,
     IBondIssuance
@@ -161,6 +167,21 @@ contract BondIssuance is
         uint256 payout
     );
 
+    /// @notice Emitted when an issuer closes an active subscription offer.
+    event SubscriptionClosed(
+        bytes32 indexed offerId,
+        address indexed bondToken,
+        address indexed issuer
+    );
+
+    /// @notice Emitted when the admin rescues tokens accidentally sent to this contract.
+    event TokensRescued(
+        address indexed token,
+        address indexed to,
+        uint256 amount,
+        address indexed operator
+    );
+
     /// @notice Emitted when a holder sets or clears a claim delegate.
     event ClaimDelegateSet(
         address indexed holder,
@@ -170,9 +191,6 @@ contract BondIssuance is
 
     /// @dev Monotonic counter used to derive subscription offer identifiers.
     uint256 private _nextOfferId;
-
-    /// @dev Reentrancy status flag where 1 means unlocked and 2 means entered.
-    uint256 private _reentrancyStatus;
 
     /// @dev Lifecycle permissions keyed by settlement-token address.
     mapping(address token => SettlementTokenPolicy policy)
@@ -190,7 +208,7 @@ contract BondIssuance is
         private _redemptionStates;
 
     /// @dev Reserved storage gap for future upgrades.
-    uint256[43] private __gap;
+    uint256[44] private __gap;
 
     /// @dev Locks the implementation contract and forces use through a proxy.
     constructor() {
@@ -209,7 +227,6 @@ contract BondIssuance is
         _grantRole(SETTLEMENT_ADMIN_ROLE, admin);
         _grantRole(PAUSER_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
-        _reentrancyStatus = 1;
     }
 
     /// @inheritdoc IBondIssuance
@@ -267,6 +284,20 @@ contract BondIssuance is
             revert InvalidParticipantRole(msg.sender, Role.ISSUER, Role.NONE);
         }
 
+        IBondToken bondToken = IBondToken(offer.bondToken);
+        if (bondToken.settlementToken() != terms.settlementToken) {
+            revert UnsupportedSettlementToken(terms.settlementToken);
+        }
+        _requireIssuanceTokenEnabled(terms.settlementToken);
+
+        if (terms.maxUnits < offer.soldUnits) {
+            revert MaxUnitsBelowSoldUnits(
+                offerId,
+                terms.maxUnits,
+                offer.soldUnits
+            );
+        }
+
         offer.settlementToken = terms.settlementToken;
         offer.unitPrice = terms.unitPrice;
         offer.maxUnits = terms.maxUnits;
@@ -289,16 +320,21 @@ contract BondIssuance is
     /// @dev Closes one subscription so no further bond units can be sold through it.
     function closeSubscription(bytes32 offerId) external {
         SubscriptionOffer storage offer = _subscriptionOffers[offerId];
+        if (offer.status != SubscriptionStatus.ACTIVE) {
+            revert SubscriptionNotActive(offerId);
+        }
         if (offer.issuer != msg.sender) {
             revert InvalidParticipantRole(msg.sender, Role.ISSUER, Role.NONE);
         }
 
         offer.status = SubscriptionStatus.CLOSED;
+        emit SubscriptionClosed(offerId, offer.bondToken, offer.issuer);
     }
 
     /// @inheritdoc IBondIssuance
     /// @dev Pulls settlement tokens from a market maker, forwards them to the issuer, and mints bonds.
     function subscribe(bytes32 offerId, uint256 units) external nonReentrant {
+        if (units == 0) revert ZeroAmount();
         _requireDomainActive(PauseDomain.SUBSCRIPTION);
 
         SubscriptionOffer storage offer = _subscriptionOffers[offerId];
@@ -359,6 +395,9 @@ contract BondIssuance is
 
     /// @inheritdoc IBondIssuance
     /// @dev Updates the allowed lifecycle usage flags for one settlement token.
+    /// NOTE: This contract assumes all settlement tokens are standard ERC-20 with exact transfer
+    /// amounts (no fee-on-transfer, no rebasing). Fee-on-transfer tokens will cause redemption
+    /// accounting to diverge from actual balances, leading to claim failures.
     function setSettlementTokenPolicy(
         address token,
         bool enabledForIssuance,
@@ -390,6 +429,7 @@ contract BondIssuance is
         address bondTokenAddress,
         uint256 amount
     ) external nonReentrant {
+        if (amount == 0) revert ZeroAmount();
         _requireDomainActive(PauseDomain.REDEMPTION_FUNDING);
 
         IBondToken bondToken = IBondToken(bondTokenAddress);
@@ -501,6 +541,20 @@ contract BondIssuance is
     }
 
     /// @inheritdoc IBondIssuance
+    /// @dev Allows the admin to recover tokens accidentally sent to this contract.
+    function rescueTokens(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (token == address(0) || to == address(0)) {
+            revert ZeroAddress();
+        }
+        IERC20(token).safeTransfer(to, amount);
+        emit TokensRescued(token, to, amount, msg.sender);
+    }
+
+    /// @inheritdoc IBondIssuance
     /// @dev Exposes the inherited pause state for off-chain monitoring and interface compliance.
     function isDomainPaused(
         PauseDomain domain
@@ -521,12 +575,19 @@ contract BondIssuance is
     }
 
     /// @dev Shared quote-cost helper used by tests and the subscription flow.
+    /// Rounds up to protect the protocol from systematic under-payment.
     function _quoteSubscriptionCost(
         uint256 units,
         uint256 unitPrice,
         uint8 bondDecimals
     ) internal pure returns (uint256) {
-        return Math.mulDiv(unitPrice, units, 10 ** uint256(bondDecimals));
+        return
+            Math.mulDiv(
+                unitPrice,
+                units,
+                10 ** uint256(bondDecimals),
+                Math.Rounding.Ceil
+            );
     }
 
     /// @dev Shared principal-plus-coupon payout helper for redemption claims.
@@ -664,12 +725,4 @@ contract BondIssuance is
     function _authorizeUpgrade(
         address
     ) internal override onlyRole(UPGRADER_ROLE) {}
-
-    /// @dev Minimal reentrancy guard for subscription and redemption state transitions.
-    modifier nonReentrant() {
-        require(_reentrancyStatus != 2, "REENTRANT_CALL");
-        _reentrancyStatus = 2;
-        _;
-        _reentrancyStatus = 1;
-    }
 }

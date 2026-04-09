@@ -124,3 +124,19 @@ error InvalidFeeConfig(uint256 currentFeeBps, uint256 maxFeeBps);
 
 /// @notice Thrown when both parties in a trade are investors.
 error InvestorToInvestorRestricted(address partyA, address partyB);
+
+/// @notice Thrown when the caller is not the approved issuer for bond creation.
+error UnauthorizedIssuer(address caller, address expectedIssuer);
+
+/// @notice Thrown when updating subscription maxUnits below the already sold amount.
+error MaxUnitsBelowSoldUnits(
+    bytes32 offerId,
+    uint256 newMaxUnits,
+    uint256 currentSoldUnits
+);
+
+/// @notice Thrown when a bond configuration parameter is invalid.
+error InvalidBondConfig(string reason);
+
+/// @notice Thrown when a zero amount is passed to an operation that requires a positive value.
+error ZeroAmount();

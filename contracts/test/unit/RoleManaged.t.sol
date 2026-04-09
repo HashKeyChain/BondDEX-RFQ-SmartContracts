@@ -41,9 +41,18 @@ contract RoleManagedTest is Test {
     function test_roleConstantsMatchExpectedHashes() public {
         RoleManagedHarness harness = new RoleManagedHarness(address(1));
 
-        assertEq(harness.issuanceApproverRole(), keccak256("ISSUANCE_APPROVER_ROLE"));
-        assertEq(harness.complianceAdminRole(), keccak256("COMPLIANCE_ADMIN_ROLE"));
-        assertEq(harness.settlementAdminRole(), keccak256("SETTLEMENT_ADMIN_ROLE"));
+        assertEq(
+            harness.issuanceApproverRole(),
+            keccak256("ISSUANCE_APPROVER_ROLE")
+        );
+        assertEq(
+            harness.complianceAdminRole(),
+            keccak256("COMPLIANCE_ADMIN_ROLE")
+        );
+        assertEq(
+            harness.settlementAdminRole(),
+            keccak256("SETTLEMENT_ADMIN_ROLE")
+        );
         assertEq(harness.pauserRole(), keccak256("PAUSER_ROLE"));
         assertEq(harness.upgraderRole(), keccak256("UPGRADER_ROLE"));
     }

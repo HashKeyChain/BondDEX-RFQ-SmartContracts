@@ -119,6 +119,12 @@ interface IBondIssuance {
         address token
     ) external view returns (bool);
 
+    /// @dev Allows the admin to recover tokens accidentally sent to this contract.
+    /// @param token Token address to rescue.
+    /// @param to Recipient address.
+    /// @param amount Amount to transfer.
+    function rescueTokens(address token, address to, uint256 amount) external;
+
     /// @dev Returns whether one domain is paused.
     /// @param domain Domain to inspect.
     /// @return paused True when the domain is paused.

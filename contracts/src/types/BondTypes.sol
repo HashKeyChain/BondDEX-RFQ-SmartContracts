@@ -9,7 +9,7 @@ enum Role {
     INVESTOR
 }
 
-/// @notice Direction of one RFQ order from the maker's perspective.
+/// @notice Direction of one RFQ order from the taker's perspective — BUY means the taker buys bonds.
 enum OrderSide {
     BUY,
     SELL
@@ -99,7 +99,7 @@ struct Order {
     uint256 bondAmount;
     /// @notice Quote amount in smallest quote-token units.
     uint256 quoteAmount;
-    /// @notice Order side from the maker's perspective.
+    /// @notice Order side from the taker's perspective — BUY means the taker buys bonds.
     OrderSide side;
     /// @notice Expiry timestamp after which execution is invalid.
     uint256 expiry;

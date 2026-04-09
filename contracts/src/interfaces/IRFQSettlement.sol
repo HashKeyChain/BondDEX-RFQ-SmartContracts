@@ -7,6 +7,10 @@ import {FeeConfig, Order, PauseDomain} from "../types/BondTypes.sol";
 /// @notice Interface for signed RFQ order execution, cancellation, nonce management, and fee policy.
 interface IRFQSettlement {
     /// @dev Executes one final signed order.
+    /// NOTE: When the market maker is the quotePayer (i.e. SELL-side for taker), the
+    /// quotePayer must have approved `quoteAmount + protocolFee` to this contract, because
+    /// the fee is collected in a separate transfer from the same payer. Use {quoteFee} to
+    /// pre-compute the total approval needed.
     /// @param order Final EIP-712 order payload.
     /// @param signature Maker signature over the typed order digest.
     function fillOrder(Order calldata order, bytes calldata signature) external;
@@ -27,8 +31,12 @@ interface IRFQSettlement {
     /// @param orders Final EIP-712 order payloads.
     function batchCancelOrders(Order[] calldata orders) external;
 
-    /// @dev Invalidates all older orders for the caller by increasing the minimum valid nonce.
+    /// @dev Invalidates all older orders for the caller by increasing the minimum valid nonce by one.
     function incrementNonce() external;
+
+    /// @dev Jumps the maker nonce floor to an arbitrary higher value, bulk-invalidating older orders.
+    /// @param newMinNonce New minimum valid nonce (must be strictly greater than current).
+    function setMinimumNonce(uint256 newMinNonce) external;
 
     /// @dev Updates fee recipient and bounded fee policy.
     /// @param config Fee configuration payload.
@@ -53,6 +61,11 @@ interface IRFQSettlement {
     /// @param orderHash Typed order hash.
     /// @return consumed True when the order has been consumed.
     function isOrderConsumed(bytes32 orderHash) external view returns (bool);
+
+    /// @dev Returns whether one order hash has already been cancelled.
+    /// @param orderHash Typed order hash.
+    /// @return cancelled True when the order has been cancelled.
+    function isOrderCancelled(bytes32 orderHash) external view returns (bool);
 
     /// @dev Returns the current minimum valid nonce for one maker.
     /// @param maker Maker address.

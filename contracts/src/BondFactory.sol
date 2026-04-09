@@ -14,6 +14,8 @@ import {RoleManaged} from "./abstracts/RoleManaged.sol";
 import {
     ExpiredDeadline,
     InvalidApprovalState,
+    InvalidBondConfig,
+    UnauthorizedIssuer,
     UnsupportedInterface,
     UnsupportedSettlementToken,
     ZeroAddress
@@ -25,6 +27,9 @@ import {IBondFactory} from "./interfaces/IBondFactory.sol";
 /// @notice Control-plane contract that approves launches and deploys new bond instances.
 /// @dev The factory binds platform approval, immutable bond metadata, and the selected
 /// compliance implementation into one bond token plus one isolated compliance module.
+/// This contract is intentionally NOT upgradeable — its role is deterministic deployment
+/// of immutable bond pairs, and keeping it non-upgradeable reduces the attack surface.
+/// If a factory bug is discovered, deploy a new factory and use it for future bonds.
 contract BondFactory is
     AccessControl,
     DomainPausable,
@@ -134,6 +139,7 @@ contract BondFactory is
 
     /// @inheritdoc IBondFactory
     /// @dev Records one issuance approval that can later be consumed exactly once.
+    /// Rejects overwriting a CONSUMED approval to prevent duplicate bond creation.
     function approveIssuance(
         bytes32 approvalId,
         address issuer,
@@ -143,6 +149,10 @@ contract BondFactory is
     ) external onlyRole(ISSUANCE_APPROVER_ROLE) {
         if (issuer == address(0) || complianceImplementation == address(0)) {
             revert ZeroAddress();
+        }
+
+        if (_issuanceApprovals[approvalId].status == ApprovalStatus.CONSUMED) {
+            revert InvalidApprovalState(ApprovalStatus.CONSUMED);
         }
 
         _issuanceApprovals[approvalId] = IssuanceApprovalRecord({
@@ -165,10 +175,14 @@ contract BondFactory is
 
     /// @inheritdoc IBondFactory
     /// @dev Marks one approval as revoked so it cannot be consumed by the issuer.
+    /// Only ACTIVE approvals can be revoked.
     function revokeIssuance(
         bytes32 approvalId
     ) external onlyRole(ISSUANCE_APPROVER_ROLE) {
         IssuanceApprovalRecord storage record = _issuanceApprovals[approvalId];
+        if (record.status != ApprovalStatus.ACTIVE) {
+            revert InvalidApprovalState(record.status);
+        }
         record.status = ApprovalStatus.REVOKED;
         emit IssuanceRevoked(approvalId, record.issuer, msg.sender);
     }
@@ -234,7 +248,7 @@ contract BondFactory is
         }
 
         if (approval.issuer != msg.sender || config.issuer != msg.sender) {
-            revert ZeroAddress();
+            revert UnauthorizedIssuer(msg.sender, approval.issuer);
         }
 
         if (
@@ -250,6 +264,16 @@ contract BondFactory is
 
         if (config.settlementToken == address(0)) {
             revert UnsupportedSettlementToken(config.settlementToken);
+        }
+
+        if (config.faceValue == 0) {
+            revert InvalidBondConfig("faceValue must be > 0");
+        }
+        if (config.maturityTimestamp <= block.timestamp) {
+            revert InvalidBondConfig("maturityTimestamp must be in the future");
+        }
+        if (config.decimals > 18) {
+            revert InvalidBondConfig("decimals must be <= 18");
         }
 
         // Deploy one isolated compliance module and one immutable bond token for this approval.
@@ -281,8 +305,9 @@ contract BondFactory is
     }
 
     /// @inheritdoc IBondFactory
-    /// @dev Updates the platform admin and simultaneously transfers DEFAULT_ADMIN_ROLE
-    /// so newly deployed ComplianceModules receive the correct governance address.
+    /// @dev Updates the platform admin and transfers DEFAULT_ADMIN_ROLE so newly deployed
+    /// ComplianceModules receive the correct governance address. The previous admin's role
+    /// is revoked unless they are the caller (preserving ability to complete transactions).
     function setPlatformAdmin(
         address newAdmin
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -293,6 +318,14 @@ contract BondFactory is
 
         if (!hasRole(DEFAULT_ADMIN_ROLE, newAdmin)) {
             _grantRole(DEFAULT_ADMIN_ROLE, newAdmin);
+        }
+
+        if (
+            previousAdmin != newAdmin &&
+            previousAdmin != msg.sender &&
+            hasRole(DEFAULT_ADMIN_ROLE, previousAdmin)
+        ) {
+            _revokeRole(DEFAULT_ADMIN_ROLE, previousAdmin);
         }
 
         emit PlatformAdminUpdated(previousAdmin, newAdmin, msg.sender);

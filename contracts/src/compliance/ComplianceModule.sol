@@ -78,6 +78,12 @@ contract ComplianceModule is
         address operator
     );
 
+    /// @notice Emitted when the compliance module is bound to its bond token.
+    event BondTokenBound(
+        address indexed bondToken,
+        address indexed complianceModule
+    );
+
     /// @notice Emitted when provider-facing compliance metadata changes.
     event PolicyMetadataUpdated(
         address indexed bondToken,
@@ -145,6 +151,7 @@ contract ComplianceModule is
         }
 
         bondToken = bondToken_;
+        emit BondTokenBound(bondToken_, address(this));
     }
 
     /// @inheritdoc IComplianceModule
@@ -264,6 +271,8 @@ contract ComplianceModule is
 
     /// @inheritdoc IComplianceModule
     /// @dev Evaluates the full transfer policy and returns an ERC1404-style restriction code.
+    /// NOTE: The `amount` parameter is intentionally unused — the current policy is purely
+    /// address/role-based. Future upgrades via UUPS can add per-transfer or cumulative limits.
     function checkTransfer(
         address from,
         address to,

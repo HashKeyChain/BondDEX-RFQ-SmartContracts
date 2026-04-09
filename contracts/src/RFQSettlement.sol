@@ -7,6 +7,9 @@ import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {
+    ReentrancyGuard
+} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {
     AccessControlUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {
@@ -56,6 +59,7 @@ contract RFQSettlement is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable,
+    ReentrancyGuard,
     DomainPausable,
     RoleManaged,
     IRFQSettlement
@@ -104,9 +108,6 @@ contract RFQSettlement is
     /// @notice Hard cap on the number of orders that may be settled atomically in one batch.
     uint256 internal constant MAX_BATCH_SIZE = 24;
 
-    /// @dev Reentrancy status flag where 1 means unlocked and 2 means entered.
-    uint256 private _reentrancyStatus;
-
     /// @dev Active fee configuration applied to every executed order.
     FeeConfig private _feeConfig;
 
@@ -123,7 +124,7 @@ contract RFQSettlement is
     mapping(bytes32 orderHash => bool cancelled) private _cancelledOrders;
 
     /// @dev Reserved storage gap for future proxy-safe upgrades.
-    uint256[45] private __gap;
+    uint256[46] private __gap;
 
     /// @dev Locks the implementation contract so only proxies may initialize it.
     constructor() {
@@ -143,7 +144,6 @@ contract RFQSettlement is
         _grantRole(PAUSER_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
 
-        _reentrancyStatus = 1;
         _feeConfig = FeeConfig({
             feeRecipient: admin,
             currentFeeBps: 0,
@@ -222,10 +222,21 @@ contract RFQSettlement is
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Raises the maker nonce floor and invalidates all older signed orders.
+    /// @dev Raises the maker nonce floor by one and invalidates all older signed orders.
     function incrementNonce() external {
         _nonceFloors[msg.sender] += 1;
         emit NonceIncremented(msg.sender, _nonceFloors[msg.sender]);
+    }
+
+    /// @inheritdoc IRFQSettlement
+    /// @dev Jumps the maker nonce floor to an arbitrary higher value, bulk-invalidating older orders.
+    function setMinimumNonce(uint256 newMinNonce) external {
+        uint256 current = _nonceFloors[msg.sender];
+        if (newMinNonce <= current) {
+            revert InvalidOrderNonce(msg.sender, newMinNonce, current + 1);
+        }
+        _nonceFloors[msg.sender] = newMinNonce;
+        emit NonceIncremented(msg.sender, newMinNonce);
     }
 
     /// @inheritdoc IRFQSettlement
@@ -285,6 +296,12 @@ contract RFQSettlement is
     /// @dev Returns whether the given order hash has already been consumed.
     function isOrderConsumed(bytes32 orderHash) external view returns (bool) {
         return _consumedOrders[orderHash];
+    }
+
+    /// @inheritdoc IRFQSettlement
+    /// @dev Returns whether the given order hash has already been cancelled.
+    function isOrderCancelled(bytes32 orderHash) external view returns (bool) {
+        return _cancelledOrders[orderHash];
     }
 
     /// @inheritdoc IRFQSettlement
@@ -473,10 +490,10 @@ contract RFQSettlement is
                 address bondReceiver
             ) = _resolveSettlementParties(order, taker);
 
-            // BUY: quoteReceiver = maker; SELL: quoteReceiver = taker.
+            // BUY (taker buys bonds): quotePayer=taker, quoteReceiver=maker.
+            // SELL (taker sells bonds): quotePayer=maker, quoteReceiver=taker.
             // Fee deducted from quoteReceiver when quoteReceiver is MM;
-            // otherwise quoteReceiver (investor) gets full quoteAmount
-            // and quotePayer (MM) pays quoteAmount + fee.
+            // otherwise quotePayer (MM) pays quoteAmount + fee separately.
             if (
                 feeAmount == 0 ||
                 (
@@ -527,7 +544,7 @@ contract RFQSettlement is
         );
     }
 
-    /// @dev Resolves token payers and receivers based on whether the maker is buying or selling bonds.
+    /// @dev Resolves token payers and receivers based on the taker's order side (BUY = taker buys bonds).
     function _resolveSettlementParties(
         Order calldata order,
         address taker
@@ -571,12 +588,4 @@ contract RFQSettlement is
     function _authorizeUpgrade(
         address
     ) internal override onlyRole(UPGRADER_ROLE) {}
-
-    /// @dev Minimal reentrancy guard for settlement entrypoints with token transfers.
-    modifier nonReentrant() {
-        require(_reentrancyStatus != 2, "REENTRANT_CALL");
-        _reentrancyStatus = 2;
-        _;
-        _reentrancyStatus = 1;
-    }
 }

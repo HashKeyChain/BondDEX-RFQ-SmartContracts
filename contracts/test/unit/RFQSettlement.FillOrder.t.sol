@@ -29,7 +29,16 @@ contract RFQSettlementFillOrderTest is RFQSettlementFixtures {
 
         vm.expectEmit(true, true, true, true);
         emit OrderFilled(
-            digest, maker, investor, address(bondToken), address(usdc), 0, 10e18, 10_500e6, 0, feeRecipient
+            digest,
+            maker,
+            investor,
+            address(bondToken),
+            address(usdc),
+            0,
+            10e18,
+            10_500e6,
+            0,
+            feeRecipient
         );
 
         vm.prank(investor);
@@ -85,7 +94,13 @@ contract RFQSettlementFillOrderTest is RFQSettlementFixtures {
         Order memory order = makeBuyOrder(10e18, 10_500e6, 0, 1);
         bytes memory signature = signOrder(order, MAKER_PK);
         vm.prank(admin);
-        settlement.setFeeConfig(FeeConfig({feeRecipient: feeRecipient, currentFeeBps: 100, maxFeeBps: 1_000}));
+        settlement.setFeeConfig(
+            FeeConfig({
+                feeRecipient: feeRecipient,
+                currentFeeBps: 100,
+                maxFeeBps: 1_000
+            })
+        );
 
         vm.prank(investor);
         settlement.fillOrder(order, signature);

@@ -23,7 +23,7 @@ contract PrimarySubscriptionMathTest is Test {
         harness = new BondIssuanceMathHarness();
     }
 
-    function testFuzz_quoteSubscriptionCostMatchesMulDiv(
+    function testFuzz_quoteSubscriptionCostMatchesMulDivCeil(
         uint256 units,
         uint256 unitPrice,
         uint8 bondDecimals
@@ -32,7 +32,12 @@ contract PrimarySubscriptionMathTest is Test {
         unitPrice = bound(unitPrice, 1, type(uint96).max);
         bondDecimals = uint8(bound(bondDecimals, 0, 18));
 
-        uint256 expected = Math.mulDiv(unitPrice, units, 10 ** uint256(bondDecimals));
+        uint256 expected = Math.mulDiv(
+            unitPrice,
+            units,
+            10 ** uint256(bondDecimals),
+            Math.Rounding.Ceil
+        );
         uint256 actual = harness.quoteSubscriptionCost(units, unitPrice, bondDecimals);
 
         assertEq(actual, expected);
