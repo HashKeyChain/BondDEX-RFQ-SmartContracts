@@ -604,6 +604,40 @@
   },
   {
     "type": "function",
+    "name": "quoteFee",
+    "inputs": [
+      {
+        "name": "bondToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "partyA",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "partyB",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "quoteAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "feeAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "renounceRole",
     "inputs": [
       {
@@ -1272,6 +1306,22 @@
       },
       {
         "name": "actualSigner",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvestorToInvestorRestricted",
+    "inputs": [
+      {
+        "name": "partyA",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "partyB",
         "type": "address",
         "internalType": "address"
       }
