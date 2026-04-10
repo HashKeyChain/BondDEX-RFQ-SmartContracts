@@ -159,6 +159,42 @@ DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf
 
 部署完成后，完整清单写入 `deployments/{chainId}.json`。
 
+### 3.1 端到端演示
+
+部署完成后，可运行完整生命周期演示（铸造 → 创建债券 → 合规配置 → 一级认购 → 二级 RFQ 交易 → 到期赎回）：
+
+```bash
+make demo-anvil
+```
+
+该命令自动分两阶段执行：到期前全部业务 → 推进 Anvil 时间到到期日 → 赎回与领取。每个 broadcast 交易独占一个区块。
+
+演示覆盖 9 个参与者（admin / issuer / makerA / makerB / makerC / investorA / investorB / investorC / delegate），包括：超额认购报错、未授权认购报错、RFQ 买卖含手续费、做市商间免手续费、取消订单、过期订单、投资者间交易限制、代理领取、多余资金救援等场景。
+
+如需纯模拟（不发送交易，含 `vm.warp`）：
+
+```bash
+make demo-anvil-sim
+```
+
+### 3.2 模块化操作
+
+部署后的日常操作（审批、合规、认购、RFQ、赎回、查询等）通过 `Operations.s.sol` 提供模块化命令。通过 `ENV` 变量选择网络：
+
+```bash
+# Anvil（默认）
+make ops-query-fee-config
+
+# 测试网
+ENV=testnet make ops-query-fee-config
+ENV=testnet DEPLOYER_PRIVATE_KEY=0x... make ops-set-whitelist ARGS="0xCM地址 0x账户 true"
+
+# 主网
+ENV=mainnet DEPLOYER_PRIVATE_KEY=0x... make ops-set-whitelist ARGS="0xCM地址 0x账户 true"
+```
+
+查询类操作（`ops-query-*`）不需要私钥。详见 `docs/部署后操作手册.md`。
+
 ## 4. 导出 ABI
 
 ```bash
@@ -255,4 +291,8 @@ DEPLOYER_PRIVATE_KEY=0x你的私钥 make deploy-testnet
 | `DEPLOYER_PRIVATE_KEY=0x... make deploy-anvil` | 本地 Anvil 一站式部署 |
 | `DEPLOYER_PRIVATE_KEY=0x... make deploy-testnet` | 测试网一站式部署 + 权限移交 |
 | `DEPLOYER_PRIVATE_KEY=0x... make deploy-mainnet` | 主网一站式部署 + 权限移交 |
+| `make demo-anvil` | Anvil 端到端演示（两阶段：到期前 + 时间推进 + 到期后） |
+| `make demo-anvil-sim` | 纯模拟演示（不 broadcast，含 vm.warp） |
 | `make export-abi` | 导出 ABI |
+| `ENV=testnet make ops-query-*` | 测试网查询（不需要私钥） |
+| `ENV=testnet DEPLOYER_PRIVATE_KEY=0x... make ops-*` | 测试网写入操作 |

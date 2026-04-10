@@ -76,7 +76,7 @@ RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不�
 │   │   ├── interfaces/      # IBondFactory, IBondToken, IBondIssuance, IComplianceModule, IRFQSettlement
 │   │   ├── libraries/       # BondErrors, BondMath, SettlementOrderEIP712
 │   │   └── types/BondTypes.sol
-│   ├── script/              # 部署脚本（FullDeploy + 配置解析 / JSON 输出 / 类型定义）、ABI 导出
+│   ├── script/              # FullDeploy 部署、AnvilDemo 端到端演示、Operations 模块化操作、ABI 导出
 │   ├── test/                # unit / fuzz / invariant / integration / fork
 │   ├── foundry.toml
 │   └── remappings.txt
@@ -92,8 +92,12 @@ RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不�
 3. 使用 `make deploy-anvil` 在本地链验证一站式部署
 4. 使用 `make deploy-testnet` 或 `make deploy-mainnet` 一站式完成部署 → 配置 → 角色授予 → 权限移交
 5. 使用 `make export-abi` 将 ABI 与发布元数据导出到 `abi-export/`
+6. 使用 `make demo-anvil` 在本地 Anvil 上运行完整生命周期演示（9 个参与者、覆盖认购/RFQ/赎回/合规拒绝等场景）
+7. 使用 `ENV=testnet make ops-*` 或 `ENV=mainnet make ops-*` 在测试网/主网执行模块化操作
 
 一站式部署脚本 `FullDeploy.s.sol` 在单次广播中完成全部操作（部署、注册合规模板、配置结算代币策略与手续费、逐角色授权、选择性撤销 deployer 权限），Anvil / Testnet / Mainnet 走完全相同的部署流水线，部署结果写入 `deployments/{chainId}.json`。
+
+`Operations.s.sol` 提供模块化操作脚本，每个函数对应一个链上操作（审批、合规、认购、RFQ、赎回、查询等），通过 `ENV` 环境变量切换 Anvil / 测试网 / 主网。
 
 ## 测试分层
 
