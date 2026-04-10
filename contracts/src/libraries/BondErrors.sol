@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { ApprovalStatus, PauseDomain, Role } from "../types/BondTypes.sol";
+import {ApprovalStatus, PauseDomain, Role} from "../types/BondTypes.sol";
 
 /// @title BondErrors
 /// @notice Shared custom errors used across the BondDEX protocol contracts.
@@ -52,10 +52,18 @@ error SubscriptionNotActive(bytes32 offerId);
 error SubscriptionWindowClosed(bytes32 offerId, uint256 currentTimestamp);
 
 /// @notice Thrown when a subscription request exceeds remaining offer capacity.
-error SubscriptionCapExceeded(bytes32 offerId, uint256 requestedUnits, uint256 remainingUnits);
+error SubscriptionCapExceeded(
+    bytes32 offerId,
+    uint256 requestedUnits,
+    uint256 remainingUnits
+);
 
 /// @notice Thrown when an account does not hold the compliance role required for an action.
-error InvalidParticipantRole(address account, Role requiredRole, Role actualRole);
+error InvalidParticipantRole(
+    address account,
+    Role requiredRole,
+    Role actualRole
+);
 
 /// @notice Thrown when an account is not present in the active whitelist.
 error NotWhitelisted(address account);
@@ -64,14 +72,20 @@ error NotWhitelisted(address account);
 error NotYetImplemented();
 
 /// @notice Thrown when a redemption claim is attempted before bond maturity.
-error BondNotMatured(address bondToken, uint256 maturityTimestamp, uint256 currentTimestamp);
+error BondNotMatured(
+    address bondToken,
+    uint256 maturityTimestamp,
+    uint256 currentTimestamp
+);
 
 /// @notice Thrown when a holder has no redeemable bond balance.
 error NoClaimableBalance(address holder, address bondToken);
 
 /// @notice Thrown when available redemption funding is lower than the required payout.
 error InsufficientRedemptionFunding(
-    address bondToken, uint256 availableAmount, uint256 requiredAmount
+    address bondToken,
+    uint256 availableAmount,
+    uint256 requiredAmount
 );
 
 /// @notice Thrown when a caller is neither the holder nor the configured claim delegate.
@@ -87,7 +101,11 @@ error OrderAlreadyConsumed(bytes32 orderHash);
 error OrderAlreadyCancelled(bytes32 orderHash);
 
 /// @notice Thrown when an order nonce is below the maker's current nonce floor.
-error InvalidOrderNonce(address maker, uint256 providedNonce, uint256 minimumValidNonce);
+error InvalidOrderNonce(
+    address maker,
+    uint256 providedNonce,
+    uint256 minimumValidNonce
+);
 
 /// @notice Thrown when an order is bound to a different taker than the caller.
 error InvalidOrderTaker(address expectedTaker, address actualCaller);
@@ -111,7 +129,11 @@ error InvestorToInvestorRestricted(address partyA, address partyB);
 error UnauthorizedIssuer(address caller, address expectedIssuer);
 
 /// @notice Thrown when updating subscription maxUnits below the already sold amount.
-error MaxUnitsBelowSoldUnits(bytes32 offerId, uint256 newMaxUnits, uint256 currentSoldUnits);
+error MaxUnitsBelowSoldUnits(
+    bytes32 offerId,
+    uint256 newMaxUnits,
+    uint256 currentSoldUnits
+);
 
 /// @notice Thrown when a bond configuration parameter is invalid.
 error InvalidBondConfig(string reason);
@@ -124,3 +146,10 @@ error UnregisteredBondToken(address bondToken);
 
 /// @notice Thrown when subscription window timestamps are invalid (closesAt != 0 but closesAt <= opensAt).
 error InvalidSubscriptionWindow(uint256 opensAt, uint256 closesAt);
+
+/// @notice Thrown when a subscription is attempted for a bond that has already matured.
+error BondAlreadyMatured(
+    address bondToken,
+    uint256 maturityTimestamp,
+    uint256 currentTimestamp
+);

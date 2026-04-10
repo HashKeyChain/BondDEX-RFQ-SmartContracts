@@ -25,6 +25,7 @@ import {
 import {DomainPausable} from "./abstracts/DomainPausable.sol";
 import {RoleManaged} from "./abstracts/RoleManaged.sol";
 import {
+    BondAlreadyMatured,
     BondNotMatured,
     InvalidParticipantRole,
     InvalidSubscriptionWindow,
@@ -245,6 +246,16 @@ contract BondIssuance is
 
         _requireIssuer(bondToken, msg.sender);
         _requireValidWindow(terms.opensAt, terms.closesAt);
+
+        if (block.timestamp >= bondToken.maturityTimestamp()) {
+            revert BondAlreadyMatured(
+                terms.bondToken,
+                bondToken.maturityTimestamp(),
+                block.timestamp
+            );
+        }
+
+        if (terms.unitPrice == 0) revert ZeroAmount();
 
         offerId = bytes32(++_nextOfferId);
         _subscriptionOffers[offerId] = SubscriptionOffer({
@@ -699,6 +710,7 @@ contract BondIssuance is
             bondToken.couponRateBps(),
             bondDecimals
         );
+        if (payout == 0) revert ZeroAmount();
 
         RedemptionState storage state = _redemptionStates[bondTokenAddress];
         uint256 availableAmount = state.fundedAmount - state.claimedAmount;

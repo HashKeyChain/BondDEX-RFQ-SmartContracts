@@ -87,7 +87,7 @@ struct SubscriptionTerms {
 
 /// @notice Final RFQ order payload signed by the maker.
 struct Order {
-    /// @notice Market maker signing the order.
+    /// @notice Party (market maker or investor) signing the order.
     address maker;
     /// @notice Optional fixed taker; zero address means any taker may execute.
     address taker;

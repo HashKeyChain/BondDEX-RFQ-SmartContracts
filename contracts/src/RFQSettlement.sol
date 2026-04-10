@@ -38,7 +38,8 @@ import {
     NotWhitelisted,
     UnregisteredBondToken,
     UnsupportedSettlementToken,
-    ZeroAddress
+    ZeroAddress,
+    ZeroAmount
 } from "./libraries/BondErrors.sol";
 import {IComplianceModule} from "./interfaces/IComplianceModule.sol";
 import {IBondToken} from "./interfaces/IBondToken.sol";
@@ -421,6 +422,10 @@ contract RFQSettlement is
         view
         returns (bytes32 orderHash, Role makerRole, Role takerRole)
     {
+        if (order.bondAmount == 0 || order.quoteAmount == 0) {
+            revert ZeroAmount();
+        }
+
         if (!isBondTokenRegistered(order.bondToken)) {
             revert UnregisteredBondToken(order.bondToken);
         }
