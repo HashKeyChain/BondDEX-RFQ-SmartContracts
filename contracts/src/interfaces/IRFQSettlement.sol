@@ -47,6 +47,22 @@ interface IRFQSettlement {
     /// @param enabled Whether the token should be enabled.
     function setSettlementTokenPolicy(address token, bool enabled) external;
 
+    /// @dev Registers or unregisters a bond token for RFQ settlement.
+    /// Only registered bond tokens may appear in executable orders.
+    /// @param bondToken Bond token address.
+    /// @param registered Whether the token should be registered.
+    function setBondTokenRegistration(
+        address bondToken,
+        bool registered
+    ) external;
+
+    /// @dev Returns whether a bond token is registered for RFQ settlement.
+    /// @param bondToken Bond token address.
+    /// @return registered True when the bond token is registered.
+    function isBondTokenRegistered(
+        address bondToken
+    ) external view returns (bool);
+
     /// @dev Sets the paused state for one settlement-controlled domain.
     /// @param domain Domain to update.
     /// @param paused Whether the domain should be paused.

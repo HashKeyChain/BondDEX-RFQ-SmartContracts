@@ -36,6 +36,7 @@ import {
     OrderAlreadyConsumed,
     UnauthorizedOrderMaker,
     NotWhitelisted,
+    UnregisteredBondToken,
     UnsupportedSettlementToken,
     ZeroAddress
 } from "./libraries/BondErrors.sol";
@@ -105,6 +106,13 @@ contract RFQSettlement is
         address operator
     );
 
+    /// @notice Emitted when governance registers or unregisters a bond token for RFQ settlement.
+    event BondTokenRegistrationUpdated(
+        address indexed bondToken,
+        bool registered,
+        address operator
+    );
+
     /// @notice Hard cap on the number of orders that may be settled atomically in one batch.
     uint256 internal constant MAX_BATCH_SIZE = 24;
 
@@ -123,8 +131,11 @@ contract RFQSettlement is
     /// @dev Tracks whether an order hash has already been cancelled.
     mapping(bytes32 orderHash => bool cancelled) private _cancelledOrders;
 
+    /// @dev Registry of bond tokens allowed in RFQ orders, preventing fake-token attacks.
+    mapping(address bondToken => bool registered) private _registeredBondTokens;
+
     /// @dev Reserved storage gap for future proxy-safe upgrades.
-    uint256[46] private __gap;
+    uint256[45] private __gap;
 
     /// @dev Locks the implementation contract so only proxies may initialize it.
     constructor() {
@@ -278,6 +289,28 @@ contract RFQSettlement is
     }
 
     /// @inheritdoc IRFQSettlement
+    /// @dev Registers or unregisters a bond token for RFQ settlement.
+    function setBondTokenRegistration(
+        address bondToken,
+        bool registered
+    ) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
+        if (bondToken == address(0)) {
+            revert ZeroAddress();
+        }
+
+        _registeredBondTokens[bondToken] = registered;
+        emit BondTokenRegistrationUpdated(bondToken, registered, msg.sender);
+    }
+
+    /// @inheritdoc IRFQSettlement
+    /// @dev Returns whether a bond token is registered for RFQ settlement.
+    function isBondTokenRegistered(
+        address bondToken
+    ) public view returns (bool) {
+        return _registeredBondTokens[bondToken];
+    }
+
+    /// @inheritdoc IRFQSettlement
     /// @dev Toggles one settlement-controlled pause domain.
     function pauseDomain(
         PauseDomain domain,
@@ -377,7 +410,8 @@ contract RFQSettlement is
             );
     }
 
-    /// @dev Validates token policy, expiry, taker binding, nonce floor, signature, and participant roles.
+    /// @dev Validates bond token registry, token policy, expiry, taker binding, nonce floor,
+    ///      signature, and participant roles.
     function _validateOrder(
         Order calldata order,
         bytes calldata signature,
@@ -387,6 +421,10 @@ contract RFQSettlement is
         view
         returns (bytes32 orderHash, Role makerRole, Role takerRole)
     {
+        if (!isBondTokenRegistered(order.bondToken)) {
+            revert UnregisteredBondToken(order.bondToken);
+        }
+
         if (!isSettlementTokenEnabled(order.quoteToken)) {
             revert UnsupportedSettlementToken(order.quoteToken);
         }

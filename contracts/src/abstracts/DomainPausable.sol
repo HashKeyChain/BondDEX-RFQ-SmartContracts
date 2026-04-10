@@ -27,6 +27,9 @@ abstract contract DomainPausable {
     }
 
     /// @dev Updates the pause flag for one lifecycle domain and emits the canonical event.
+    /// NOTE: This function reverts (not silently no-ops) when the domain already holds the
+    /// requested state. Callers in multi-sig or automated retry scenarios should query
+    /// `isDomainPaused` before sending the transaction to avoid unexpected reverts.
     function _setDomainPaused(PauseDomain domain, bool paused) internal {
         if (_pausedDomains[domain] == paused) {
             revert DomainAlreadySet(domain, paused);

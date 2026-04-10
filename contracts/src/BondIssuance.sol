@@ -27,6 +27,7 @@ import {RoleManaged} from "./abstracts/RoleManaged.sol";
 import {
     BondNotMatured,
     InvalidParticipantRole,
+    InvalidSubscriptionWindow,
     InsufficientRedemptionFunding,
     MaxUnitsBelowSoldUnits,
     NoClaimableBalance,
@@ -243,6 +244,7 @@ contract BondIssuance is
         }
 
         _requireIssuer(bondToken, msg.sender);
+        _requireValidWindow(terms.opensAt, terms.closesAt);
 
         offerId = bytes32(++_nextOfferId);
         _subscriptionOffers[offerId] = SubscriptionOffer({
@@ -298,7 +300,8 @@ contract BondIssuance is
             );
         }
 
-        offer.settlementToken = terms.settlementToken;
+        _requireValidWindow(terms.opensAt, terms.closesAt);
+
         offer.unitPrice = terms.unitPrice;
         offer.maxUnits = terms.maxUnits;
         offer.opensAt = terms.opensAt;
@@ -719,6 +722,16 @@ contract BondIssuance is
             bondAmount,
             payout
         );
+    }
+
+    /// @dev Reverts when closesAt is non-zero but not strictly after opensAt.
+    function _requireValidWindow(
+        uint256 opensAt,
+        uint256 closesAt
+    ) internal pure {
+        if (closesAt != 0 && closesAt <= opensAt) {
+            revert InvalidSubscriptionWindow(opensAt, closesAt);
+        }
     }
 
     /// @dev Restricts UUPS upgrades to the configured upgrader role.

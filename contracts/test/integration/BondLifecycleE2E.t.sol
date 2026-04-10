@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {Test} from "forge-std/Test.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {BondFactory} from "../../src/BondFactory.sol";
-import {BondIssuance} from "../../src/BondIssuance.sol";
-import {BondToken} from "../../src/BondToken.sol";
-import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
-import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
-import {RFQSettlement} from "../../src/RFQSettlement.sol";
-import {BondConfig, Role, SubscriptionTerms, Order, OrderSide, FeeConfig} from "../../src/types/BondTypes.sol";
-import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
+import { BondFactory } from "../../src/BondFactory.sol";
+import { BondIssuance } from "../../src/BondIssuance.sol";
+import { BondToken } from "../../src/BondToken.sol";
+import { ComplianceModule } from "../../src/compliance/ComplianceModule.sol";
+import { MockERC20Decimals } from "../mocks/MockERC20Decimals.sol";
+import { RFQSettlement } from "../../src/RFQSettlement.sol";
+import {
+    BondConfig,
+    Role,
+    SubscriptionTerms,
+    Order,
+    OrderSide,
+    FeeConfig
+} from "../../src/types/BondTypes.sol";
+import { IComplianceModule } from "../../src/interfaces/IComplianceModule.sol";
 
 contract BondLifecycleE2ETest is Test {
     uint256 internal constant MAKER_PK = 0xA11CE;
@@ -34,12 +41,22 @@ contract BondLifecycleE2ETest is Test {
 
         BondIssuance issuanceImplementation = new BondIssuance();
         issuance = BondIssuance(
-            address(new ERC1967Proxy(address(issuanceImplementation), abi.encodeCall(BondIssuance.initialize, (admin))))
+            address(
+                new ERC1967Proxy(
+                    address(issuanceImplementation),
+                    abi.encodeCall(BondIssuance.initialize, (admin))
+                )
+            )
         );
 
         RFQSettlement settlementImplementation = new RFQSettlement();
         settlement = RFQSettlement(
-            address(new ERC1967Proxy(address(settlementImplementation), abi.encodeCall(RFQSettlement.initialize, (admin))))
+            address(
+                new ERC1967Proxy(
+                    address(settlementImplementation),
+                    abi.encodeCall(RFQSettlement.initialize, (admin))
+                )
+            )
         );
 
         complianceImplementation = new ComplianceModule();
@@ -51,11 +68,17 @@ contract BondLifecycleE2ETest is Test {
             address(complianceImplementation), type(IComplianceModule).interfaceId
         );
         factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, keccak256("metadata")
+            approvalId,
+            issuer,
+            address(complianceImplementation),
+            block.timestamp + 1 days,
+            keccak256("metadata")
         );
         issuance.setSettlementTokenPolicy(address(usdc), true, false, true);
         settlement.setSettlementTokenPolicy(address(usdc), true);
-        settlement.setFeeConfig(FeeConfig({feeRecipient: feeRecipient, currentFeeBps: 50, maxFeeBps: 1_000}));
+        settlement.setFeeConfig(
+            FeeConfig({ feeRecipient: feeRecipient, currentFeeBps: 50, maxFeeBps: 1_000 })
+        );
         vm.stopPrank();
 
         BondConfig memory config = BondConfig({
@@ -74,7 +97,8 @@ contract BondLifecycleE2ETest is Test {
         });
 
         vm.prank(issuer);
-        (address bondTokenAddress, address complianceModuleAddress) = factory.createBond(config, approvalId);
+        (address bondTokenAddress, address complianceModuleAddress) =
+            factory.createBond(config, approvalId);
         BondToken bondToken = BondToken(bondTokenAddress);
         ComplianceModule complianceModule = ComplianceModule(complianceModuleAddress);
 
@@ -85,6 +109,7 @@ contract BondLifecycleE2ETest is Test {
         complianceModule.setRole(issuer, Role.ISSUER);
         complianceModule.setRole(maker, Role.MARKET_MAKER);
         complianceModule.setRole(investor, Role.INVESTOR);
+        settlement.setBondTokenRegistration(bondTokenAddress, true);
         vm.stopPrank();
 
         vm.prank(issuer);

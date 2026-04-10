@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {Test} from "forge-std/Test.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {BondToken} from "../../src/BondToken.sol";
-import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
-import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
-import {Role, Order, OrderSide, FeeConfig} from "../../src/types/BondTypes.sol";
-import {RFQSettlement} from "../../src/RFQSettlement.sol";
+import { BondToken } from "../../src/BondToken.sol";
+import { ComplianceModule } from "../../src/compliance/ComplianceModule.sol";
+import { MockERC20Decimals } from "../mocks/MockERC20Decimals.sol";
+import { Role, Order, OrderSide, FeeConfig } from "../../src/types/BondTypes.sol";
+import { RFQSettlement } from "../../src/RFQSettlement.sol";
 
 abstract contract RFQSettlementFixtures is Test {
     using ECDSA for bytes32;
@@ -41,14 +41,21 @@ abstract contract RFQSettlementFixtures is Test {
             address(
                 new ERC1967Proxy(
                     address(complianceImplementation),
-                    abi.encodeCall(ComplianceModule.initialize, (admin, factory, keccak256("policy"), 1))
+                    abi.encodeCall(
+                        ComplianceModule.initialize, (admin, factory, keccak256("policy"), 1)
+                    )
                 )
             )
         );
 
         RFQSettlement settlementImplementation = new RFQSettlement();
         settlement = RFQSettlement(
-            address(new ERC1967Proxy(address(settlementImplementation), abi.encodeCall(RFQSettlement.initialize, (admin))))
+            address(
+                new ERC1967Proxy(
+                    address(settlementImplementation),
+                    abi.encodeCall(RFQSettlement.initialize, (admin))
+                )
+            )
         );
 
         bondToken = new BondToken(
@@ -74,8 +81,11 @@ abstract contract RFQSettlementFixtures is Test {
         complianceModule.setRole(maker, Role.MARKET_MAKER);
         complianceModule.setRole(investor, Role.INVESTOR);
         complianceModule.setRole(otherMaker, Role.MARKET_MAKER);
+        settlement.setBondTokenRegistration(address(bondToken), true);
         settlement.setSettlementTokenPolicy(address(usdc), true);
-        settlement.setFeeConfig(FeeConfig({feeRecipient: feeRecipient, currentFeeBps: 0, maxFeeBps: 1_000}));
+        settlement.setFeeConfig(
+            FeeConfig({ feeRecipient: feeRecipient, currentFeeBps: 0, maxFeeBps: 1_000 })
+        );
         vm.stopPrank();
 
         vm.prank(issuanceController);
