@@ -13,7 +13,9 @@ contract BondIssuanceRedemptionHarness is BondIssuance {
         pure
         returns (uint256)
     {
-        return _quoteRedemptionPayout(bondAmount, faceValue, couponRateBps, bondDecimals);
+        uint256 principal = Math.mulDiv(bondAmount, faceValue, 10 ** uint256(bondDecimals));
+        uint256 interest = Math.mulDiv(principal, couponRateBps, 10_000);
+        return principal + interest;
     }
 }
 

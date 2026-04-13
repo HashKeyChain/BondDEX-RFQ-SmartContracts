@@ -21,7 +21,7 @@ contract BondIssuanceClaimDelegateTest is BondIssuanceRedemptionFixtures {
     function test_holderCanSetDelegateAndDelegateClaimsForHolder() public {
         warpToMaturity();
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 105_000e6);
+        issuance.depositRedemption(address(bondToken), 100_301_369_800);
 
         vm.expectEmit(true, true, false, true);
         emit ClaimDelegateSet(holder, delegate, holder);
@@ -29,11 +29,11 @@ contract BondIssuanceClaimDelegateTest is BondIssuanceRedemptionFixtures {
         issuance.setClaimDelegate(delegate);
 
         vm.expectEmit(true, true, true, true);
-        emit RedemptionClaimed(address(bondToken), holder, delegate, 100e18, 105_000e6);
+        emit RedemptionClaimed(address(bondToken), holder, delegate, 100e18, 100_301_369_800);
         vm.prank(delegate);
         issuance.claimFor(address(bondToken), holder);
 
-        assertEq(usdc.balanceOf(holder), 105_000e6);
+        assertEq(usdc.balanceOf(holder), 100_301_369_800);
         assertEq(usdc.balanceOf(delegate), 0);
         assertEq(bondToken.balanceOf(holder), 0);
     }
@@ -41,7 +41,7 @@ contract BondIssuanceClaimDelegateTest is BondIssuanceRedemptionFixtures {
     function test_revertWhenDelegateRevokedOrUnauthorized() public {
         warpToMaturity();
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 105_000e6);
+        issuance.depositRedemption(address(bondToken), 100_301_369_800);
 
         vm.prank(holder);
         issuance.setClaimDelegate(delegate);
@@ -56,7 +56,7 @@ contract BondIssuanceClaimDelegateTest is BondIssuanceRedemptionFixtures {
     function test_delegateClaimRespectsClaimsPause() public {
         warpToMaturity();
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 105_000e6);
+        issuance.depositRedemption(address(bondToken), 100_301_369_800);
 
         vm.prank(holder);
         issuance.setClaimDelegate(delegate);

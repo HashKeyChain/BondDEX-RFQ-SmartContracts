@@ -10,7 +10,15 @@ import {Test} from "forge-std/Test.sol";
 import {BondToken} from "../../src/BondToken.sol";
 import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
 import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
-import {Role, Order, OrderSide, FeeConfig} from "../../src/types/BondTypes.sol";
+import {
+    Role,
+    Order,
+    OrderSide,
+    FeeConfig,
+    BondCategory,
+    CouponFrequency,
+    DayCount
+} from "../../src/types/BondTypes.sol";
 import {RFQSettlement} from "../../src/RFQSettlement.sol";
 
 abstract contract RFQSettlementFixtures is Test {
@@ -62,16 +70,23 @@ abstract contract RFQSettlementFixtures is Test {
         );
 
         bondToken = new BondToken(
-            issuer,
-            "HashKey Bond",
-            "HKB",
-            18,
-            1_000e6,
-            500,
-            block.timestamp + 30 days,
-            address(usdc),
-            address(complianceModule),
-            issuanceController
+            BondToken.ConstructorParams({
+                issuer: issuer,
+                name: "HashKey Bond",
+                symbol: "HKB",
+                decimals: 18,
+                faceValue: 1_000e6,
+                couponRateBps: 500,
+                maturityTimestamp: block.timestamp + 30 days,
+                settlementToken: address(usdc),
+                complianceModule: address(complianceModule),
+                issuanceController: issuanceController,
+                issueDate: block.timestamp,
+                dayCountConvention: DayCount.ACT_365,
+                couponFrequency: CouponFrequency.BULLET,
+                bondCategory: BondCategory.CORPORATE,
+                isin: bytes12(0)
+            })
         );
 
         vm.prank(factory);
@@ -135,7 +150,8 @@ abstract contract RFQSettlementFixtures is Test {
                 expiry: block.timestamp + 1 days,
                 nonce: nonce,
                 salt: salt,
-                maxFeeBps: 10_000
+                maxFeeBps: 10_000,
+                accruedInterest: 0
             });
     }
 
@@ -158,7 +174,8 @@ abstract contract RFQSettlementFixtures is Test {
                 expiry: block.timestamp + 1 days,
                 nonce: nonce,
                 salt: salt,
-                maxFeeBps: 10_000
+                maxFeeBps: 10_000,
+                accruedInterest: 0
             });
     }
 
@@ -180,7 +197,8 @@ abstract contract RFQSettlementFixtures is Test {
                 expiry: block.timestamp + 1 days,
                 nonce: nonce,
                 salt: salt,
-                maxFeeBps: 10_000
+                maxFeeBps: 10_000,
+                accruedInterest: 0
             });
     }
 

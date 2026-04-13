@@ -21,19 +21,19 @@ contract BondIssuanceClaimDirectTest is BondIssuanceRedemptionFixtures {
         warpToMaturity();
 
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 105_000e6);
+        issuance.depositRedemption(address(bondToken), 100_301_369_800);
 
         vm.expectEmit(true, true, true, true);
-        emit RedemptionClaimed(address(bondToken), holder, holder, 100e18, 105_000e6);
+        emit RedemptionClaimed(address(bondToken), holder, holder, 100e18, 100_301_369_800);
 
         vm.prank(holder);
         issuance.claim(address(bondToken));
 
         assertEq(bondToken.balanceOf(holder), 0);
-        assertEq(usdc.balanceOf(holder), 105_000e6);
+        assertEq(usdc.balanceOf(holder), 100_301_369_800);
         (uint256 fundedAmount, uint256 claimedAmount,) = issuance.getRedemptionState(address(bondToken));
-        assertEq(fundedAmount, 105_000e6);
-        assertEq(claimedAmount, 105_000e6);
+        assertEq(fundedAmount, 100_301_369_800);
+        assertEq(claimedAmount, 100_301_369_800);
     }
 
     function test_revertWhenInsufficientFunding() public {
@@ -51,20 +51,20 @@ contract BondIssuanceClaimDirectTest is BondIssuanceRedemptionFixtures {
         warpToMaturity();
 
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 105_000e6);
+        issuance.depositRedemption(address(bondToken), 100_301_369_800);
 
         vm.prank(admin);
         issuance.pauseDomain(PauseDomain.SETTLEMENT, true);
 
         vm.prank(holder);
         issuance.claim(address(bondToken));
-        assertEq(usdc.balanceOf(holder), 105_000e6);
+        assertEq(usdc.balanceOf(holder), 100_301_369_800);
 
         vm.prank(address(issuance));
         bondToken.mint(holder, 100e18);
-        usdc.mint(issuer, 105_000e6);
+        usdc.mint(issuer, 100_301_369_800);
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 105_000e6);
+        issuance.depositRedemption(address(bondToken), 100_301_369_800);
 
         vm.prank(admin);
         issuance.pauseDomain(PauseDomain.CLAIMS, true);

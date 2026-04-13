@@ -39,6 +39,7 @@ import {
     SubscriptionCapExceeded,
     SubscriptionNotActive,
     SubscriptionWindowClosed,
+    SubscriptionWindowExceedsIssueDate,
     UnsupportedSettlementToken,
     UnauthorizedClaimCaller,
     ZeroAddress,
@@ -205,6 +206,13 @@ contract BondIssuance is
         address indexed to,
         uint256 amount,
         address indexed operator
+    );
+
+    /// @notice Emitted when excess redemption liability is released for a bond series.
+    event ExcessRedemptionReleased(
+        address indexed bondToken,
+        address indexed settlementToken,
+        uint256 excessAmount
     );
 
     /// @notice Emitted when a holder sets or clears a claim delegate.
@@ -378,6 +386,14 @@ contract BondIssuance is
         _requireIssuer(bondToken, msg.sender);
         _requireValidWindow(terms.opensAt, terms.closesAt);
 
+        uint256 bondIssueDate = bondToken.issueDate();
+        if (terms.closesAt != 0 && terms.closesAt > bondIssueDate) {
+            revert SubscriptionWindowExceedsIssueDate(
+                terms.closesAt,
+                bondIssueDate
+            );
+        }
+
         if (block.timestamp >= bondToken.maturityTimestamp()) {
             revert BondAlreadyMatured(
                 terms.bondToken,
@@ -432,6 +448,10 @@ contract BondIssuance is
 
     /// @inheritdoc IBondIssuance
     /// @dev Pulls settlement tokens from a market maker, forwards them to the issuer, and mints bonds.
+    /// Primary-market subscriptions carry no accrued interest — the subscription price (unitPrice)
+    /// is a flat amount per bond. Interest accrual begins at the bond's issueDate, which is
+    /// typically set after the subscription window closes, ensuring all subscribers pay the same
+    /// price regardless of when they subscribed within the window.
     function subscribe(bytes32 offerId, uint256 units) external nonReentrant {
         if (units == 0) revert ZeroAmount();
         _requireDomainActive(PauseDomain.SUBSCRIPTION);
@@ -672,6 +692,49 @@ contract BondIssuance is
     }
 
     /// @inheritdoc IBondIssuance
+    /// @dev Releases provably excess redemption liability for one bond series.
+    /// Only callable after maturity. Computes actual obligation based on outstanding
+    /// bond supply and reduces the liability accordingly, making the excess rescuable.
+    function releaseExcessRedemption(
+        address bondTokenAddress
+    ) external nonReentrant onlyRole(DEFAULT_ADMIN_ROLE) {
+        IBondToken bondToken = IBondToken(bondTokenAddress);
+        if (block.timestamp <= bondToken.maturityTimestamp()) {
+            revert BondNotMatured(
+                bondTokenAddress,
+                bondToken.maturityTimestamp(),
+                block.timestamp
+            );
+        }
+
+        RedemptionState storage state = _redemptionStates[bondTokenAddress];
+        uint256 deposited = state.fundedAmount - state.claimedAmount;
+        if (deposited == 0) return;
+
+        uint256 outstanding = IERC20(bondTokenAddress).totalSupply();
+        uint256 actualObligation;
+        if (outstanding > 0) {
+            uint8 bondDecimals = IERC20Metadata(bondTokenAddress).decimals();
+            actualObligation = _quoteRedemptionPayout(
+                bondToken,
+                outstanding,
+                bondDecimals
+            );
+        }
+
+        if (deposited > actualObligation) {
+            uint256 excess = deposited - actualObligation;
+            _totalRedemptionLiability[bondToken.settlementToken()] -= excess;
+            state.fundedAmount -= excess;
+            emit ExcessRedemptionReleased(
+                bondTokenAddress,
+                bondToken.settlementToken(),
+                excess
+            );
+        }
+    }
+
+    /// @inheritdoc IBondIssuance
     /// @dev Returns the stored subscription approval record.
     function getSubscriptionApproval(
         bytes32 approvalId
@@ -734,19 +797,25 @@ contract BondIssuance is
             );
     }
 
-    /// @dev Shared principal-plus-coupon payout helper for redemption claims.
+    /// @dev Computes principal plus full-term accrued interest using BondToken's AI view.
     function _quoteRedemptionPayout(
+        IBondToken bondToken,
         uint256 bondAmount,
-        uint256 faceValue,
-        uint256 couponRateBps,
         uint8 bondDecimals
-    ) internal pure returns (uint256) {
+    ) internal view returns (uint256) {
         uint256 principal = Math.mulDiv(
             bondAmount,
-            faceValue,
+            bondToken.faceValue(),
             10 ** uint256(bondDecimals)
         );
-        uint256 interest = Math.mulDiv(principal, couponRateBps, 10_000);
+        uint256 aiPerUnit = bondToken.accruedInterestPerUnit(
+            bondToken.maturityTimestamp()
+        );
+        uint256 interest = Math.mulDiv(
+            aiPerUnit,
+            bondAmount,
+            10 ** uint256(bondDecimals)
+        );
         return principal + interest;
     }
 
@@ -835,9 +904,8 @@ contract BondIssuance is
 
         uint8 bondDecimals = IERC20Metadata(bondTokenAddress).decimals();
         uint256 payout = _quoteRedemptionPayout(
+            bondToken,
             bondAmount,
-            bondToken.faceValue(),
-            bondToken.couponRateBps(),
             bondDecimals
         );
         if (payout == 0) revert ZeroAmount();
@@ -865,6 +933,22 @@ contract BondIssuance is
             bondAmount,
             payout
         );
+
+        // After all bonds are burned, automatically release the excess redemption liability for this bond series.
+        if (IERC20(bondTokenAddress).totalSupply() == 0) {
+            uint256 excess = state.fundedAmount - state.claimedAmount;
+            if (excess > 0) {
+                _totalRedemptionLiability[
+                    bondToken.settlementToken()
+                ] -= excess;
+                state.fundedAmount = state.claimedAmount;
+                emit ExcessRedemptionReleased(
+                    bondTokenAddress,
+                    bondToken.settlementToken(),
+                    excess
+                );
+            }
+        }
     }
 
     /// @dev Reverts when closesAt is non-zero but not strictly after opensAt.

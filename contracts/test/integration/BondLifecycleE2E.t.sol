@@ -14,6 +14,9 @@ import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
 import {RFQSettlement} from "../../src/RFQSettlement.sol";
 import {
     BondConfig,
+    BondCategory,
+    CouponFrequency,
+    DayCount,
     Role,
     SubscriptionTerms,
     Order,
@@ -100,7 +103,12 @@ contract BondLifecycleE2ETest is Test {
             settlementTokenDecimals: 6,
             complianceImplementation: address(complianceImplementation),
             policyId: keccak256("policy"),
-            policyVersion: 1
+            policyVersion: 1,
+            issueDate: block.timestamp + 2 days,
+            dayCountConvention: DayCount.ACT_365,
+            couponFrequency: CouponFrequency.BULLET,
+            bondCategory: BondCategory.CORPORATE,
+            isin: bytes12(0)
         });
 
         vm.prank(issuer);
@@ -167,7 +175,8 @@ contract BondLifecycleE2ETest is Test {
             expiry: block.timestamp + 1 days,
             nonce: 0,
             salt: 1,
-            maxFeeBps: 10_000
+            maxFeeBps: 10_000,
+            accruedInterest: 0
         });
         bytes32 digest = settlement.hashOrder(order);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(MAKER_PK, digest);
@@ -177,16 +186,16 @@ contract BondLifecycleE2ETest is Test {
 
         vm.warp(block.timestamp + 31 days);
 
-        usdc.mint(issuer, 10_500e6);
+        usdc.mint(issuer, 10_038_356_160);
         vm.prank(issuer);
         usdc.approve(address(issuance), type(uint256).max);
         vm.prank(issuer);
-        issuance.depositRedemption(bondTokenAddress, 10_500e6);
+        issuance.depositRedemption(bondTokenAddress, 10_038_356_160);
 
         vm.prank(investor);
         issuance.claim(bondTokenAddress);
 
-        assertEq(usdc.balanceOf(investor), 500_000e6 - 10_500e6 + 10_500e6);
+        assertEq(usdc.balanceOf(investor), 499_538_356_160);
         assertEq(bondToken.balanceOf(investor), 0);
         assertEq(usdc.balanceOf(feeRecipient), 52_500_000);
     }

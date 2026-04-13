@@ -11,7 +11,10 @@ import {RFQSettlement} from "../src/RFQSettlement.sol";
 import {MockERC20Decimals} from "../test/mocks/MockERC20Decimals.sol";
 import {
     ApprovalStatus,
+    BondCategory,
     BondConfig,
+    CouponFrequency,
+    DayCount,
     FeeConfig,
     Order,
     OrderSide,
@@ -105,14 +108,20 @@ contract Operations is BaseConfig {
     }
 
     /// @notice 创建债券（发行人调用）
-    /// @param approvalId 审批 ID
+    /// @param approvalId 审批 ID（必须已审批且未消费）
     /// @param name_ 债券名称
     /// @param symbol_ 债券符号
-    /// @param decimals_ 债券精度（0 = 整数 bond, 18 = 标准）
+    /// @param decimals_ 精度（0=整数 bond, 18=标准）
     /// @param faceValue_ 面值（结算代币最小单位）
-    /// @param couponRateBps_ 票息率 bps
-    /// @param maturityTimestamp_ 到期时间 Unix
+    /// @param couponRateBps_ 年化票息率 bps（500=5%/年）
+    /// @param maturityTimestamp_ 到期时间（Unix 时间戳）
     /// @param settlementToken_ 结算代币地址
+    /// @param extendedData abi.encode(uint256 issueDate, uint8 dayCount, uint8 couponFreq, uint8 bondCategory, bytes12 isin)
+    ///   - issueDate: 起息日（Unix 时间戳）
+    ///   - dayCount: 计息惯例（0=ACT_365, 1=ACT_360, 2=THIRTY_360）
+    ///   - couponFreq: 付息频率（0=BULLET, 1=ANNUAL, 2=SEMI_ANNUAL, 3=QUARTERLY）
+    ///   - bondCategory: 债券类别（0=CORPORATE, 1=GOVERNMENT, 2=CONVERTIBLE, 3=ABS）
+    ///   - isin: ISIN 代码（12 字节，留空填 bytes12(0)）
     function createBond(
         bytes32 approvalId,
         string calldata name_,
@@ -121,7 +130,8 @@ contract Operations is BaseConfig {
         uint256 faceValue_,
         uint256 couponRateBps_,
         uint256 maturityTimestamp_,
-        address settlementToken_
+        address settlementToken_,
+        bytes calldata extendedData
     ) external {
         uint256 pk = _senderPk();
         BondConfig memory config = _buildBondConfig(
@@ -134,7 +144,23 @@ contract Operations is BaseConfig {
             maturityTimestamp_,
             settlementToken_
         );
+        _applyExtended(config, extendedData);
         _executeBondCreation(config, approvalId, pk);
+    }
+
+    function _applyExtended(
+        BondConfig memory config,
+        bytes calldata data
+    ) internal pure {
+        (uint256 d, uint8 dc, uint8 f, uint8 c, bytes12 i) = abi.decode(
+            data,
+            (uint256, uint8, uint8, uint8, bytes12)
+        );
+        config.issueDate = d;
+        config.dayCountConvention = DayCount(dc);
+        config.couponFrequency = CouponFrequency(f);
+        config.bondCategory = BondCategory(c);
+        config.isin = i;
     }
 
     function _buildBondConfig(
@@ -362,6 +388,7 @@ contract Operations is BaseConfig {
     /// @param expiry 过期时间
     /// @param nonce maker nonce
     /// @param salt 随机盐
+    /// @param accruedInterest 应计利息（结算代币最小单位）
     function fillOrder(
         address makerAddr,
         address takerAddr,
@@ -372,7 +399,8 @@ contract Operations is BaseConfig {
         uint8 side,
         uint256 expiry,
         uint256 nonce,
-        uint256 salt
+        uint256 salt,
+        uint256 accruedInterest
     ) external {
         (, , address settlementAddr, ) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
@@ -388,7 +416,8 @@ contract Operations is BaseConfig {
             expiry: expiry,
             nonce: nonce,
             salt: salt,
-            maxFeeBps: 10_000
+            maxFeeBps: 10_000,
+            accruedInterest: accruedInterest
         });
 
         uint256 makerPk = vm.envUint("MAKER_PRIVATE_KEY");
@@ -415,7 +444,8 @@ contract Operations is BaseConfig {
         uint8 side,
         uint256 expiry,
         uint256 nonce,
-        uint256 salt
+        uint256 salt,
+        uint256 accruedInterest
     ) external {
         (, , address settlementAddr, ) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
@@ -431,7 +461,8 @@ contract Operations is BaseConfig {
             expiry: expiry,
             nonce: nonce,
             salt: salt,
-            maxFeeBps: 10_000
+            maxFeeBps: 10_000,
+            accruedInterest: accruedInterest
         });
 
         vm.startBroadcast(_senderPk());
@@ -626,6 +657,16 @@ contract Operations is BaseConfig {
         console2.log("Fee config updated:", currentFeeBps, "bps");
     }
 
+    /// @notice 设置应计利息容差窗口（SETTLEMENT_ADMIN_ROLE 调用）
+    function setAiToleranceSeconds(uint256 toleranceSeconds) external {
+        (, , address settlementAddr, ) = _deployment();
+        RFQSettlement stl = RFQSettlement(settlementAddr);
+        vm.startBroadcast(_senderPk());
+        stl.setAiToleranceSeconds(toleranceSeconds);
+        vm.stopBroadcast();
+        console2.log("AI tolerance set to:", toleranceSeconds, "seconds");
+    }
+
     /// @notice 紧急代币救援（DEFAULT_ADMIN_ROLE 调用）
     function rescueTokens(address token, address to, uint256 amount) external {
         (, address issuanceAddr, , ) = _deployment();
@@ -636,6 +677,18 @@ contract Operations is BaseConfig {
         vm.stopBroadcast();
 
         console2.log("Tokens rescued:", amount);
+    }
+
+    /// @notice 释放超额赎回负债（DEFAULT_ADMIN_ROLE 调用，债券到期后）
+    function releaseExcessRedemption(address bondTokenAddr) external {
+        (, address issuanceAddr, , ) = _deployment();
+        BondIssuance iss = BondIssuance(issuanceAddr);
+
+        vm.startBroadcast(_senderPk());
+        iss.releaseExcessRedemption(bondTokenAddr);
+        vm.stopBroadcast();
+
+        console2.log("Excess redemption released for bond:", bondTokenAddr);
     }
 
     /// @notice ERC-20 approve（通用工具，适用于任何代币）
@@ -762,6 +815,14 @@ contract Operations is BaseConfig {
         console2.log("  maxFeeBps:    ", fc.maxFeeBps);
     }
 
+    /// @notice 查询应计利息容差
+    function queryAiTolerance() external view {
+        (, , address settlementAddr, ) = _deployment();
+        RFQSettlement stl = RFQSettlement(settlementAddr);
+        uint256 tolerance = stl.aiToleranceSeconds();
+        console2.log("AI tolerance:", tolerance, "seconds");
+    }
+
     /// @notice 查询 maker nonce
     function queryNonce(address makerAddr) external view {
         (, , address settlementAddr, ) = _deployment();
@@ -780,17 +841,17 @@ contract Operations is BaseConfig {
         console2.log("Bond token", bondTokenAddr, "registered:", registered);
     }
 
-    /// @notice 预估手续费
+    /// @notice 预估手续费（基于 dirty amount = quoteAmount + accruedInterest）
     function queryFee(
         address bondTokenAddr,
         address partyA,
         address partyB,
-        uint256 quoteAmount
+        uint256 dirtyAmount
     ) external view {
         (, , address settlementAddr, ) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
-        uint256 fee = stl.quoteFee(bondTokenAddr, partyA, partyB, quoteAmount);
+        uint256 fee = stl.quoteFee(bondTokenAddr, partyA, partyB, dirtyAmount);
         console2.log("Estimated fee:", fee);
     }
 

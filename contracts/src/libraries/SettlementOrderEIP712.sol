@@ -25,7 +25,7 @@ library SettlementOrderEIP712 {
     /// @notice Type hash for the RFQ order payload.
     bytes32 internal constant ORDER_TYPEHASH =
         keccak256(
-            "Order(address maker,address taker,address bondToken,address quoteToken,uint256 bondAmount,uint256 quoteAmount,uint8 side,uint256 expiry,uint256 nonce,uint256 salt,uint16 maxFeeBps)"
+            "Order(address maker,address taker,address bondToken,address quoteToken,uint256 bondAmount,uint256 quoteAmount,uint8 side,uint256 expiry,uint256 nonce,uint256 salt,uint16 maxFeeBps,uint256 accruedInterest)"
         );
 
     /// @notice Computes the EIP-712 domain separator for a specific contract and chain.
@@ -66,7 +66,8 @@ library SettlementOrderEIP712 {
                     order.expiry,
                     order.nonce,
                     order.salt,
-                    order.maxFeeBps
+                    order.maxFeeBps,
+                    order.accruedInterest
                 )
             );
     }

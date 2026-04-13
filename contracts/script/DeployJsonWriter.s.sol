@@ -5,6 +5,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {console2} from "forge-std/console2.sol";
 import {BaseConfig} from "./BaseConfig.s.sol";
 import {DeployConfig, TokenPolicy, DeployResult} from "./DeployTypes.s.sol";
+import {RFQSettlement} from "../src/RFQSettlement.sol";
 
 /// @title DeployJsonWriter
 /// @notice 部署结果 JSON 序列化与日志输出。
@@ -22,7 +23,7 @@ abstract contract DeployJsonWriter is BaseConfig {
             _jsonHeader(),
             _jsonMeta(cfg),
             _jsonContracts(r),
-            _jsonConfig(cfg, tokens),
+            _jsonConfig(cfg, r, tokens),
             _jsonRoles(cfg),
             _jsonHandoff(cfg),
             "}\n"
@@ -135,13 +136,19 @@ abstract contract DeployJsonWriter is BaseConfig {
 
     function _jsonConfig(
         DeployConfig memory cfg,
+        DeployResult memory r,
         TokenPolicy[] memory tokens
-    ) internal pure returns (string memory) {
+    ) internal view returns (string memory) {
+        uint256 aiTolerance = RFQSettlement(r.rfqSettlement)
+            .aiToleranceSeconds();
         return
             string.concat(
                 '  "configuration": {\n',
                 _jsonTokenPolicies(tokens),
                 _jsonFeeConfig(cfg),
+                '    "aiToleranceSeconds": ',
+                aiTolerance.toString(),
+                ",\n",
                 '    "complianceImplementationRegistered": true\n',
                 "  },\n"
             );

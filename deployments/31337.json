@@ -2,7 +2,7 @@
   "version": "0.1.0-draft",
   "chainId": 31337,
   "network": "anvil",
-  "deployedAt": 1775839788,
+  "deployedAt": 1767139200,
   "blockNumber": 0,
   "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
   "platformAdmin": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
@@ -31,6 +31,7 @@
       "currentFeeBps": 30,
       "maxFeeBps": 1000
     },
+    "aiToleranceSeconds": 300,
     "complianceImplementationRegistered": true
   },
   "roles": {
@@ -42,6 +43,7 @@
     },
     "bondIssuance": {
       "DEFAULT_ADMIN_ROLE": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "ISSUANCE_APPROVER_ROLE": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
       "SETTLEMENT_ADMIN_ROLE": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
       "PAUSER_ROLE": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
       "UPGRADER_ROLE": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"

@@ -14,6 +14,7 @@ contract RFQSettlementFillOrderTest is RFQSettlementFixtures {
         uint8 side,
         uint256 bondAmount,
         uint256 quoteAmount,
+        uint256 accruedInterest,
         uint256 feeAmount,
         address feeRecipient
     );
@@ -37,6 +38,7 @@ contract RFQSettlementFillOrderTest is RFQSettlementFixtures {
             0,
             10e18,
             10_500e6,
+            0,
             0,
             feeRecipient
         );

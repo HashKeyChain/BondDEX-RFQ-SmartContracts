@@ -336,7 +336,7 @@
       {
         "name": "status",
         "type": "uint8",
-        "internalType": "uint8"
+        "internalType": "enum ApprovalStatus"
       }
     ],
     "stateMutability": "view"
@@ -436,6 +436,19 @@
   },
   {
     "type": "function",
+    "name": "markSubscriptionExpired",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "pauseDomain",
     "inputs": [
       {
@@ -464,6 +477,19 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "releaseExcessRedemption",
+    "inputs": [
+      {
+        "name": "bondTokenAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -654,6 +680,31 @@
         "type": "address",
         "indexed": false,
         "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ExcessRedemptionReleased",
+    "inputs": [
+      {
+        "name": "bondToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "settlementToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "excessAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -1467,6 +1518,22 @@
       },
       {
         "name": "currentTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "SubscriptionWindowExceedsIssueDate",
+    "inputs": [
+      {
+        "name": "closesAt",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "issueDate",
         "type": "uint256",
         "internalType": "uint256"
       }

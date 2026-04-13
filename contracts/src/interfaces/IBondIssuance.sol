@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ApprovalStatus, PauseDomain, SubscriptionTerms} from "../types/BondTypes.sol";
+import {
+    ApprovalStatus,
+    PauseDomain,
+    SubscriptionTerms
+} from "../types/BondTypes.sol";
 
 /// @title IBondIssuance
 /// @notice Interface for primary-market subscription management and post-maturity redemption flows.
@@ -141,6 +145,12 @@ interface IBondIssuance {
     /// @param to Recipient address.
     /// @param amount Amount to transfer.
     function rescueTokens(address token, address to, uint256 amount) external;
+
+    /// @dev Releases provably excess redemption liability for one matured bond series.
+    /// Computes actual obligation from outstanding supply and reduces tracked liability,
+    /// making the excess available for rescue. Only callable after maturity by admin.
+    /// @param bondToken Bond token address.
+    function releaseExcessRedemption(address bondToken) external;
 
     /// @dev Returns one subscription approval record.
     /// @param approvalId Subscription approval identifier.

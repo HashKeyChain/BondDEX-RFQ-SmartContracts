@@ -129,6 +129,31 @@
             "name": "policyVersion",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "issueDate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "dayCountConvention",
+            "type": "uint8",
+            "internalType": "enum DayCount"
+          },
+          {
+            "name": "couponFrequency",
+            "type": "uint8",
+            "internalType": "enum CouponFrequency"
+          },
+          {
+            "name": "bondCategory",
+            "type": "uint8",
+            "internalType": "enum BondCategory"
+          },
+          {
+            "name": "isin",
+            "type": "bytes12",
+            "internalType": "bytes12"
           }
         ]
       },
@@ -342,6 +367,19 @@
   },
   {
     "type": "function",
+    "name": "markIssuanceExpired",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "pauseDomain",
     "inputs": [
       {
@@ -533,6 +571,49 @@
         "type": "address",
         "indexed": false,
         "internalType": "address"
+      },
+      {
+        "name": "issueDate",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "BondMetadata",
+    "inputs": [
+      {
+        "name": "bondToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "dayCountConvention",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "couponFrequency",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "bondCategory",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "isin",
+        "type": "bytes12",
+        "indexed": false,
+        "internalType": "bytes12"
       }
     ],
     "anonymous": false
@@ -844,6 +925,22 @@
         "name": "reason",
         "type": "string",
         "internalType": "string"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidIssueDate",
+    "inputs": [
+      {
+        "name": "issueDate",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "maturityTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },

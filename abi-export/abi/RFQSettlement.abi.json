@@ -32,6 +32,19 @@
   },
   {
     "type": "function",
+    "name": "aiToleranceSeconds",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "batchCancelOrders",
     "inputs": [
       {
@@ -93,6 +106,11 @@
             "name": "maxFeeBps",
             "type": "uint16",
             "internalType": "uint16"
+          },
+          {
+            "name": "accruedInterest",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
@@ -163,6 +181,11 @@
             "name": "maxFeeBps",
             "type": "uint16",
             "internalType": "uint16"
+          },
+          {
+            "name": "accruedInterest",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       },
@@ -238,6 +261,11 @@
             "name": "maxFeeBps",
             "type": "uint16",
             "internalType": "uint16"
+          },
+          {
+            "name": "accruedInterest",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
@@ -357,6 +385,11 @@
             "name": "maxFeeBps",
             "type": "uint16",
             "internalType": "uint16"
+          },
+          {
+            "name": "accruedInterest",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       },
@@ -493,6 +526,11 @@
             "name": "maxFeeBps",
             "type": "uint16",
             "internalType": "uint16"
+          },
+          {
+            "name": "accruedInterest",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
@@ -685,7 +723,7 @@
         "internalType": "address"
       },
       {
-        "name": "quoteAmount",
+        "name": "dirtyAmount",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -730,6 +768,19 @@
         "name": "account",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setAiToleranceSeconds",
+    "inputs": [
+      {
+        "name": "toleranceSeconds",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -850,6 +901,25 @@
     ],
     "outputs": [],
     "stateMutability": "payable"
+  },
+  {
+    "type": "event",
+    "name": "AiToleranceUpdated",
+    "inputs": [
+      {
+        "name": "newToleranceSeconds",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "operator",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -1012,6 +1082,12 @@
       },
       {
         "name": "quoteAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "accruedInterest",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1187,6 +1263,27 @@
         "name": "neededRole",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AccruedInterestMismatch",
+    "inputs": [
+      {
+        "name": "declared",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "tolerance",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },

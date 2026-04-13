@@ -5,7 +5,13 @@ import {Test} from "forge-std/Test.sol";
 
 import {BondToken} from "../../src/BondToken.sol";
 import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
-import {PauseDomain, Role} from "../../src/types/BondTypes.sol";
+import {
+    BondCategory,
+    CouponFrequency,
+    DayCount,
+    PauseDomain,
+    Role
+} from "../../src/types/BondTypes.sol";
 
 contract StaticRestrictionComplianceMock is IComplianceModule {
     uint8 internal _restrictionCode;
@@ -46,40 +52,92 @@ contract BondTokenMetadataAndMintBurnTest is Test {
     function setUp() public {
         complianceModule = new StaticRestrictionComplianceMock();
         bondToken = new BondToken(
-            issuer,
-            "HashKey Bond",
-            "HKB",
-            18,
-            1_000e6,
-            500,
-            block.timestamp + 30 days,
-            stablecoin,
-            address(complianceModule),
-            issuanceController
+            BondToken.ConstructorParams({
+                issuer: issuer,
+                name: "HashKey Bond",
+                symbol: "HKB",
+                decimals: 18,
+                faceValue: 1_000e6,
+                couponRateBps: 500,
+                maturityTimestamp: block.timestamp + 30 days,
+                settlementToken: stablecoin,
+                complianceModule: address(complianceModule),
+                issuanceController: issuanceController,
+                issueDate: block.timestamp,
+                dayCountConvention: DayCount.ACT_365,
+                couponFrequency: CouponFrequency.BULLET,
+                bondCategory: BondCategory.CORPORATE,
+                isin: bytes12(0)
+            })
         );
     }
 
     function test_revertWhenConstructedWithZeroFaceValue() public {
         vm.expectRevert();
         new BondToken(
-            issuer, "HKB", "HKB", 18, 0, 500,
-            block.timestamp + 30 days, stablecoin, address(complianceModule), issuanceController
+            BondToken.ConstructorParams({
+                issuer: issuer,
+                name: "HKB",
+                symbol: "HKB",
+                decimals: 18,
+                faceValue: 0,
+                couponRateBps: 500,
+                maturityTimestamp: block.timestamp + 30 days,
+                settlementToken: stablecoin,
+                complianceModule: address(complianceModule),
+                issuanceController: issuanceController,
+                issueDate: block.timestamp,
+                dayCountConvention: DayCount.ACT_365,
+                couponFrequency: CouponFrequency.BULLET,
+                bondCategory: BondCategory.CORPORATE,
+                isin: bytes12(0)
+            })
         );
     }
 
     function test_revertWhenConstructedWithExcessiveCouponRate() public {
         vm.expectRevert();
         new BondToken(
-            issuer, "HKB", "HKB", 18, 1_000e6, 10_001,
-            block.timestamp + 30 days, stablecoin, address(complianceModule), issuanceController
+            BondToken.ConstructorParams({
+                issuer: issuer,
+                name: "HKB",
+                symbol: "HKB",
+                decimals: 18,
+                faceValue: 1_000e6,
+                couponRateBps: 10_001,
+                maturityTimestamp: block.timestamp + 30 days,
+                settlementToken: stablecoin,
+                complianceModule: address(complianceModule),
+                issuanceController: issuanceController,
+                issueDate: block.timestamp,
+                dayCountConvention: DayCount.ACT_365,
+                couponFrequency: CouponFrequency.BULLET,
+                bondCategory: BondCategory.CORPORATE,
+                isin: bytes12(0)
+            })
         );
     }
 
     function test_revertWhenConstructedWithPastMaturity() public {
         vm.expectRevert();
         new BondToken(
-            issuer, "HKB", "HKB", 18, 1_000e6, 500,
-            block.timestamp - 1, stablecoin, address(complianceModule), issuanceController
+            BondToken.ConstructorParams({
+                issuer: issuer,
+                name: "HKB",
+                symbol: "HKB",
+                decimals: 18,
+                faceValue: 1_000e6,
+                couponRateBps: 500,
+                maturityTimestamp: block.timestamp - 1,
+                settlementToken: stablecoin,
+                complianceModule: address(complianceModule),
+                issuanceController: issuanceController,
+                issueDate: block.timestamp,
+                dayCountConvention: DayCount.ACT_365,
+                couponFrequency: CouponFrequency.BULLET,
+                bondCategory: BondCategory.CORPORATE,
+                isin: bytes12(0)
+            })
         );
     }
 

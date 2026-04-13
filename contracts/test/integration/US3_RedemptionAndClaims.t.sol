@@ -12,7 +12,7 @@ contract US3RedemptionAndClaimsIntegrationTest is BondIssuanceRedemptionFixtures
         warpToMaturity();
 
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 105_000e6);
+        issuance.depositRedemption(address(bondToken), 100_301_369_800);
 
         vm.prank(holder);
         issuance.setClaimDelegate(delegate);
@@ -20,7 +20,7 @@ contract US3RedemptionAndClaimsIntegrationTest is BondIssuanceRedemptionFixtures
         vm.prank(delegate);
         issuance.claimFor(address(bondToken), holder);
 
-        assertEq(usdc.balanceOf(holder), 105_000e6);
+        assertEq(usdc.balanceOf(holder), 100_301_369_800);
         assertEq(usdc.balanceOf(delegate), 0);
         assertEq(bondToken.balanceOf(holder), 0);
     }

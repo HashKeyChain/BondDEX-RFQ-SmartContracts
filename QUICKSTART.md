@@ -131,10 +131,10 @@ make build
 
 ```bash
 make test-us1   # 发行审批 + 一级认购
-make test-us2   # RFQ 二级成交、批量成交、手续费
+make test-us2   # RFQ 二级成交、批量成交、手续费、应计利息验证
 make test-us3   # 赎回注资 + 持有人兑付
 make test-e2e   # 完整生命周期 E2E
-make test        # 全量回归（98 用例）
+make test        # 全量回归
 ```
 
 ## 3. 在本地 Anvil 上验证一站式部署
@@ -163,17 +163,17 @@ DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf
 
 ### 3.1 端到端演示
 
-部署完成后，可运行完整生命周期演示（铸造 → 创建债券 → 合规配置 → 一级认购 → 二级 RFQ 交易 → 到期赎回）：
+一键执行完整生命周期演示（自动启动 Anvil → 部署 → 演示 → 关闭 Anvil）：
 
 ```bash
 make demo-anvil
 ```
 
-该命令自动分两阶段执行：到期前全部业务 → 推进 Anvil 时间到到期日 → 赎回与领取。每个 broadcast 交易独占一个区块。
+该命令自动以 2025-12-31 时间戳启动 Anvil，部署合约后按真实时间线多阶段执行：认购窗口（2026-01-01）→ 起息后 12 分钟 → +2 天 → 每月推进至 +3 月 → 到期日（2027-01-09），Makefile 通过 `cast rpc` 自动推进 Anvil 时间。每笔 RFQ 交易包含基于链上时间自动计算的应计利息。演示结束后自动关闭 Anvil。
 
-演示覆盖 9 个参与者（admin / issuer / makerA / makerB / makerC / investorA / investorB / investorC / delegate），包括：超额认购报错、未授权认购报错、RFQ 买卖含手续费、做市商间免手续费、取消订单、过期订单、投资者间交易限制、代理领取、多余资金救援等场景。
+演示覆盖 9 个参与者（admin / issuer / makerA / makerB / makerC / investorA / investorB / investorC / delegate），包括：超额认购报错、未授权认购报错、RFQ 买卖含应计利息和手续费、做市商间免手续费但有应计利息、取消订单、过期订单、投资者间交易限制、代理领取、多余资金救援等场景。
 
-如需纯模拟（不发送交易，含 `vm.warp`）：
+如需纯模拟（不需要 Anvil 运行，含 `vm.warp`，单次完成全流程；需要先有 `deployments/31337.json`）：
 
 ```bash
 make demo-anvil-sim
@@ -196,6 +196,8 @@ ENV=mainnet DEPLOYER_PRIVATE_KEY=0x... make ops-set-whitelist ARGS="0xCM地址 0
 ```
 
 查询类操作（`ops-query-*`）不需要私钥。详见 `docs/部署后操作手册.md`。
+
+应计利息容差配置（`setAiToleranceSeconds` / `aiToleranceSeconds`）可通过 `Operations.s.sol` 直接调用，详见 `docs/部署后操作手册.md`。
 
 ## 4. 导出 ABI
 
@@ -278,6 +280,7 @@ DEPLOYER_PRIVATE_KEY=0x你的私钥 make deploy-testnet
 | `contracts` | 所有合约地址（代理 + 实现） |
 | `configuration.settlementTokens[]` | 每条代币的完整策略 |
 | `configuration.feeConfig` | 手续费率和接收地址 |
+| `configuration.aiToleranceSeconds` | 应计利息验证容差（秒），从链上读取 |
 | `roles.bondFactory` | BondFactory 每个角色的持有者 |
 | `roles.bondIssuance` | BondIssuance 每个角色的持有者 |
 | `roles.rfqSettlement` | RFQSettlement 每个角色的持有者 |
@@ -294,8 +297,61 @@ DEPLOYER_PRIVATE_KEY=0x你的私钥 make deploy-testnet
 | `DEPLOYER_PRIVATE_KEY=0x... make deploy-anvil` | 本地 Anvil 一站式部署 |
 | `DEPLOYER_PRIVATE_KEY=0x... make deploy-testnet` | 测试网一站式部署 + 权限移交 |
 | `DEPLOYER_PRIVATE_KEY=0x... make deploy-mainnet` | 主网一站式部署 + 权限移交 |
-| `make demo-anvil` | Anvil 端到端演示（两阶段：到期前 + 时间推进 + 到期后） |
-| `make demo-anvil-sim` | 纯模拟演示（不 broadcast，含 vm.warp） |
+| `make ops-release-excess-redemption ARGS="<bondToken>"` | 释放超额赎回负债（到期后） |
+| `make demo-anvil` | Anvil 端到端演示（多阶段：按真实时间线推进认购→RFQ→赎回） |
+| `make demo-anvil-sim` | 纯模拟演示（不 broadcast，含 vm.warp，单次完成） |
 | `make export-abi` | 导出 ABI |
 | `ENV=testnet make ops-query-*` | 测试网查询（不需要私钥） |
 | `ENV=testnet DEPLOYER_PRIVATE_KEY=0x... make ops-*` | 测试网写入操作 |
+
+## BondConfig 字段速查
+
+`createBond` 使用的 `BondConfig` 结构体完整示例：
+
+```solidity
+BondConfig({
+    issuer:                   0x发行人地址,
+    name:                     "HashKey Bond 2026-Q1",
+    symbol:                   "HKB-Q1",
+    decimals:                 0,
+    faceValue:                1_000e6,           // 1,000 USDC
+    couponRateBps:            500,               // 年化 5%（注意：现在是年化利率）
+    maturityTimestamp:        1767225600,         // 2026-01-01 到期
+    issueDate:                1704067200,         // 2024-01-01 发行
+    dayCountConvention:       DayCount.ACT_365,
+    couponFrequency:          CouponFrequency.BULLET,
+    bondCategory:             BondCategory.CORPORATE,
+    isin:                     bytes12(0),         // 或填入 12 字节 ISIN
+    settlementToken:          0xUSDC地址,
+    settlementTokenDecimals:  6,
+    complianceImplementation: 0x已注册合规模板地址,
+    policyId:                 keccak256("policy-v1"),
+    policyVersion:            1
+})
+```
+
+**DayCountConvention 枚举值：**
+
+| 枚举 | 值 | 说明 |
+| --- | --- | --- |
+| `ACT_365` | 0 | 实际天数 / 365 |
+| `ACT_360` | 1 | 实际天数 / 360 |
+| `THIRTY_360` | 2 | 30/360 规则 |
+
+**CouponFrequency 枚举值：**
+
+| 枚举 | 值 | 说明 |
+| --- | --- | --- |
+| `BULLET` | 0 | 到期一次性付息（最常见） |
+| `ANNUAL` | 1 | 每年付息 |
+| `SEMI_ANNUAL` | 2 | 每半年付息 |
+| `QUARTERLY` | 3 | 每季度付息 |
+
+**BondCategory 枚举值：**
+
+| 枚举 | 值 | 说明 |
+| --- | --- | --- |
+| `CORPORATE` | 0 | 公司债 |
+| `GOVERNMENT` | 1 | 政府债 |
+| `CONVERTIBLE` | 2 | 可转债 |
+| `ABS` | 3 | 资产支持证券 |

@@ -11,7 +11,7 @@ import {BondIssuance} from "../../src/BondIssuance.sol";
 import {BondToken} from "../../src/BondToken.sol";
 import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
 import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
-import {Role, SubscriptionTerms} from "../../src/types/BondTypes.sol";
+import {BondCategory, CouponFrequency, DayCount, Role, SubscriptionTerms} from "../../src/types/BondTypes.sol";
 
 contract US1SubscriptionHandler is Test {
     BondIssuance internal immutable issuance;
@@ -85,16 +85,23 @@ contract US1PrimaryMarketAccountingInvariantTest is StdInvariant, Test {
         );
 
         bondToken = new BondToken(
-            issuer,
-            "HashKey Bond",
-            "HKB",
-            18,
-            1_000e6,
-            500,
-            block.timestamp + 30 days,
-            address(usdc),
-            address(module),
-            address(issuance)
+            BondToken.ConstructorParams({
+                issuer: issuer,
+                name: "HashKey Bond",
+                symbol: "HKB",
+                decimals: 18,
+                faceValue: 1_000e6,
+                couponRateBps: 500,
+                maturityTimestamp: block.timestamp + 30 days,
+                settlementToken: address(usdc),
+                complianceModule: address(module),
+                issuanceController: address(issuance),
+                issueDate: block.timestamp + 8 days,
+                dayCountConvention: DayCount.ACT_365,
+                couponFrequency: CouponFrequency.BULLET,
+                bondCategory: BondCategory.CORPORATE,
+                isin: bytes12(0)
+            })
         );
 
         vm.prank(factory);

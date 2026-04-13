@@ -2,15 +2,19 @@
 pragma solidity ^0.8.28;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {
     InvalidBondConfig,
+    InvalidIssueDate,
     UnauthorizedController,
     TransferRestricted,
     ZeroAddress
 } from "./libraries/BondErrors.sol";
+import {DateLib} from "./libraries/DateLib.sol";
 import {IComplianceModule} from "./interfaces/IComplianceModule.sol";
 import {IBondToken} from "./interfaces/IBondToken.sol";
+import {BondCategory, CouponFrequency, DayCount} from "./types/BondTypes.sol";
 
 /// @title BondToken
 /// @notice ERC-20 bond instrument with immutable issuance terms and compliance-gated transfers.
@@ -32,70 +36,133 @@ contract BondToken is ERC20, IBondToken {
     /// @notice Face value per whole bond unit denominated in settlement-token units.
     uint256 public immutable faceValue;
 
-    /// @notice Coupon rate expressed in basis points.
+    /// @notice Annual coupon rate expressed in basis points.
     uint256 public immutable couponRateBps;
 
     /// @notice Unix timestamp after which redemption claims become available.
     uint256 public immutable maturityTimestamp;
 
+    /// @notice Predetermined interest accrual start date, shared by all holders.
+    /// Typically set after the subscription window closes. No interest accrues before this date;
+    /// secondary-market buyers compensate sellers for accrued interest since this date.
+    uint256 public immutable issueDate;
+
+    /// @notice Day count convention used for accrued interest calculation.
+    DayCount public immutable dayCountConvention;
+
+    /// @notice Coupon payment frequency.
+    CouponFrequency public immutable couponFrequency;
+
+    /// @notice Bond category classification.
+    BondCategory public immutable bondCategory;
+
+    /// @notice International Securities Identification Number (ISO 6166).
+    bytes12 public immutable isin;
+
     /// @dev Cached decimals value so each bond series can expose custom precision.
     uint8 private immutable _tokenDecimals;
 
-    /// @param issuer_ Issuer address recorded for the bond series.
-    /// @param name_ ERC-20 token name.
-    /// @param symbol_ ERC-20 token symbol.
-    /// @param decimals_ Token decimals used for bond accounting.
-    /// @param faceValue_ Face value per whole bond unit.
-    /// @param couponRateBps_ Coupon rate in basis points.
-    /// @param maturityTimestamp_ Redemption maturity timestamp.
-    /// @param settlementToken_ Settlement token used by the lifecycle flows.
-    /// @param complianceModule_ Bound compliance module for transfer checks.
-    /// @param issuanceController_ Issuance controller allowed to mint and burn.
+    /// @param params_ Packed constructor parameters to avoid stack-too-deep.
+    struct ConstructorParams {
+        address issuer;
+        string name;
+        string symbol;
+        uint8 decimals;
+        uint256 faceValue;
+        uint256 couponRateBps;
+        uint256 maturityTimestamp;
+        address settlementToken;
+        address complianceModule;
+        address issuanceController;
+        uint256 issueDate;
+        DayCount dayCountConvention;
+        CouponFrequency couponFrequency;
+        BondCategory bondCategory;
+        bytes12 isin;
+    }
+
     constructor(
-        address issuer_,
-        string memory name_,
-        string memory symbol_,
-        uint8 decimals_,
-        uint256 faceValue_,
-        uint256 couponRateBps_,
-        uint256 maturityTimestamp_,
-        address settlementToken_,
-        address complianceModule_,
-        address issuanceController_
-    ) ERC20(name_, symbol_) {
+        ConstructorParams memory params_
+    ) ERC20(params_.name, params_.symbol) {
         if (
-            issuer_ == address(0) ||
-            settlementToken_ == address(0) ||
-            complianceModule_ == address(0) ||
-            issuanceController_ == address(0)
+            params_.issuer == address(0) ||
+            params_.settlementToken == address(0) ||
+            params_.complianceModule == address(0) ||
+            params_.issuanceController == address(0)
         ) {
             revert ZeroAddress();
         }
 
-        if (faceValue_ == 0) {
+        if (params_.faceValue == 0) {
             revert InvalidBondConfig("faceValue must be > 0");
         }
-        if (couponRateBps_ > 10_000) {
+        if (params_.couponRateBps > 10_000) {
             revert InvalidBondConfig("couponRateBps must be <= 10000");
         }
-        if (maturityTimestamp_ <= block.timestamp) {
+        if (params_.maturityTimestamp <= block.timestamp) {
             revert InvalidBondConfig("maturityTimestamp must be in the future");
         }
+        if (params_.issueDate >= params_.maturityTimestamp) {
+            revert InvalidIssueDate(
+                params_.issueDate,
+                params_.maturityTimestamp
+            );
+        }
 
-        issuer = issuer_;
-        settlementToken = settlementToken_;
-        complianceModule = complianceModule_;
-        issuanceController = issuanceController_;
-        faceValue = faceValue_;
-        couponRateBps = couponRateBps_;
-        maturityTimestamp = maturityTimestamp_;
-        _tokenDecimals = decimals_;
+        issuer = params_.issuer;
+        settlementToken = params_.settlementToken;
+        complianceModule = params_.complianceModule;
+        issuanceController = params_.issuanceController;
+        faceValue = params_.faceValue;
+        couponRateBps = params_.couponRateBps;
+        maturityTimestamp = params_.maturityTimestamp;
+        issueDate = params_.issueDate;
+        dayCountConvention = params_.dayCountConvention;
+        couponFrequency = params_.couponFrequency;
+        bondCategory = params_.bondCategory;
+        isin = params_.isin;
+        _tokenDecimals = params_.decimals;
     }
 
     /// @inheritdoc ERC20
     /// @dev Returns the immutable decimals configured for this bond series.
     function decimals() public view override returns (uint8) {
         return _tokenDecimals;
+    }
+
+    /// @inheritdoc IBondToken
+    /// @dev Computes accrued interest per whole bond unit using the configured day count convention.
+    /// Returns 0 before issueDate (no interest accrues during subscription window).
+    /// Caps at maturityTimestamp so the full-term interest equals the redemption coupon.
+    function accruedInterestPerUnit(
+        uint256 timestamp
+    ) external view returns (uint256) {
+        if (timestamp <= issueDate) return 0;
+        uint256 effectiveTs = timestamp < maturityTimestamp
+            ? timestamp
+            : maturityTimestamp;
+
+        if (dayCountConvention == DayCount.ACT_365) {
+            uint256 elapsedSeconds = effectiveTs - issueDate;
+            return
+                Math.mulDiv(
+                    faceValue * couponRateBps,
+                    elapsedSeconds,
+                    10_000 * 365 days
+                );
+        }
+        if (dayCountConvention == DayCount.ACT_360) {
+            uint256 elapsedSeconds = effectiveTs - issueDate;
+            return
+                Math.mulDiv(
+                    faceValue * couponRateBps,
+                    elapsedSeconds,
+                    10_000 * 360 days
+                );
+        }
+        // DayCount.THIRTY_360
+        uint256 days360 = DateLib.diffDays30_360(issueDate, effectiveTs);
+        return Math.mulDiv(faceValue * couponRateBps, days360, 10_000 * 360);
     }
 
     /// @inheritdoc IBondToken

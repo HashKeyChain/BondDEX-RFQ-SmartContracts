@@ -4,8 +4,12 @@ pragma solidity ^0.8.28;
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
+    IERC20Metadata
+} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {
     ReentrancyGuard
 } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -23,6 +27,7 @@ import {DomainPausable} from "./abstracts/DomainPausable.sol";
 import {RoleManaged} from "./abstracts/RoleManaged.sol";
 import {BondMath} from "./libraries/BondMath.sol";
 import {
+    AccruedInterestMismatch,
     ExpiredDeadline,
     FeeExceedsOrderLimit,
     InvalidBatchLength,
@@ -55,9 +60,10 @@ import {
 import {SettlementOrderEIP712} from "./libraries/SettlementOrderEIP712.sol";
 
 /// @title RFQSettlement
-/// @notice Secondary-market settlement engine for signed RFQ bond orders.
+/// @notice Secondary-market settlement engine for signed RFQ bond orders with accrued interest.
 /// @dev Makers sign EIP-712 orders off-chain and investors execute them on-chain. The contract
-/// validates signatures, nonce floors, allowlisted settlement tokens, compliance roles, and fee policy.
+/// validates signatures, nonce floors, allowlisted settlement tokens, compliance roles, fee policy,
+/// and accrued interest correctness.
 contract RFQSettlement is
     Initializable,
     AccessControlUpgradeable,
@@ -79,6 +85,7 @@ contract RFQSettlement is
         uint8 side,
         uint256 bondAmount,
         uint256 quoteAmount,
+        uint256 accruedInterest,
         uint256 feeAmount,
         address feeRecipient
     );
@@ -115,8 +122,14 @@ contract RFQSettlement is
         address operator
     );
 
+    /// @notice Emitted when governance updates the accrued interest tolerance window.
+    event AiToleranceUpdated(uint256 newToleranceSeconds, address operator);
+
     /// @notice Hard cap on the number of orders that may be settled atomically in one batch.
     uint256 internal constant MAX_BATCH_SIZE = 24;
+
+    /// @notice Default accrued interest tolerance window (5 minutes).
+    uint256 internal constant DEFAULT_AI_TOLERANCE_SECONDS = 300;
 
     /// @dev Active fee configuration applied to every executed order.
     FeeConfig private _feeConfig;
@@ -136,8 +149,11 @@ contract RFQSettlement is
     /// @dev Registry of bond tokens allowed in RFQ orders, preventing fake-token attacks.
     mapping(address bondToken => bool registered) private _registeredBondTokens;
 
+    /// @dev Tolerance window in seconds for accrued interest validation.
+    uint256 private _aiToleranceSeconds;
+
     /// @dev Reserved storage gap for future proxy-safe upgrades.
-    uint256[45] private __gap;
+    uint256[44] private __gap;
 
     /// @dev Locks the implementation contract so only proxies may initialize it.
     constructor() {
@@ -162,6 +178,8 @@ contract RFQSettlement is
             currentFeeBps: 0,
             maxFeeBps: 1_000
         });
+
+        _aiToleranceSeconds = DEFAULT_AI_TOLERANCE_SECONDS;
     }
 
     /// @inheritdoc IRFQSettlement
@@ -309,6 +327,15 @@ contract RFQSettlement is
     }
 
     /// @inheritdoc IRFQSettlement
+    /// @dev Updates the tolerance window for accrued interest validation.
+    function setAiToleranceSeconds(
+        uint256 toleranceSeconds
+    ) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
+        _aiToleranceSeconds = toleranceSeconds;
+        emit AiToleranceUpdated(toleranceSeconds, msg.sender);
+    }
+
+    /// @inheritdoc IRFQSettlement
     /// @dev Returns whether a bond token is registered for RFQ settlement.
     function isBondTokenRegistered(
         address bondToken
@@ -370,13 +397,20 @@ contract RFQSettlement is
     }
 
     /// @inheritdoc IRFQSettlement
+    /// @dev Returns the current accrued interest tolerance in seconds.
+    function aiToleranceSeconds() external view returns (uint256) {
+        return _aiToleranceSeconds;
+    }
+
+    /// @inheritdoc IRFQSettlement
     /// @dev Quotes the protocol fee for a trade between two parties on a given bond.
     /// Returns 0 when both parties are market makers (fee-exempt).
+    /// The dirtyAmount should be quoteAmount + accruedInterest.
     function quoteFee(
         address bondToken,
         address partyA,
         address partyB,
-        uint256 quoteAmount
+        uint256 dirtyAmount
     ) external view returns (uint256 feeAmount) {
         if (!isBondTokenRegistered(bondToken)) {
             revert UnregisteredBondToken(bondToken);
@@ -391,7 +425,7 @@ contract RFQSettlement is
         if (roleA == Role.MARKET_MAKER && roleB == Role.MARKET_MAKER) {
             return 0;
         }
-        return _quoteFeeAmount(quoteAmount);
+        return _quoteFeeAmount(dirtyAmount);
     }
 
     /// @inheritdoc IRFQSettlement
@@ -402,11 +436,11 @@ contract RFQSettlement is
         return super.isDomainPaused(domain);
     }
 
-    /// @dev Quotes protocol fee for one order quote amount using the current fee configuration.
+    /// @dev Quotes protocol fee based on the dirty amount (quoteAmount + accruedInterest).
     function _quoteFeeAmount(
-        uint256 quoteAmount
+        uint256 dirtyAmount
     ) internal view returns (uint256) {
-        return BondMath.mulBps(quoteAmount, _feeConfig.currentFeeBps);
+        return BondMath.mulBps(dirtyAmount, _feeConfig.currentFeeBps);
     }
 
     /// @dev Computes the EIP-712 typed-data digest for one order.
@@ -421,7 +455,7 @@ contract RFQSettlement is
     }
 
     /// @dev Validates bond token registry, token policy, expiry, taker binding, nonce floor,
-    ///      signature, and participant roles.
+    ///      signature, participant roles, and accrued interest.
     function _validateOrder(
         Order calldata order,
         bytes calldata signature,
@@ -476,6 +510,48 @@ contract RFQSettlement is
         }
 
         (makerRole, takerRole) = _requireParticipantRoles(order, taker);
+
+        _validateAccruedInterest(order);
+    }
+
+    /// @dev Validates that the declared accrued interest is within tolerance of the on-chain value.
+    function _validateAccruedInterest(Order calldata order) internal view {
+        IBondToken bt = IBondToken(order.bondToken);
+        uint8 bondDecimals = IERC20Metadata(order.bondToken).decimals();
+
+        uint256 aiPerUnit = bt.accruedInterestPerUnit(block.timestamp);
+        uint256 expectedAI = Math.mulDiv(
+            aiPerUnit,
+            order.bondAmount,
+            10 ** uint256(bondDecimals)
+        );
+
+        uint256 tolerance;
+        if (_aiToleranceSeconds > 0) {
+            uint256 aiPerUnitLater = bt.accruedInterestPerUnit(
+                block.timestamp + _aiToleranceSeconds
+            );
+            uint256 expectedAILater = Math.mulDiv(
+                aiPerUnitLater,
+                order.bondAmount,
+                10 ** uint256(bondDecimals)
+            );
+            tolerance = expectedAILater > expectedAI
+                ? expectedAILater - expectedAI
+                : 0;
+        }
+
+        if (
+            order.accruedInterest > expectedAI + tolerance ||
+            (expectedAI > tolerance &&
+                order.accruedInterest < expectedAI - tolerance)
+        ) {
+            revert AccruedInterestMismatch(
+                order.accruedInterest,
+                expectedAI,
+                tolerance
+            );
+        }
     }
 
     /// @dev Validates whitelist, roles, and direction. Returns roles for downstream fee logic.
@@ -516,13 +592,11 @@ contract RFQSettlement is
     }
 
     /// @dev Executes token transfers for one validated order and emits the canonical fill event.
+    /// dirtyAmount = quoteAmount + accruedInterest. Fee is computed on dirtyAmount.
     /// Fee is always charged to the market-maker side:
-    ///   - MM is quoteReceiver → MM receives quoteAmount - fee (deducted from income)
-    ///   - MM is quotePayer   → MM pays quoteAmount + fee (investor receives full quoteAmount)
+    ///   - MM is quoteReceiver → MM receives dirtyAmount - fee
+    ///   - MM is quotePayer   → MM pays dirtyAmount + fee (counterparty receives dirtyAmount)
     ///   - MM ↔ MM            → fee exempt
-    /// NOTE: `order.maxFeeBps` protects the maker (signer) from unexpected fee increases.
-    /// When the taker is the actual fee-bearing market maker (e.g. BUY order with maker=Investor),
-    /// the taker must verify `feeConfig.currentFeeBps` off-chain before submitting `fillOrder`.
     function _executeOrder(
         Order calldata order,
         bytes32 orderHash,
@@ -535,13 +609,18 @@ contract RFQSettlement is
         }
         _consumedOrders[orderHash] = true;
 
+        uint256 dirtyAmount = order.quoteAmount + order.accruedInterest;
+
         uint256 feeAmount = (makerRole == Role.MARKET_MAKER &&
             takerRole == Role.MARKET_MAKER)
             ? 0
-            : _quoteFeeAmount(order.quoteAmount);
+            : _quoteFeeAmount(dirtyAmount);
 
         if (feeAmount > 0 && _feeConfig.currentFeeBps > order.maxFeeBps) {
-            revert FeeExceedsOrderLimit(order.maxFeeBps, _feeConfig.currentFeeBps);
+            revert FeeExceedsOrderLimit(
+                order.maxFeeBps,
+                _feeConfig.currentFeeBps
+            );
         }
 
         {
@@ -552,10 +631,8 @@ contract RFQSettlement is
                 address bondReceiver
             ) = _resolveSettlementParties(order, taker);
 
-            // BUY (taker buys bonds): quotePayer=taker, quoteReceiver=maker.
-            // SELL (taker sells bonds): quotePayer=maker, quoteReceiver=taker.
             // Fee deducted from quoteReceiver when quoteReceiver is MM;
-            // otherwise quotePayer (MM) pays quoteAmount + fee separately.
+            // otherwise quotePayer (MM) pays dirtyAmount + fee separately.
             if (
                 feeAmount == 0 ||
                 (
@@ -567,13 +644,13 @@ contract RFQSettlement is
                 IERC20(order.quoteToken).safeTransferFrom(
                     quotePayer,
                     quoteReceiver,
-                    order.quoteAmount - feeAmount
+                    dirtyAmount - feeAmount
                 );
             } else {
                 IERC20(order.quoteToken).safeTransferFrom(
                     quotePayer,
                     quoteReceiver,
-                    order.quoteAmount
+                    dirtyAmount
                 );
             }
 
@@ -601,6 +678,7 @@ contract RFQSettlement is
             uint8(order.side),
             order.bondAmount,
             order.quoteAmount,
+            order.accruedInterest,
             feeAmount,
             _feeConfig.feeRecipient
         );

@@ -74,7 +74,8 @@ contract SettlementOrderEIP712Test is Test {
                 expiry: 1_900_000_000,
                 nonce: 42,
                 salt: 777,
-                maxFeeBps: 10_000
+                maxFeeBps: 10_000,
+                accruedInterest: 0
             });
     }
 }

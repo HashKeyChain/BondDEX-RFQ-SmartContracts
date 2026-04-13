@@ -10,7 +10,13 @@ import {BondFactory} from "../../src/BondFactory.sol";
 import {BondIssuance} from "../../src/BondIssuance.sol";
 import {BondToken} from "../../src/BondToken.sol";
 import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
-import {ApprovalStatus, BondConfig} from "../../src/types/BondTypes.sol";
+import {
+    ApprovalStatus,
+    BondCategory,
+    BondConfig,
+    CouponFrequency,
+    DayCount
+} from "../../src/types/BondTypes.sol";
 import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
 
 contract BondFactoryIssuanceApprovalTest is Test {
@@ -39,7 +45,8 @@ contract BondFactoryIssuanceApprovalTest is Test {
         uint256 faceValue,
         uint256 couponRateBps,
         uint256 maturityTimestamp,
-        address settlementToken
+        address settlementToken,
+        uint256 issueDate
     );
 
     address internal admin = makeAddr("admin");
@@ -159,7 +166,12 @@ contract BondFactoryIssuanceApprovalTest is Test {
             settlementTokenDecimals: 6,
             complianceImplementation: address(complianceImplementation),
             policyId: keccak256("policy"),
-            policyVersion: 1
+            policyVersion: 1,
+            issueDate: block.timestamp,
+            dayCountConvention: DayCount.ACT_365,
+            couponFrequency: CouponFrequency.BULLET,
+            bondCategory: BondCategory.CORPORATE,
+            isin: bytes12(0)
         });
 
         vm.expectEmit(false, true, false, true);
@@ -173,7 +185,8 @@ contract BondFactoryIssuanceApprovalTest is Test {
             1_000e6,
             500,
             block.timestamp + 30 days,
-            stablecoin
+            stablecoin,
+            block.timestamp
         );
         vm.prank(issuer);
         (address bondTokenAddress, address complianceAddress) = factory
@@ -221,7 +234,12 @@ contract BondFactoryIssuanceApprovalTest is Test {
             settlementTokenDecimals: 6,
             complianceImplementation: address(complianceImplementation),
             policyId: keccak256("policy"),
-            policyVersion: 1
+            policyVersion: 1,
+            issueDate: block.timestamp,
+            dayCountConvention: DayCount.ACT_365,
+            couponFrequency: CouponFrequency.BULLET,
+            bondCategory: BondCategory.CORPORATE,
+            isin: bytes12(0)
         });
 
         vm.prank(issuer);

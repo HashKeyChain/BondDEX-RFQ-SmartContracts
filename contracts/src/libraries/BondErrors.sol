@@ -169,3 +169,16 @@ error BondAlreadyMatured(
     uint256 maturityTimestamp,
     uint256 currentTimestamp
 );
+
+/// @notice Thrown when the declared accrued interest deviates from the on-chain calculation beyond tolerance.
+error AccruedInterestMismatch(
+    uint256 declared,
+    uint256 expected,
+    uint256 tolerance
+);
+
+/// @notice Thrown when issueDate is not strictly before maturityTimestamp.
+error InvalidIssueDate(uint256 issueDate, uint256 maturityTimestamp);
+
+/// @notice Thrown when a subscription window extends past the bond's issue date.
+error SubscriptionWindowExceedsIssueDate(uint256 closesAt, uint256 issueDate);

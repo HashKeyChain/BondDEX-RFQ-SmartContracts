@@ -7,10 +7,8 @@ import {FeeConfig, Order, PauseDomain} from "../types/BondTypes.sol";
 /// @notice Interface for signed RFQ order execution, cancellation, nonce management, and fee policy.
 interface IRFQSettlement {
     /// @dev Executes one final signed order.
-    /// NOTE: When the market maker is the quotePayer (i.e. SELL-side for taker), the
-    /// quotePayer must have approved `quoteAmount + protocolFee` to this contract, because
-    /// the fee is collected in a separate transfer from the same payer. Use {quoteFee} to
-    /// pre-compute the total approval needed.
+    /// NOTE: The quotePayer must have approved `dirtyAmount + protocolFee` where
+    /// dirtyAmount = quoteAmount + accruedInterest. Use {quoteFee} to pre-compute.
     /// @param order Final EIP-712 order payload.
     /// @param signature Maker signature over the typed order digest.
     function fillOrder(Order calldata order, bytes calldata signature) external;
@@ -55,6 +53,10 @@ interface IRFQSettlement {
         address bondToken,
         bool registered
     ) external;
+
+    /// @dev Updates the tolerance window for accrued interest validation.
+    /// @param toleranceSeconds Maximum allowed deviation in seconds.
+    function setAiToleranceSeconds(uint256 toleranceSeconds) external;
 
     /// @dev Returns whether a bond token is registered for RFQ settlement.
     /// @param bondToken Bond token address.
@@ -103,6 +105,10 @@ interface IRFQSettlement {
         address token
     ) external view returns (bool);
 
+    /// @dev Returns the current accrued interest tolerance in seconds.
+    /// @return seconds Tolerance window.
+    function aiToleranceSeconds() external view returns (uint256);
+
     /// @dev Returns whether one domain is paused.
     /// @param domain Domain to inspect.
     /// @return paused True when the domain is paused.
@@ -113,12 +119,12 @@ interface IRFQSettlement {
     /// @param bondToken Bond token address used to resolve the compliance module.
     /// @param partyA First participant address.
     /// @param partyB Second participant address.
-    /// @param quoteAmount The payer's total input amount.
-    /// @return feeAmount Estimated fee deducted from quoteAmount.
+    /// @param dirtyAmount The full settlement amount (quoteAmount + accruedInterest).
+    /// @return feeAmount Estimated fee.
     function quoteFee(
         address bondToken,
         address partyA,
         address partyB,
-        uint256 quoteAmount
+        uint256 dirtyAmount
     ) external view returns (uint256 feeAmount);
 }

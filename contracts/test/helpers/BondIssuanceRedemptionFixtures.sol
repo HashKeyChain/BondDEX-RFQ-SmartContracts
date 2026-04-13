@@ -8,7 +8,7 @@ import {BondIssuance} from "../../src/BondIssuance.sol";
 import {BondToken} from "../../src/BondToken.sol";
 import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
 import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
-import {Role} from "../../src/types/BondTypes.sol";
+import {Role, BondCategory, CouponFrequency, DayCount} from "../../src/types/BondTypes.sol";
 
 abstract contract BondIssuanceRedemptionFixtures is Test {
     address internal admin = makeAddr("admin");
@@ -41,18 +41,23 @@ abstract contract BondIssuanceRedemptionFixtures is Test {
             )
         );
 
-        bondToken = new BondToken(
-            issuer,
-            "HashKey Bond",
-            "HKB",
-            18,
-            1_000e6,
-            500,
-            block.timestamp + 30 days,
-            address(usdc),
-            address(complianceModule),
-            address(issuance)
-        );
+        bondToken = new BondToken(BondToken.ConstructorParams({
+            issuer: issuer,
+            name: "HashKey Bond",
+            symbol: "HKB",
+            decimals: 18,
+            faceValue: 1_000e6,
+            couponRateBps: 500,
+            maturityTimestamp: block.timestamp + 30 days,
+            settlementToken: address(usdc),
+            complianceModule: address(complianceModule),
+            issuanceController: address(issuance),
+            issueDate: block.timestamp + 8 days,
+            dayCountConvention: DayCount.ACT_365,
+            couponFrequency: CouponFrequency.BULLET,
+            bondCategory: BondCategory.CORPORATE,
+            isin: bytes12(0)
+        }));
 
         vm.prank(factory);
         complianceModule.bindBondToken(address(bondToken));

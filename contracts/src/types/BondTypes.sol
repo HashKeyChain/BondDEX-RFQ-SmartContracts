@@ -42,6 +42,29 @@ enum SubscriptionStatus {
     CANCELLED
 }
 
+/// @notice Day count convention for accrued interest calculation.
+enum DayCount {
+    ACT_365, // Actual/365
+    ACT_360, // Actual/360
+    THIRTY_360 // 30/360 US
+}
+
+/// @notice Coupon payment frequency.
+enum CouponFrequency {
+    BULLET, // Single payment at maturity
+    ANNUAL, // Annual payments
+    SEMI_ANNUAL, // Semi-annual payments
+    QUARTERLY // Quarterly payments
+}
+
+/// @notice Bond category classification.
+enum BondCategory {
+    CORPORATE, // Corporate bonds
+    GOVERNMENT, // Government bonds
+    CONVERTIBLE, // Convertible bonds
+    ABS // Asset-backed securities
+}
+
 /// @notice Immutable configuration used by the factory to deploy one bond series.
 struct BondConfig {
     /// @notice Issuer allowed to launch and service the bond.
@@ -54,7 +77,7 @@ struct BondConfig {
     uint8 decimals;
     /// @notice Face value per whole bond unit in settlement-token units.
     uint256 faceValue;
-    /// @notice Coupon rate in basis points.
+    /// @notice Annual coupon rate in basis points.
     uint256 couponRateBps;
     /// @notice Redemption maturity timestamp.
     uint256 maturityTimestamp;
@@ -68,6 +91,19 @@ struct BondConfig {
     bytes32 policyId;
     /// @notice Provider-facing policy version.
     uint256 policyVersion;
+    /// @notice Predetermined interest accrual start date (Unix timestamp).
+    /// Typically set to a date after the subscription window closes so that
+    /// primary-market subscribers all share the same accrual origin regardless
+    /// of when they subscribed. No interest accrues before this date.
+    uint256 issueDate;
+    /// @notice Day count convention for accrued interest calculation.
+    DayCount dayCountConvention;
+    /// @notice Coupon payment frequency.
+    CouponFrequency couponFrequency;
+    /// @notice Bond category classification.
+    BondCategory bondCategory;
+    /// @notice International Securities Identification Number (ISO 6166, 12 bytes).
+    bytes12 isin;
 }
 
 /// @notice Mutable subscription terms set by the issuer for primary issuance.
@@ -98,7 +134,7 @@ struct Order {
     address quoteToken;
     /// @notice Bond amount in smallest bond units.
     uint256 bondAmount;
-    /// @notice Quote amount in smallest quote-token units.
+    /// @notice Clean price (quote amount excluding accrued interest) in smallest quote-token units.
     uint256 quoteAmount;
     /// @notice Order side from the taker's perspective — BUY means the taker buys bonds.
     OrderSide side;
@@ -110,6 +146,8 @@ struct Order {
     uint256 salt;
     /// @notice Maximum fee basis points the maker accepts for this order.
     uint16 maxFeeBps;
+    /// @notice Accrued interest amount in smallest quote-token units, validated on-chain at settlement.
+    uint256 accruedInterest;
 }
 
 /// @notice Governance-controlled fee policy for RFQ settlement.

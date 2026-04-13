@@ -12,7 +12,10 @@ import {BondToken} from "../../src/BondToken.sol";
 import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
 import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
 import {
+    BondCategory,
     BondConfig,
+    CouponFrequency,
+    DayCount,
     SubscriptionTerms,
     Role
 } from "../../src/types/BondTypes.sol";
@@ -74,7 +77,12 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
             settlementTokenDecimals: 6,
             complianceImplementation: address(complianceImplementation),
             policyId: keccak256("policy"),
-            policyVersion: 1
+            policyVersion: 1,
+            issueDate: block.timestamp + 8 days,
+            dayCountConvention: DayCount.ACT_365,
+            couponFrequency: CouponFrequency.BULLET,
+            bondCategory: BondCategory.CORPORATE,
+            isin: bytes12(0)
         });
 
         vm.prank(issuer);
@@ -157,7 +165,12 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
             settlementTokenDecimals: 6,
             complianceImplementation: address(complianceImplementation),
             policyId: keccak256("policy"),
-            policyVersion: 1
+            policyVersion: 1,
+            issueDate: block.timestamp + 8 days,
+            dayCountConvention: DayCount.ACT_365,
+            couponFrequency: CouponFrequency.BULLET,
+            bondCategory: BondCategory.CORPORATE,
+            isin: bytes12(0)
         });
 
         vm.prank(issuer);

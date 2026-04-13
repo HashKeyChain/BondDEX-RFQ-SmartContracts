@@ -15,6 +15,7 @@ import {
     ExpiredDeadline,
     InvalidApprovalState,
     InvalidBondConfig,
+    InvalidIssueDate,
     UnauthorizedIssuer,
     UnsupportedInterface,
     UnsupportedSettlementToken,
@@ -91,6 +92,7 @@ contract BondFactory is
     );
 
     /// @notice Emitted when the factory successfully creates one bond series.
+    /// @dev Split into two events to avoid stack-too-deep with 15+ fields.
     event BondCreated(
         address indexed bondToken,
         address indexed issuer,
@@ -101,7 +103,17 @@ contract BondFactory is
         uint256 faceValue,
         uint256 couponRateBps,
         uint256 maturityTimestamp,
-        address settlementToken
+        address settlementToken,
+        uint256 issueDate
+    );
+
+    /// @notice Supplementary event carrying extended bond metadata emitted alongside BondCreated.
+    event BondMetadata(
+        address indexed bondToken,
+        uint8 dayCountConvention,
+        uint8 couponFrequency,
+        uint8 bondCategory,
+        bytes12 isin
     );
 
     /// @notice Issuance controller passed into every deployed bond token.
@@ -305,6 +317,9 @@ contract BondFactory is
         if (config.couponRateBps > 10_000) {
             revert InvalidBondConfig("couponRateBps must be <= 10000");
         }
+        if (config.issueDate >= config.maturityTimestamp) {
+            revert InvalidIssueDate(config.issueDate, config.maturityTimestamp);
+        }
 
         // Deploy one isolated compliance module and one immutable bond token for this approval.
         complianceModuleAddress = _deployComplianceModule(config);
@@ -434,21 +449,28 @@ contract BondFactory is
         return
             address(
                 new BondToken(
-                    config.issuer,
-                    config.name,
-                    config.symbol,
-                    config.decimals,
-                    config.faceValue,
-                    config.couponRateBps,
-                    config.maturityTimestamp,
-                    config.settlementToken,
-                    complianceModuleAddress,
-                    issuanceController
+                    BondToken.ConstructorParams({
+                        issuer: config.issuer,
+                        name: config.name,
+                        symbol: config.symbol,
+                        decimals: config.decimals,
+                        faceValue: config.faceValue,
+                        couponRateBps: config.couponRateBps,
+                        maturityTimestamp: config.maturityTimestamp,
+                        settlementToken: config.settlementToken,
+                        complianceModule: complianceModuleAddress,
+                        issuanceController: issuanceController,
+                        issueDate: config.issueDate,
+                        dayCountConvention: config.dayCountConvention,
+                        couponFrequency: config.couponFrequency,
+                        bondCategory: config.bondCategory,
+                        isin: config.isin
+                    })
                 )
             );
     }
 
-    /// @dev Emits the canonical bond creation event consumed by off-chain indexers.
+    /// @dev Emits the canonical bond creation events consumed by off-chain indexers.
     function _emitBondCreated(
         BondConfig calldata config,
         address bondTokenAddress,
@@ -464,7 +486,15 @@ contract BondFactory is
             config.faceValue,
             config.couponRateBps,
             config.maturityTimestamp,
-            config.settlementToken
+            config.settlementToken,
+            config.issueDate
+        );
+        emit BondMetadata(
+            bondTokenAddress,
+            uint8(config.dayCountConvention),
+            uint8(config.couponFrequency),
+            uint8(config.bondCategory),
+            config.isin
         );
     }
 }

@@ -67,40 +67,95 @@ export-abi:
 	cd $(CONTRACTS_DIR) && forge build && forge script $(SCRIPT_DIR)/ExportAbi.s.sol:ExportAbi
 
 # ─── Anvil 全自动演示 ────────────────────────────────────────
-# 两阶段执行：到期前 → 推进时间 → 到期后
-# Anvil auto-mine 模式下每个 broadcast 交易独占一个区块
+# 演示使用固定时间线（2026-01-01 起），需要 Anvil 从更早的时间启动。
+#
+# 一键执行（自动启动 Anvil → 部署 → 演示 → 关闭 Anvil）：
+#   make demo-anvil
+#
+# 纯模拟（不需要 Anvil，含 vm.warp）：
+#   make demo-anvil-sim
+#
+# 时间线（UTC）：
+#   2025-12-31 00:00  Anvil 启动时间
+#   2026-01-01 00:00  认购窗口开启 → Phase 1-4
+#   2026-01-09 00:12  起息日 + 12min → Step 7
+#   +2 天              → Step 8-9
+#   +30 天             → Step 10
+#   +30 天             → Step 11
+#   +30 天             → Step 12-13, 15
+#   2027-01-09 00:01  到期日 + 1s → Step 16-17
 
-.PHONY: demo-anvil demo-anvil-pre demo-anvil-post demo-anvil-sim
+# Anvil 启动时间戳：2025-12-31 00:00 UTC（认购前一天，确保时间线可向前推进）
+DEMO_ANVIL_TS := 1767139200
+DEMO_RPC      := $(call cfg,anvil,rpcUrl)
+DEMO_SCRIPT   := $(SCRIPT_DIR)/AnvilDemo.s.sol:AnvilDemo
+DEMO_PK       := 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
-# 执行完整生命周期演示
-demo-anvil: demo-anvil-pre
+.PHONY: demo-anvil demo-anvil-sim
+
+# 全自动演示：启动 Anvil → 部署 → 分步执行演示 → 关闭 Anvil
+demo-anvil:
+	@echo "=== BondDEX RFQ — Full Lifecycle Demo ==="
 	@echo ""
-	@echo ">>> Warping Anvil time past maturity (30 days + 1s)..."
-	@cast rpc --rpc-url $(call cfg,anvil,rpcUrl) evm_increaseTime 2592001 > /dev/null
-	@cast rpc --rpc-url $(call cfg,anvil,rpcUrl) evm_mine > /dev/null
-	@echo ">>> Time warped. Running post-maturity phases..."
+	@echo ">>> Stopping existing Anvil (if any)..."
+	@-pkill -f "anvil" 2>/dev/null || true
+	@sleep 1
+	@echo ">>> Starting Anvil (timestamp: 2025-12-31 00:00 UTC)..."
+	@anvil --timestamp $(DEMO_ANVIL_TS) --silent &
+	@sleep 2
+	@echo ">>> Deploying contracts..."
+	@DEPLOYER_PRIVATE_KEY=$(DEMO_PK) $(MAKE) deploy-anvil
 	@echo ""
-	$(MAKE) demo-anvil-post
+	@echo ">>> [Phase 1-4] Setting time to 2026-01-01 00:00 UTC (subscription opens)"
+	@cast rpc --rpc-url $(DEMO_RPC) evm_setNextBlockTimestamp 1767225600 > /dev/null
+	@cast rpc --rpc-url $(DEMO_RPC) evm_mine > /dev/null
+	cd $(CONTRACTS_DIR) && forge script $(DEMO_SCRIPT) \
+		--sig "runSetup()" --rpc-url $(DEMO_RPC) --broadcast
+	@echo ""
+	@echo ">>> [Step 7] Warping to 2026-01-09 00:12 UTC (issueDate + 12 min)"
+	@cast rpc --rpc-url $(DEMO_RPC) evm_setNextBlockTimestamp 1767917520 > /dev/null
+	@cast rpc --rpc-url $(DEMO_RPC) evm_mine > /dev/null
+	cd $(CONTRACTS_DIR) && forge script $(DEMO_SCRIPT) \
+		--sig "runStep7()" --rpc-url $(DEMO_RPC) --broadcast
+	@echo ""
+	@echo ">>> [Step 8-9] Warping +2 days"
+	@cast rpc --rpc-url $(DEMO_RPC) evm_increaseTime 172800 > /dev/null
+	@cast rpc --rpc-url $(DEMO_RPC) evm_mine > /dev/null
+	cd $(CONTRACTS_DIR) && forge script $(DEMO_SCRIPT) \
+		--sig "runStep8()" --rpc-url $(DEMO_RPC) --broadcast
+	@echo ""
+	@echo ">>> [Step 10] Warping +30 days (~1 month)"
+	@cast rpc --rpc-url $(DEMO_RPC) evm_increaseTime 2592000 > /dev/null
+	@cast rpc --rpc-url $(DEMO_RPC) evm_mine > /dev/null
+	cd $(CONTRACTS_DIR) && forge script $(DEMO_SCRIPT) \
+		--sig "runStep10()" --rpc-url $(DEMO_RPC) --broadcast
+	@echo ""
+	@echo ">>> [Step 11] Warping +30 days (~2 months)"
+	@cast rpc --rpc-url $(DEMO_RPC) evm_increaseTime 2592000 > /dev/null
+	@cast rpc --rpc-url $(DEMO_RPC) evm_mine > /dev/null
+	cd $(CONTRACTS_DIR) && forge script $(DEMO_SCRIPT) \
+		--sig "runStep11()" --rpc-url $(DEMO_RPC) --broadcast
+	@echo ""
+	@echo ">>> [Step 12-13, 15] Warping +30 days (~3 months)"
+	@cast rpc --rpc-url $(DEMO_RPC) evm_increaseTime 2592000 > /dev/null
+	@cast rpc --rpc-url $(DEMO_RPC) evm_mine > /dev/null
+	cd $(CONTRACTS_DIR) && forge script $(DEMO_SCRIPT) \
+		--sig "runStep12()" --rpc-url $(DEMO_RPC) --broadcast
+	@echo ""
+	@echo ">>> [Step 16-17] Warping to 2027-01-09 00:00:01 UTC (maturity + 1)"
+	@cast rpc --rpc-url $(DEMO_RPC) evm_setNextBlockTimestamp 1799452801 > /dev/null
+	@cast rpc --rpc-url $(DEMO_RPC) evm_mine > /dev/null
+	cd $(CONTRACTS_DIR) && forge script $(DEMO_SCRIPT) \
+		--sig "runPostMaturity()" --rpc-url $(DEMO_RPC) --broadcast
+	@echo ""
+	@echo ">>> Stopping Anvil..."
+	@-pkill -f "anvil --timestamp $(DEMO_ANVIL_TS)" 2>/dev/null || true
 
-# 执行到期前阶段
-demo-anvil-pre:
-	cd $(CONTRACTS_DIR) && forge script $(SCRIPT_DIR)/AnvilDemo.s.sol:AnvilDemo \
-		--sig "runPreMaturity()" \
-		--rpc-url $(call cfg,anvil,rpcUrl) \
-		--broadcast
-
-# 执行到期后阶段
-demo-anvil-post:
-	cd $(CONTRACTS_DIR) && forge script $(SCRIPT_DIR)/AnvilDemo.s.sol:AnvilDemo \
-		--sig "runPostMaturity()" \
-		--rpc-url $(call cfg,anvil,rpcUrl) \
-		--broadcast
-
-# 执行纯模拟阶段
+# 纯模拟（不需要运行 Anvil，含 vm.warp，全流程一次跑完）
+# 需要先有 deployments/31337.json（先运行过 deploy-anvil）
 demo-anvil-sim:
-	cd $(CONTRACTS_DIR) && forge script $(SCRIPT_DIR)/AnvilDemo.s.sol:AnvilDemo \
-		--sig "run()" \
-		--rpc-url $(call cfg,anvil,rpcUrl)
+	cd $(CONTRACTS_DIR) && forge script $(DEMO_SCRIPT) \
+		--sig "run()" --rpc-url $(DEMO_RPC)
 
 # ─── 模块化操作（Operations） ─────────────────────────────────
 # 通过 ENV 变量选择网络（默认 anvil），DEPLOYER_PRIVATE_KEY 传入私钥。
@@ -119,11 +174,11 @@ OPS_SCRIPT := $(SCRIPT_DIR)/Operations.s.sol:Operations
 .PHONY: ops-approve-issuance ops-create-bond ops-set-whitelist ops-set-role
 .PHONY: ops-approve-subscription ops-revoke-subscription-approval ops-create-subscription ops-subscribe ops-close-subscription
 .PHONY: ops-fill-order ops-cancel-order ops-increment-nonce
-.PHONY: ops-deposit-redemption ops-claim ops-claim-for ops-set-delegate ops-rescue-tokens
+.PHONY: ops-deposit-redemption ops-claim ops-claim-for ops-set-delegate ops-rescue-tokens ops-release-excess-redemption
 .PHONY: ops-mark-issuance-expired ops-mark-subscription-expired
 .PHONY: ops-pause-factory ops-pause-issuance ops-pause-settlement ops-pause-compliance
 .PHONY: ops-set-minimum-nonce
-.PHONY: ops-set-fee-config ops-set-bond-token ops-mint-usdc ops-approve-token
+.PHONY: ops-set-fee-config ops-set-ai-tolerance ops-query-ai-tolerance ops-set-bond-token ops-mint-usdc ops-approve-token
 .PHONY: ops-query-order ops-query-redemption ops-query-subscription ops-query-remaining-units
 .PHONY: ops-query-subscription-approval
 .PHONY: ops-query-compliance ops-query-fee-config ops-query-nonce ops-query-fee
@@ -136,9 +191,10 @@ ops-approve-issuance:
 		--rpc-url $(OPS_RPC) --broadcast
 
 # 创建债券
+# extendedData = $(cast abi-encode "f(uint256,uint8,uint8,uint8,bytes12)" <issueDate> <dayCount> <couponFreq> <category> <isin>)
 ops-create-bond:
 	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
-		--sig "createBond(bytes32,string,string,uint8,uint256,uint256,uint256,address)" $(ARGS) \
+		--sig "createBond(bytes32,string,string,uint8,uint256,uint256,uint256,address,bytes)" $(ARGS) \
 		--rpc-url $(OPS_RPC) --broadcast
 
 # 设置白名单
@@ -186,13 +242,13 @@ ops-close-subscription:
 # 填充订单
 ops-fill-order:
 	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
-		--sig "fillOrder(address,address,address,address,uint256,uint256,uint8,uint256,uint256,uint256)" $(ARGS) \
+		--sig "fillOrder(address,address,address,address,uint256,uint256,uint8,uint256,uint256,uint256,uint256)" $(ARGS) \
 		--rpc-url $(OPS_RPC) --broadcast
 
 # 取消订单
 ops-cancel-order:
 	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
-		--sig "cancelOrder(address,address,address,address,uint256,uint256,uint8,uint256,uint256,uint256)" $(ARGS) \
+		--sig "cancelOrder(address,address,address,address,uint256,uint256,uint8,uint256,uint256,uint256,uint256)" $(ARGS) \
 		--rpc-url $(OPS_RPC) --broadcast
 
 # 增加 nonce
@@ -229,6 +285,12 @@ ops-set-delegate:
 ops-rescue-tokens:
 	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
 		--sig "rescueTokens(address,address,uint256)" $(ARGS) \
+		--rpc-url $(OPS_RPC) --broadcast
+
+# 释放超额赎回负债（债券到期后）
+ops-release-excess-redemption:
+	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
+		--sig "releaseExcessRedemption(address)" $(ARGS) \
 		--rpc-url $(OPS_RPC) --broadcast
 
 # 标记过期的发行审批
@@ -278,6 +340,18 @@ ops-set-bond-token:
 	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
 		--sig "setBondTokenRegistration(address,bool)" $(ARGS) \
 		--rpc-url $(OPS_RPC) --broadcast
+
+# 设置应计利息容差
+ops-set-ai-tolerance:
+	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
+		--sig "setAiToleranceSeconds(uint256)" $(ARGS) \
+		--rpc-url $(OPS_RPC) --broadcast
+
+# 查询应计利息容差
+ops-query-ai-tolerance:
+	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
+		--sig "queryAiTolerance()" \
+		--rpc-url $(OPS_RPC)
 
 # 设置手续费配置
 ops-set-fee-config:

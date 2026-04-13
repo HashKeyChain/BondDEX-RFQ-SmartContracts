@@ -51,7 +51,8 @@ contract RFQSettlementDomainForkTest is Test {
             expiry: block.timestamp + 1 days,
             nonce: 0,
             salt: 1,
-            maxFeeBps: 10_000
+            maxFeeBps: 10_000,
+            accruedInterest: 0
         });
 
         bytes32 digest = settlement.hashOrder(order);

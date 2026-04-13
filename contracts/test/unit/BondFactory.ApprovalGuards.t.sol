@@ -10,10 +10,17 @@ import {BondFactory} from "../../src/BondFactory.sol";
 import {BondIssuance} from "../../src/BondIssuance.sol";
 import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
 import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
-import {ApprovalStatus, BondConfig} from "../../src/types/BondTypes.sol";
+import {
+    ApprovalStatus,
+    BondCategory,
+    BondConfig,
+    CouponFrequency,
+    DayCount
+} from "../../src/types/BondTypes.sol";
 import {
     InvalidApprovalState,
-    InvalidBondConfig
+    InvalidBondConfig,
+    InvalidIssueDate
 } from "../../src/libraries/BondErrors.sol";
 
 contract BondFactoryApprovalGuardsTest is Test {
@@ -335,7 +342,12 @@ contract BondFactoryApprovalGuardsTest is Test {
             settlementTokenDecimals: 6,
             complianceImplementation: address(complianceImplementation),
             policyId: keccak256("policy"),
-            policyVersion: 1
+            policyVersion: 1,
+            issueDate: block.timestamp,
+            dayCountConvention: DayCount.ACT_365,
+            couponFrequency: CouponFrequency.BULLET,
+            bondCategory: BondCategory.CORPORATE,
+            isin: bytes12(0)
         });
 
         vm.prank(issuer);
@@ -359,7 +371,12 @@ contract BondFactoryApprovalGuardsTest is Test {
                 settlementTokenDecimals: 6,
                 complianceImplementation: address(complianceImplementation),
                 policyId: keccak256("policy"),
-                policyVersion: 1
+                policyVersion: 1,
+                issueDate: block.timestamp,
+                dayCountConvention: DayCount.ACT_365,
+                couponFrequency: CouponFrequency.BULLET,
+                bondCategory: BondCategory.CORPORATE,
+                isin: bytes12(0)
             });
     }
 }
