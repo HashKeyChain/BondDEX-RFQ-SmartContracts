@@ -12,23 +12,29 @@
 - `IssuanceApproved`
 - `IssuanceRevoked`
 - `ComplianceImplementationRegistered`
+- `PlatformAdminUpdated`
 - `BondCreated`
+- `PauseDomainUpdated`
 
 ### ComplianceModule
 
 - `WhitelistUpdated`
 - `RoleUpdated`
+- `BondTokenBound`
 - `PolicyMetadataUpdated`
 - `PauseDomainUpdated`
 
 ### BondIssuance
 
 - `SettlementTokenPolicyUpdated`
+- `SubscriptionApproved`
+- `SubscriptionApprovalRevoked`
 - `SubscriptionCreated`
-- `SubscriptionUpdated`
 - `Subscribed`
+- `SubscriptionClosed`
 - `RedemptionDeposited`
 - `RedemptionClaimed`
+- `TokensRescued`
 - `ClaimDelegateSet`
 - `PauseDomainUpdated`
 
@@ -36,6 +42,7 @@
 
 - `FeeConfigUpdated`
 - `SettlementTokenPolicyUpdated`
+- `BondTokenRegistrationUpdated`
 - `OrderFilled`
 - `OrderCancelled`
 - `NonceIncremented`

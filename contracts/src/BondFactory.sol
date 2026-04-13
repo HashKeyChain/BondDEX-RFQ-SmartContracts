@@ -151,8 +151,17 @@ contract BondFactory is
             revert ZeroAddress();
         }
 
-        if (_issuanceApprovals[approvalId].status == ApprovalStatus.CONSUMED) {
-            revert InvalidApprovalState(ApprovalStatus.CONSUMED);
+        if (!_approvedComplianceImplementations[complianceImplementation]) {
+            revert UnsupportedInterface(complianceImplementation, bytes4(0));
+        }
+
+        if (expiresAt != 0 && expiresAt <= block.timestamp) {
+            revert ExpiredDeadline(expiresAt, block.timestamp);
+        }
+
+        ApprovalStatus currentStatus = _issuanceApprovals[approvalId].status;
+        if (currentStatus != ApprovalStatus.NONE) {
+            revert InvalidApprovalState(currentStatus);
         }
 
         _issuanceApprovals[approvalId] = IssuanceApprovalRecord({
@@ -188,6 +197,21 @@ contract BondFactory is
     }
 
     /// @inheritdoc IBondFactory
+    /// @dev Persists EXPIRED status for an active approval whose deadline has passed.
+    /// Anyone may call this to update the on-chain state for off-chain indexers.
+    function markIssuanceExpired(bytes32 approvalId) external {
+        IssuanceApprovalRecord storage record = _issuanceApprovals[approvalId];
+        if (record.status != ApprovalStatus.ACTIVE) {
+            revert InvalidApprovalState(record.status);
+        }
+        if (record.expiresAt == 0 || record.expiresAt >= block.timestamp) {
+            revert InvalidApprovalState(record.status);
+        }
+        record.status = ApprovalStatus.EXPIRED;
+        emit IssuanceRevoked(approvalId, record.issuer, msg.sender);
+    }
+
+    /// @inheritdoc IBondFactory
     /// @dev Registers one compliance implementation after verifying the expected interface.
     function registerComplianceImplementation(
         address implementation,
@@ -215,6 +239,9 @@ contract BondFactory is
     function disableComplianceImplementation(
         address implementation
     ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+        if (implementation == address(0)) {
+            revert ZeroAddress();
+        }
         _approvedComplianceImplementations[implementation] = false;
         emit ComplianceImplementationRegistered(
             implementation,
@@ -275,6 +302,9 @@ contract BondFactory is
         if (config.decimals > 18) {
             revert InvalidBondConfig("decimals must be <= 18");
         }
+        if (config.couponRateBps > 10_000) {
+            revert InvalidBondConfig("couponRateBps must be <= 10000");
+        }
 
         // Deploy one isolated compliance module and one immutable bond token for this approval.
         complianceModuleAddress = _deployComplianceModule(config);
@@ -305,9 +335,11 @@ contract BondFactory is
     }
 
     /// @inheritdoc IBondFactory
-    /// @dev Updates the platform admin and transfers DEFAULT_ADMIN_ROLE so newly deployed
-    /// ComplianceModules receive the correct governance address. The previous admin's role
-    /// is revoked unless they are the caller (preserving ability to complete transactions).
+    /// @dev Updates the `platformAdmin` state variable so newly deployed ComplianceModules
+    /// receive the correct governance address. This function does NOT perform a complete
+    /// admin role transfer — the caller retains `DEFAULT_ADMIN_ROLE` after execution.
+    /// To fully hand over control, the old admin must separately call `renounceRole` or
+    /// the new admin must call `revokeRole` via standard AccessControl operations.
     function setPlatformAdmin(
         address newAdmin
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {

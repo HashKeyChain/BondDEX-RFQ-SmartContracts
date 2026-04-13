@@ -14,6 +14,7 @@ struct DeployConfig {
     address factoryPauser;
     // BondIssuance 角色
     address issuanceAdmin;
+    address issuanceIssuanceApprover;
     address issuanceSettlementAdmin;
     address issuancePauser;
     address issuanceUpgrader;

@@ -16,6 +16,7 @@ import {RoleManaged} from "../abstracts/RoleManaged.sol";
 import {
     BondTokenAlreadyBound,
     InvalidArrayLength,
+    InvalidParticipantRole,
     ZeroAddress
 } from "../libraries/BondErrors.sol";
 import {IComplianceModule} from "../interfaces/IComplianceModule.sol";
@@ -108,7 +109,7 @@ contract ComplianceModule is
     mapping(address account => Role role) private _roles;
 
     /// @dev Reserved storage gap for future upgrades.
-    uint256[46] private __gap;
+    uint256[45] private __gap;
 
     /// @dev Locks the implementation contract and requires proxy initialization.
     constructor() {
@@ -160,6 +161,8 @@ contract ComplianceModule is
         address account,
         bool allowed
     ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+        _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
+        if (account == address(0)) revert ZeroAddress();
         _whitelist[account] = allowed;
         emit WhitelistUpdated(
             bondToken,
@@ -176,6 +179,7 @@ contract ComplianceModule is
         address[] calldata accounts,
         bool[] calldata allowed
     ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+        _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         if (accounts.length != allowed.length) {
             revert InvalidArrayLength();
         }
@@ -198,6 +202,11 @@ contract ComplianceModule is
         address account,
         Role role
     ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+        if (account == address(0)) revert ZeroAddress();
+        if (uint8(role) > uint8(Role.INVESTOR)) {
+            revert InvalidParticipantRole(account, Role.INVESTOR, role);
+        }
+        _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         _roles[account] = role;
         emit RoleUpdated(bondToken, account, address(this), role, msg.sender);
     }
@@ -208,11 +217,20 @@ contract ComplianceModule is
         address[] calldata accounts,
         Role[] calldata roles
     ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+        _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         if (accounts.length != roles.length) {
             revert InvalidArrayLength();
         }
 
         for (uint256 i = 0; i < accounts.length; i++) {
+            if (accounts[i] == address(0)) revert ZeroAddress();
+            if (uint8(roles[i]) > uint8(Role.INVESTOR)) {
+                revert InvalidParticipantRole(
+                    accounts[i],
+                    Role.INVESTOR,
+                    roles[i]
+                );
+            }
             _roles[accounts[i]] = roles[i];
             emit RoleUpdated(
                 bondToken,
@@ -230,6 +248,7 @@ contract ComplianceModule is
         bytes32 policyId_,
         uint256 policyVersion_
     ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+        _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         _policyId = policyId_;
         _policyVersion = policyVersion_;
         emit PolicyMetadataUpdated(

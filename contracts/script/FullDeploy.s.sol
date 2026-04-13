@@ -170,6 +170,10 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
         DeployConfig memory cfg
     ) internal {
         issuance.grantRole(0x00, cfg.issuanceAdmin);
+        issuance.grantRole(
+            ISSUANCE_APPROVER_ROLE,
+            cfg.issuanceIssuanceApprover
+        );
         issuance.grantRole(SETTLEMENT_ADMIN_ROLE, cfg.issuanceSettlementAdmin);
         issuance.grantRole(PAUSER_ROLE, cfg.issuancePauser);
         issuance.grantRole(UPGRADER_ROLE, cfg.issuanceUpgrader);
@@ -229,6 +233,13 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
         }
 
         // ── BondIssuance ──
+        retained += _renounceIf(
+            issuance,
+            ISSUANCE_APPROVER_ROLE,
+            d,
+            cfg.issuanceIssuanceApprover,
+            "BondIssuance.ISSUANCE_APPROVER_ROLE"
+        );
         retained += _renounceIf(
             issuance,
             SETTLEMENT_ADMIN_ROLE,

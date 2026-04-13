@@ -27,6 +27,7 @@ enum PauseDomain {
 
 /// @notice Lifecycle states for issuance approvals stored by the factory.
 enum ApprovalStatus {
+    NONE,
     ACTIVE,
     CONSUMED,
     REVOKED,
@@ -35,7 +36,7 @@ enum ApprovalStatus {
 
 /// @notice Lifecycle states for subscription offers.
 enum SubscriptionStatus {
-    DRAFT,
+    NONE,
     ACTIVE,
     CLOSED,
     CANCELLED
@@ -107,6 +108,8 @@ struct Order {
     uint256 nonce;
     /// @notice Extra uniqueness salt used for otherwise identical orders.
     uint256 salt;
+    /// @notice Maximum fee basis points the maker accepts for this order.
+    uint16 maxFeeBps;
 }
 
 /// @notice Governance-controlled fee policy for RFQ settlement.

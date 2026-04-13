@@ -24,6 +24,10 @@ interface IBondFactory {
     /// @param approvalId Unique approval identifier.
     function revokeIssuance(bytes32 approvalId) external;
 
+    /// @dev Marks an active-but-expired issuance approval as EXPIRED on-chain.
+    /// @param approvalId Approval identifier whose deadline has passed.
+    function markIssuanceExpired(bytes32 approvalId) external;
+
     /// @dev Registers one compliance implementation that future bonds may instantiate.
     /// @param implementation Compliance implementation address.
     /// @param interfaceId ERC165 interface identifier expected from the implementation.

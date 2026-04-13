@@ -32,6 +32,39 @@
   },
   {
     "type": "function",
+    "name": "approveSubscription",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "issuer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "bondToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "maxUnits",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "expiresAt",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "claim",
     "inputs": [
       {
@@ -114,6 +147,11 @@
             "internalType": "uint256"
           }
         ]
+      },
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [
@@ -253,6 +291,45 @@
       },
       {
         "name": "closesAt",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "status",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getSubscriptionApproval",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "issuer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "bondToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "maxUnits",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "expiresAt",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -449,6 +526,19 @@
   },
   {
     "type": "function",
+    "name": "revokeSubscriptionApproval",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setClaimDelegate",
     "inputs": [
       {
@@ -524,56 +614,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "updateSubscription",
-    "inputs": [
-      {
-        "name": "offerId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "terms",
-        "type": "tuple",
-        "internalType": "struct SubscriptionTerms",
-        "components": [
-          {
-            "name": "bondToken",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "settlementToken",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "unitPrice",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "maxUnits",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "opensAt",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "closesAt",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -887,6 +927,74 @@
   },
   {
     "type": "event",
+    "name": "SubscriptionApprovalRevoked",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "issuer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "approver",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SubscriptionApproved",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "issuer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "bondToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "approver",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "maxUnits",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "expiresAt",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "SubscriptionClosed",
     "inputs": [
       {
@@ -913,61 +1021,6 @@
   {
     "type": "event",
     "name": "SubscriptionCreated",
-    "inputs": [
-      {
-        "name": "offerId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "bondToken",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "issuer",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "settlementToken",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "unitPrice",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "maxUnits",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "opensAt",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "closesAt",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "SubscriptionUpdated",
     "inputs": [
       {
         "name": "offerId",
@@ -1183,6 +1236,22 @@
   },
   {
     "type": "error",
+    "name": "ExpiredDeadline",
+    "inputs": [
+      {
+        "name": "expiry",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "FailedCall",
     "inputs": []
   },
@@ -1202,6 +1271,27 @@
       },
       {
         "name": "requiredAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InsufficientRescuableBalance",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "rescuableAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "requestedAmount",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1251,20 +1341,20 @@
   },
   {
     "type": "error",
-    "name": "MaxUnitsBelowSoldUnits",
+    "name": "MaxUnitsExceedsApproval",
     "inputs": [
       {
-        "name": "offerId",
+        "name": "approvalId",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "newMaxUnits",
+        "name": "requested",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "currentSoldUnits",
+        "name": "approved",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1315,6 +1405,22 @@
         "name": "token",
         "type": "address",
         "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "SubscriptionApprovalNotActive",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "currentStatus",
+        "type": "uint8",
+        "internalType": "enum ApprovalStatus"
       }
     ]
   },

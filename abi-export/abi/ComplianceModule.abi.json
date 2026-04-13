@@ -879,6 +879,17 @@
   },
   {
     "type": "error",
+    "name": "DomainPaused",
+    "inputs": [
+      {
+        "name": "domain",
+        "type": "uint8",
+        "internalType": "enum PauseDomain"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ERC1967InvalidImplementation",
     "inputs": [
       {
@@ -907,6 +918,27 @@
     "type": "error",
     "name": "InvalidInitialization",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidParticipantRole",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "requiredRole",
+        "type": "uint8",
+        "internalType": "enum Role"
+      },
+      {
+        "name": "actualRole",
+        "type": "uint8",
+        "internalType": "enum Role"
+      }
+    ]
   },
   {
     "type": "error",

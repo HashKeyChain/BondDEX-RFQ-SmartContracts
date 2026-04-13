@@ -17,6 +17,9 @@ abstract contract DomainPausable {
     /// @dev Pause state keyed by lifecycle domain.
     mapping(PauseDomain domain => bool paused) private _pausedDomains;
 
+    /// @dev Reserved storage gap for future upgrades.
+    uint256[49] private __gap;
+
     /// @notice Returns whether the domain is currently paused.
     /// @param domain Lifecycle domain to inspect.
     /// @return paused True when the domain is paused.

@@ -117,12 +117,15 @@ OPS_RPC := $(call cfg,$(ENV),rpcUrl)
 OPS_SCRIPT := $(SCRIPT_DIR)/Operations.s.sol:Operations
 
 .PHONY: ops-approve-issuance ops-create-bond ops-set-whitelist ops-set-role
-.PHONY: ops-create-subscription ops-subscribe ops-close-subscription ops-update-subscription
+.PHONY: ops-approve-subscription ops-revoke-subscription-approval ops-create-subscription ops-subscribe ops-close-subscription
 .PHONY: ops-fill-order ops-cancel-order ops-increment-nonce
-.PHONY: ops-deposit-redemption ops-claim ops-claim-for ops-set-delegate
-.PHONY: ops-pause-factory ops-pause-issuance ops-pause-settlement
+.PHONY: ops-deposit-redemption ops-claim ops-claim-for ops-set-delegate ops-rescue-tokens
+.PHONY: ops-mark-issuance-expired ops-mark-subscription-expired
+.PHONY: ops-pause-factory ops-pause-issuance ops-pause-settlement ops-pause-compliance
+.PHONY: ops-set-minimum-nonce
 .PHONY: ops-set-fee-config ops-set-bond-token ops-mint-usdc ops-approve-token
 .PHONY: ops-query-order ops-query-redemption ops-query-subscription ops-query-remaining-units
+.PHONY: ops-query-subscription-approval
 .PHONY: ops-query-compliance ops-query-fee-config ops-query-nonce ops-query-fee
 .PHONY: ops-query-bond-token ops-query-balance ops-query-bond-balances
 
@@ -150,10 +153,22 @@ ops-set-role:
 		--sig "setRole(address,address,uint8)" $(ARGS) \
 		--rpc-url $(OPS_RPC) --broadcast
 
-# 创建订阅
+# 审批认购
+ops-approve-subscription:
+	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
+		--sig "approveSubscription(bytes32,address,address,uint256,uint256)" $(ARGS) \
+		--rpc-url $(OPS_RPC) --broadcast
+
+# 撤销认购审批
+ops-revoke-subscription-approval:
+	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
+		--sig "revokeSubscriptionApproval(bytes32)" $(ARGS) \
+		--rpc-url $(OPS_RPC) --broadcast
+
+# 创建订阅（需先审批）
 ops-create-subscription:
 	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
-		--sig "createSubscription(address,address,uint256,uint256,uint256,uint256)" $(ARGS) \
+		--sig "createSubscription(address,address,uint256,uint256,uint256,uint256,bytes32)" $(ARGS) \
 		--rpc-url $(OPS_RPC) --broadcast
 
 # 订阅
@@ -210,6 +225,30 @@ ops-set-delegate:
 		--sig "setClaimDelegate(address)" $(ARGS) \
 		--rpc-url $(OPS_RPC) --broadcast
 
+# 紧急代币救援
+ops-rescue-tokens:
+	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
+		--sig "rescueTokens(address,address,uint256)" $(ARGS) \
+		--rpc-url $(OPS_RPC) --broadcast
+
+# 标记过期的发行审批
+ops-mark-issuance-expired:
+	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
+		--sig "markIssuanceExpired(bytes32)" $(ARGS) \
+		--rpc-url $(OPS_RPC) --broadcast
+
+# 标记过期的认购审批
+ops-mark-subscription-expired:
+	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
+		--sig "markSubscriptionExpired(bytes32)" $(ARGS) \
+		--rpc-url $(OPS_RPC) --broadcast
+
+# 设置最小 nonce
+ops-set-minimum-nonce:
+	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
+		--sig "setMinimumNonce(uint256)" $(ARGS) \
+		--rpc-url $(OPS_RPC) --broadcast
+
 # 暂停工厂
 ops-pause-factory:
 	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
@@ -226,6 +265,12 @@ ops-pause-issuance:
 ops-pause-settlement:
 	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
 		--sig "pauseDomainSettlement(uint8,bool)" $(ARGS) \
+		--rpc-url $(OPS_RPC) --broadcast
+
+# 暂停合规模块
+ops-pause-compliance:
+	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
+		--sig "pauseDomainCompliance(address,uint8,bool)" $(ARGS) \
 		--rpc-url $(OPS_RPC) --broadcast
 
 # 设置债券 token
@@ -318,8 +363,8 @@ ops-query-remaining-units:
 		--sig "queryRemainingUnits(bytes32)" $(ARGS) \
 		--rpc-url $(OPS_RPC)
 
-# 更新订阅
-ops-update-subscription:
+# 查询认购审批
+ops-query-subscription-approval:
 	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
-		--sig "updateSubscription(bytes32,address,address,uint256,uint256,uint256,uint256)" $(ARGS) \
-		--rpc-url $(OPS_RPC) --broadcast
+		--sig "querySubscriptionApproval(bytes32)" $(ARGS) \
+		--rpc-url $(OPS_RPC)

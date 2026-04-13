@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { Test } from "forge-std/Test.sol";
+import {
+    ERC1967Proxy
+} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Test} from "forge-std/Test.sol";
 
-import { BondFactory } from "../../src/BondFactory.sol";
-import { BondIssuance } from "../../src/BondIssuance.sol";
-import { BondToken } from "../../src/BondToken.sol";
-import { ComplianceModule } from "../../src/compliance/ComplianceModule.sol";
-import { MockERC20Decimals } from "../mocks/MockERC20Decimals.sol";
-import { RFQSettlement } from "../../src/RFQSettlement.sol";
+import {BondFactory} from "../../src/BondFactory.sol";
+import {BondIssuance} from "../../src/BondIssuance.sol";
+import {BondToken} from "../../src/BondToken.sol";
+import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
+import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
+import {RFQSettlement} from "../../src/RFQSettlement.sol";
 import {
     BondConfig,
     Role,
@@ -18,7 +20,7 @@ import {
     OrderSide,
     FeeConfig
 } from "../../src/types/BondTypes.sol";
-import { IComplianceModule } from "../../src/interfaces/IComplianceModule.sol";
+import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
 
 contract BondLifecycleE2ETest is Test {
     uint256 internal constant MAKER_PK = 0xA11CE;
@@ -65,7 +67,8 @@ contract BondLifecycleE2ETest is Test {
         bytes32 approvalId = keccak256("approval");
         vm.startPrank(admin);
         factory.registerComplianceImplementation(
-            address(complianceImplementation), type(IComplianceModule).interfaceId
+            address(complianceImplementation),
+            type(IComplianceModule).interfaceId
         );
         factory.approveIssuance(
             approvalId,
@@ -77,7 +80,11 @@ contract BondLifecycleE2ETest is Test {
         issuance.setSettlementTokenPolicy(address(usdc), true, false, true);
         settlement.setSettlementTokenPolicy(address(usdc), true);
         settlement.setFeeConfig(
-            FeeConfig({ feeRecipient: feeRecipient, currentFeeBps: 50, maxFeeBps: 1_000 })
+            FeeConfig({
+                feeRecipient: feeRecipient,
+                currentFeeBps: 50,
+                maxFeeBps: 1_000
+            })
         );
         vm.stopPrank();
 
@@ -97,10 +104,12 @@ contract BondLifecycleE2ETest is Test {
         });
 
         vm.prank(issuer);
-        (address bondTokenAddress, address complianceModuleAddress) =
-            factory.createBond(config, approvalId);
+        (address bondTokenAddress, address complianceModuleAddress) = factory
+            .createBond(config, approvalId);
         BondToken bondToken = BondToken(bondTokenAddress);
-        ComplianceModule complianceModule = ComplianceModule(complianceModuleAddress);
+        ComplianceModule complianceModule = ComplianceModule(
+            complianceModuleAddress
+        );
 
         vm.startPrank(admin);
         complianceModule.setWhitelist(issuer, true);
@@ -112,6 +121,16 @@ contract BondLifecycleE2ETest is Test {
         settlement.setBondTokenRegistration(bondTokenAddress, true);
         vm.stopPrank();
 
+        bytes32 subApprovalId = keccak256("e2e-sub-approval");
+        vm.prank(admin);
+        issuance.approveSubscription(
+            subApprovalId,
+            issuer,
+            bondTokenAddress,
+            100e18,
+            0
+        );
+
         vm.prank(issuer);
         bytes32 offerId = issuance.createSubscription(
             SubscriptionTerms({
@@ -121,7 +140,8 @@ contract BondLifecycleE2ETest is Test {
                 maxUnits: 100e18,
                 opensAt: block.timestamp,
                 closesAt: block.timestamp + 1 days
-            })
+            }),
+            subApprovalId
         );
 
         usdc.mint(maker, 500_000e6);
@@ -146,7 +166,8 @@ contract BondLifecycleE2ETest is Test {
             side: OrderSide.BUY,
             expiry: block.timestamp + 1 days,
             nonce: 0,
-            salt: 1
+            salt: 1,
+            maxFeeBps: 10_000
         });
         bytes32 digest = settlement.hashOrder(order);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(MAKER_PK, digest);

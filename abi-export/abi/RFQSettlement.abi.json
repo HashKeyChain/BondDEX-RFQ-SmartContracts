@@ -88,6 +88,11 @@
             "name": "salt",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeBps",
+            "type": "uint16",
+            "internalType": "uint16"
           }
         ]
       }
@@ -153,6 +158,11 @@
             "name": "salt",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeBps",
+            "type": "uint16",
+            "internalType": "uint16"
           }
         ]
       },
@@ -223,6 +233,11 @@
             "name": "salt",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeBps",
+            "type": "uint16",
+            "internalType": "uint16"
           }
         ]
       }
@@ -337,6 +352,11 @@
             "name": "salt",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeBps",
+            "type": "uint16",
+            "internalType": "uint16"
           }
         ]
       },
@@ -468,6 +488,11 @@
             "name": "salt",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "maxFeeBps",
+            "type": "uint16",
+            "internalType": "uint16"
           }
         ]
       }
@@ -1266,6 +1291,22 @@
     "type": "error",
     "name": "FailedCall",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FeeExceedsOrderLimit",
+    "inputs": [
+      {
+        "name": "orderMaxFeeBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "currentFeeBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ]
   },
   {
     "type": "error",

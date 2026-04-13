@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {
+    InvalidBondConfig,
     UnauthorizedController,
     TransferRestricted,
     ZeroAddress
@@ -69,6 +70,16 @@ contract BondToken is ERC20, IBondToken {
             issuanceController_ == address(0)
         ) {
             revert ZeroAddress();
+        }
+
+        if (faceValue_ == 0) {
+            revert InvalidBondConfig("faceValue must be > 0");
+        }
+        if (couponRateBps_ > 10_000) {
+            revert InvalidBondConfig("couponRateBps must be <= 10000");
+        }
+        if (maturityTimestamp_ <= block.timestamp) {
+            revert InvalidBondConfig("maturityTimestamp must be in the future");
         }
 
         issuer = issuer_;

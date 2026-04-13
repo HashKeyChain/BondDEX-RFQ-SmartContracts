@@ -27,12 +27,15 @@ import {RoleManaged} from "./abstracts/RoleManaged.sol";
 import {
     BondAlreadyMatured,
     BondNotMatured,
+    ExpiredDeadline,
     InvalidParticipantRole,
     InvalidSubscriptionWindow,
     InsufficientRedemptionFunding,
-    MaxUnitsBelowSoldUnits,
+    InsufficientRescuableBalance,
+    MaxUnitsExceedsApproval,
     NoClaimableBalance,
     NotWhitelisted,
+    SubscriptionApprovalNotActive,
     SubscriptionCapExceeded,
     SubscriptionNotActive,
     SubscriptionWindowClosed,
@@ -45,6 +48,7 @@ import {IComplianceModule} from "./interfaces/IComplianceModule.sol";
 import {IBondIssuance} from "./interfaces/IBondIssuance.sol";
 import {IBondToken} from "./interfaces/IBondToken.sol";
 import {
+    ApprovalStatus,
     PauseDomain,
     Role,
     SubscriptionStatus,
@@ -78,7 +82,7 @@ contract BondIssuance is
 
     /// @dev Stores the issuer-defined terms for one subscription window.
     struct SubscriptionOffer {
-        /// @dev Issuer that owns and can update the offer.
+        /// @dev Issuer that owns the offer.
         address issuer;
         /// @dev Bond token offered in the subscription window.
         address bondToken;
@@ -96,6 +100,20 @@ contract BondIssuance is
         uint256 closesAt;
         /// @dev Current status of the offer.
         SubscriptionStatus status;
+    }
+
+    /// @dev Stores governance-approved parameters for one subscription window.
+    struct SubscriptionApprovalRecord {
+        /// @dev Issuer address allowed to consume the approval.
+        address issuer;
+        /// @dev Bond token that the subscription must target.
+        address bondToken;
+        /// @dev Upper bound on bond units the issuer may offer.
+        uint256 maxUnits;
+        /// @dev Optional deadline after which the approval can no longer be used.
+        uint256 expiresAt;
+        /// @dev Current approval lifecycle status.
+        ApprovalStatus status;
     }
 
     /// @dev Tracks cumulative redemption funding and payouts for one bond token.
@@ -129,16 +147,21 @@ contract BondIssuance is
         uint256 closesAt
     );
 
-    /// @notice Emitted when an issuer updates the economic or timing terms of an active offer.
-    event SubscriptionUpdated(
-        bytes32 indexed offerId,
-        address indexed bondToken,
+    /// @notice Emitted when governance approves one subscription window.
+    event SubscriptionApproved(
+        bytes32 indexed approvalId,
         address indexed issuer,
-        address settlementToken,
-        uint256 unitPrice,
+        address indexed bondToken,
+        address approver,
         uint256 maxUnits,
-        uint256 opensAt,
-        uint256 closesAt
+        uint256 expiresAt
+    );
+
+    /// @notice Emitted when governance revokes an active subscription approval.
+    event SubscriptionApprovalRevoked(
+        bytes32 indexed approvalId,
+        address indexed issuer,
+        address approver
     );
 
     /// @notice Emitted when a market maker successfully subscribes for bond units.
@@ -202,6 +225,10 @@ contract BondIssuance is
     mapping(bytes32 offerId => SubscriptionOffer offer)
         private _subscriptionOffers;
 
+    /// @dev Subscription approval records keyed by approval identifier.
+    mapping(bytes32 approvalId => SubscriptionApprovalRecord record)
+        private _subscriptionApprovals;
+
     /// @dev Optional claim delegate keyed by holder address.
     mapping(address holder => address delegate) private _claimDelegates;
 
@@ -209,8 +236,12 @@ contract BondIssuance is
     mapping(address bondToken => RedemptionState state)
         private _redemptionStates;
 
+    /// @dev Aggregated redemption liability keyed by settlement-token address.
+    mapping(address token => uint256 liability)
+        private _totalRedemptionLiability;
+
     /// @dev Reserved storage gap for future upgrades.
-    uint256[44] private __gap;
+    uint256[43] private __gap;
 
     /// @dev Locks the implementation contract and forces use through a proxy.
     constructor() {
@@ -226,18 +257,118 @@ contract BondIssuance is
         __AccessControl_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(ISSUANCE_APPROVER_ROLE, admin);
         _grantRole(SETTLEMENT_ADMIN_ROLE, admin);
         _grantRole(PAUSER_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
     }
 
     /// @inheritdoc IBondIssuance
-    /// @dev Creates one issuer-owned subscription window after validating token policy and issuer role.
+    /// @dev Records one subscription approval that can later be consumed exactly once.
+    function approveSubscription(
+        bytes32 approvalId,
+        address issuer,
+        address bondToken,
+        uint256 maxUnits,
+        uint256 expiresAt
+    ) external onlyRole(ISSUANCE_APPROVER_ROLE) {
+        if (issuer == address(0) || bondToken == address(0)) {
+            revert ZeroAddress();
+        }
+        if (maxUnits == 0) revert ZeroAmount();
+        if (expiresAt != 0 && expiresAt <= block.timestamp) {
+            revert ExpiredDeadline(expiresAt, block.timestamp);
+        }
+
+        ApprovalStatus currentStatus = _subscriptionApprovals[approvalId]
+            .status;
+        if (currentStatus != ApprovalStatus.NONE) {
+            revert SubscriptionApprovalNotActive(approvalId, currentStatus);
+        }
+
+        _subscriptionApprovals[approvalId] = SubscriptionApprovalRecord({
+            issuer: issuer,
+            bondToken: bondToken,
+            maxUnits: maxUnits,
+            expiresAt: expiresAt,
+            status: ApprovalStatus.ACTIVE
+        });
+
+        emit SubscriptionApproved(
+            approvalId,
+            issuer,
+            bondToken,
+            msg.sender,
+            maxUnits,
+            expiresAt
+        );
+    }
+
+    /// @inheritdoc IBondIssuance
+    /// @dev Marks one subscription approval as revoked so the issuer cannot consume it.
+    function revokeSubscriptionApproval(
+        bytes32 approvalId
+    ) external onlyRole(ISSUANCE_APPROVER_ROLE) {
+        SubscriptionApprovalRecord storage record = _subscriptionApprovals[
+            approvalId
+        ];
+        if (record.status != ApprovalStatus.ACTIVE) {
+            revert SubscriptionApprovalNotActive(approvalId, record.status);
+        }
+        record.status = ApprovalStatus.REVOKED;
+        emit SubscriptionApprovalRevoked(approvalId, record.issuer, msg.sender);
+    }
+
+    /// @inheritdoc IBondIssuance
+    /// @dev Persists EXPIRED status for an active subscription approval whose deadline has passed.
+    function markSubscriptionExpired(bytes32 approvalId) external {
+        SubscriptionApprovalRecord storage record = _subscriptionApprovals[
+            approvalId
+        ];
+        if (record.status != ApprovalStatus.ACTIVE) {
+            revert SubscriptionApprovalNotActive(approvalId, record.status);
+        }
+        if (record.expiresAt == 0 || record.expiresAt >= block.timestamp) {
+            revert SubscriptionApprovalNotActive(approvalId, record.status);
+        }
+        record.status = ApprovalStatus.EXPIRED;
+        emit SubscriptionApprovalRevoked(approvalId, record.issuer, msg.sender);
+    }
+
+    /// @inheritdoc IBondIssuance
+    /// @dev Consumes one subscription approval and creates an issuer-owned subscription window.
     function createSubscription(
-        SubscriptionTerms calldata terms
+        SubscriptionTerms calldata terms,
+        bytes32 approvalId
     ) external returns (bytes32 offerId) {
         _requireDomainActive(PauseDomain.SUBSCRIPTION);
         _requireIssuanceTokenEnabled(terms.settlementToken);
+
+        SubscriptionApprovalRecord storage approval = _subscriptionApprovals[
+            approvalId
+        ];
+        if (approval.status != ApprovalStatus.ACTIVE) {
+            revert SubscriptionApprovalNotActive(approvalId, approval.status);
+        }
+        if (approval.expiresAt != 0 && approval.expiresAt < block.timestamp) {
+            revert SubscriptionApprovalNotActive(
+                approvalId,
+                ApprovalStatus.EXPIRED
+            );
+        }
+        if (approval.issuer != msg.sender) {
+            revert InvalidParticipantRole(msg.sender, Role.ISSUER, Role.NONE);
+        }
+        if (approval.bondToken != terms.bondToken) {
+            revert SubscriptionApprovalNotActive(approvalId, approval.status);
+        }
+        if (terms.maxUnits > approval.maxUnits) {
+            revert MaxUnitsExceedsApproval(
+                approvalId,
+                terms.maxUnits,
+                approval.maxUnits
+            );
+        }
 
         IBondToken bondToken = IBondToken(terms.bondToken);
         if (bondToken.settlementToken() != terms.settlementToken) {
@@ -256,6 +387,8 @@ contract BondIssuance is
         }
 
         if (terms.unitPrice == 0) revert ZeroAmount();
+
+        approval.status = ApprovalStatus.CONSUMED;
 
         offerId = bytes32(++_nextOfferId);
         _subscriptionOffers[offerId] = SubscriptionOffer({
@@ -279,54 +412,6 @@ contract BondIssuance is
             terms.maxUnits,
             terms.opensAt,
             terms.closesAt
-        );
-    }
-
-    /// @inheritdoc IBondIssuance
-    /// @dev Updates the mutable terms of one active subscription owned by the caller.
-    function updateSubscription(
-        bytes32 offerId,
-        SubscriptionTerms calldata terms
-    ) external {
-        SubscriptionOffer storage offer = _subscriptionOffers[offerId];
-        if (offer.status != SubscriptionStatus.ACTIVE) {
-            revert SubscriptionNotActive(offerId);
-        }
-
-        if (offer.issuer != msg.sender) {
-            revert InvalidParticipantRole(msg.sender, Role.ISSUER, Role.NONE);
-        }
-
-        IBondToken bondToken = IBondToken(offer.bondToken);
-        if (bondToken.settlementToken() != terms.settlementToken) {
-            revert UnsupportedSettlementToken(terms.settlementToken);
-        }
-        _requireIssuanceTokenEnabled(terms.settlementToken);
-
-        if (terms.maxUnits < offer.soldUnits) {
-            revert MaxUnitsBelowSoldUnits(
-                offerId,
-                terms.maxUnits,
-                offer.soldUnits
-            );
-        }
-
-        _requireValidWindow(terms.opensAt, terms.closesAt);
-
-        offer.unitPrice = terms.unitPrice;
-        offer.maxUnits = terms.maxUnits;
-        offer.opensAt = terms.opensAt;
-        offer.closesAt = terms.closesAt;
-
-        emit SubscriptionUpdated(
-            offerId,
-            offer.bondToken,
-            offer.issuer,
-            offer.settlementToken,
-            offer.unitPrice,
-            offer.maxUnits,
-            offer.opensAt,
-            offer.closesAt
         );
     }
 
@@ -366,6 +451,13 @@ contract BondIssuance is
         _requireIssuanceTokenEnabled(offer.settlementToken);
 
         IBondToken bondToken = IBondToken(offer.bondToken);
+        if (block.timestamp >= bondToken.maturityTimestamp()) {
+            revert BondAlreadyMatured(
+                offer.bondToken,
+                bondToken.maturityTimestamp(),
+                block.timestamp
+            );
+        }
         IComplianceModule complianceModule = IComplianceModule(
             bondToken.complianceModule()
         );
@@ -453,6 +545,7 @@ contract BondIssuance is
         RedemptionState storage state = _redemptionStates[bondTokenAddress];
         state.fundedAmount += amount;
         state.lastFundingAt = block.timestamp;
+        _totalRedemptionLiability[bondToken.settlementToken()] += amount;
 
         IERC20(bondToken.settlementToken()).safeTransferFrom(
             msg.sender,
@@ -556,6 +649,8 @@ contract BondIssuance is
 
     /// @inheritdoc IBondIssuance
     /// @dev Allows the admin to recover tokens accidentally sent to this contract.
+    /// The function protects all outstanding redemption liabilities for the given token
+    /// across every bond series, preventing admin from withdrawing funds owed to holders.
     function rescueTokens(
         address token,
         address to,
@@ -564,8 +659,43 @@ contract BondIssuance is
         if (token == address(0) || to == address(0)) {
             revert ZeroAddress();
         }
+
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 locked = _totalRedemptionLiability[token];
+        uint256 rescuable = balance > locked ? balance - locked : 0;
+        if (amount > rescuable) {
+            revert InsufficientRescuableBalance(token, rescuable, amount);
+        }
+
         IERC20(token).safeTransfer(to, amount);
         emit TokensRescued(token, to, amount, msg.sender);
+    }
+
+    /// @inheritdoc IBondIssuance
+    /// @dev Returns the stored subscription approval record.
+    function getSubscriptionApproval(
+        bytes32 approvalId
+    )
+        external
+        view
+        returns (
+            address issuer,
+            address bondToken,
+            uint256 maxUnits,
+            uint256 expiresAt,
+            ApprovalStatus status
+        )
+    {
+        SubscriptionApprovalRecord memory record = _subscriptionApprovals[
+            approvalId
+        ];
+        return (
+            record.issuer,
+            record.bondToken,
+            record.maxUnits,
+            record.expiresAt,
+            record.status
+        );
     }
 
     /// @inheritdoc IBondIssuance
@@ -724,6 +854,7 @@ contract BondIssuance is
 
         // Burn first, then transfer payout so the holder cannot re-use the same bond balance.
         state.claimedAmount += payout;
+        _totalRedemptionLiability[bondToken.settlementToken()] -= payout;
         bondToken.burn(holder, bondAmount);
         IERC20(bondToken.settlementToken()).safeTransfer(holder, payout);
 

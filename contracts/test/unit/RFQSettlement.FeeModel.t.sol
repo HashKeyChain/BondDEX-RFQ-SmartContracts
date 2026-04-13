@@ -43,7 +43,8 @@ contract RFQSettlementFeeModelTest is RFQSettlementFixtures {
             side: OrderSide.BUY,
             expiry: block.timestamp + 1 days,
             nonce: 0,
-            salt: 100
+            salt: 100,
+            maxFeeBps: 10_000
         });
         bytes memory sig = signOrder(order, MAKER_PK);
 
@@ -92,7 +93,8 @@ contract RFQSettlementFeeModelTest is RFQSettlementFixtures {
             side: OrderSide.SELL,
             expiry: block.timestamp + 1 days,
             nonce: 0,
-            salt: 200
+            salt: 200,
+            maxFeeBps: 10_000
         });
         bytes memory sig = signOrder(order, MAKER_PK);
 
@@ -135,7 +137,8 @@ contract RFQSettlementFeeModelTest is RFQSettlementFixtures {
             side: OrderSide.BUY,
             expiry: block.timestamp + 1 days,
             nonce: 0,
-            salt: 300
+            salt: 300,
+            maxFeeBps: 10_000
         });
         bytes memory sig = signOrder(order, MAKER_PK);
 
@@ -176,7 +179,8 @@ contract RFQSettlementFeeModelTest is RFQSettlementFixtures {
             side: OrderSide.SELL,
             expiry: block.timestamp + 1 days,
             nonce: 0,
-            salt: 301
+            salt: 301,
+            maxFeeBps: 10_000
         });
         bytes memory sig = signOrder(order, MAKER_PK);
 

@@ -24,6 +24,7 @@ import {RoleManaged} from "./abstracts/RoleManaged.sol";
 import {BondMath} from "./libraries/BondMath.sol";
 import {
     ExpiredDeadline,
+    FeeExceedsOrderLimit,
     InvalidBatchLength,
     InvalidBatchSize,
     InvalidFeeConfig,
@@ -228,6 +229,10 @@ contract RFQSettlement is
     /// @inheritdoc IRFQSettlement
     /// @dev Cancels multiple orders for the caller.
     function batchCancelOrders(Order[] calldata orders) external {
+        if (orders.length == 0 || orders.length > MAX_BATCH_SIZE) {
+            revert InvalidBatchSize(orders.length, MAX_BATCH_SIZE);
+        }
+
         for (uint256 i = 0; i < orders.length; i++) {
             _cancelOrder(orders[i], msg.sender);
         }
@@ -373,6 +378,10 @@ contract RFQSettlement is
         address partyB,
         uint256 quoteAmount
     ) external view returns (uint256 feeAmount) {
+        if (!isBondTokenRegistered(bondToken)) {
+            revert UnregisteredBondToken(bondToken);
+        }
+
         IComplianceModule complianceModule = IComplianceModule(
             IBondToken(bondToken).complianceModule()
         );
@@ -511,6 +520,9 @@ contract RFQSettlement is
     ///   - MM is quoteReceiver → MM receives quoteAmount - fee (deducted from income)
     ///   - MM is quotePayer   → MM pays quoteAmount + fee (investor receives full quoteAmount)
     ///   - MM ↔ MM            → fee exempt
+    /// NOTE: `order.maxFeeBps` protects the maker (signer) from unexpected fee increases.
+    /// When the taker is the actual fee-bearing market maker (e.g. BUY order with maker=Investor),
+    /// the taker must verify `feeConfig.currentFeeBps` off-chain before submitting `fillOrder`.
     function _executeOrder(
         Order calldata order,
         bytes32 orderHash,
@@ -518,12 +530,19 @@ contract RFQSettlement is
         Role makerRole,
         Role takerRole
     ) internal {
+        if (_consumedOrders[orderHash]) {
+            revert OrderAlreadyConsumed(orderHash);
+        }
         _consumedOrders[orderHash] = true;
 
         uint256 feeAmount = (makerRole == Role.MARKET_MAKER &&
             takerRole == Role.MARKET_MAKER)
             ? 0
             : _quoteFeeAmount(order.quoteAmount);
+
+        if (feeAmount > 0 && _feeConfig.currentFeeBps > order.maxFeeBps) {
+            revert FeeExceedsOrderLimit(order.maxFeeBps, _feeConfig.currentFeeBps);
+        }
 
         {
             (

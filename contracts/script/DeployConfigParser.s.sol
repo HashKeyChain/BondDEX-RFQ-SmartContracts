@@ -53,6 +53,10 @@ abstract contract DeployConfigParser is Script {
             json,
             ".roles.bondIssuance.admin"
         );
+        cfg.issuanceIssuanceApprover = vm.parseJsonAddress(
+            json,
+            ".roles.bondIssuance.issuanceApprover"
+        );
         cfg.issuanceSettlementAdmin = vm.parseJsonAddress(
             json,
             ".roles.bondIssuance.settlementAdmin"
@@ -145,6 +149,10 @@ abstract contract DeployConfigParser is Script {
         require(
             cfg.issuanceAdmin != address(0),
             "roles.bondIssuance.admin required"
+        );
+        require(
+            cfg.issuanceIssuanceApprover != address(0),
+            "roles.bondIssuance.issuanceApprover required"
         );
         require(
             cfg.issuanceSettlementAdmin != address(0),

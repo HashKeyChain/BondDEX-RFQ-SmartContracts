@@ -59,6 +59,30 @@ contract BondTokenMetadataAndMintBurnTest is Test {
         );
     }
 
+    function test_revertWhenConstructedWithZeroFaceValue() public {
+        vm.expectRevert();
+        new BondToken(
+            issuer, "HKB", "HKB", 18, 0, 500,
+            block.timestamp + 30 days, stablecoin, address(complianceModule), issuanceController
+        );
+    }
+
+    function test_revertWhenConstructedWithExcessiveCouponRate() public {
+        vm.expectRevert();
+        new BondToken(
+            issuer, "HKB", "HKB", 18, 1_000e6, 10_001,
+            block.timestamp + 30 days, stablecoin, address(complianceModule), issuanceController
+        );
+    }
+
+    function test_revertWhenConstructedWithPastMaturity() public {
+        vm.expectRevert();
+        new BondToken(
+            issuer, "HKB", "HKB", 18, 1_000e6, 500,
+            block.timestamp - 1, stablecoin, address(complianceModule), issuanceController
+        );
+    }
+
     function test_metadataAndWiringAreImmutable() public view {
         assertEq(bondToken.name(), "HashKey Bond");
         assertEq(bondToken.symbol(), "HKB");

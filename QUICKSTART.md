@@ -50,6 +50,7 @@ config/
     },
     "bondIssuance": {
       "admin":            "0x一级市场DEFAULT_ADMIN_ROLE持有者",
+      "issuanceApprover": "0x认购审批ISSUANCE_APPROVER_ROLE持有者",
       "settlementAdmin":  "0x结算管理SETTLEMENT_ADMIN_ROLE持有者",
       "pauser":           "0x暂停操作PAUSER_ROLE持有者",
       "upgrader":         "0xUUPS升级UPGRADER_ROLE持有者"
@@ -97,6 +98,7 @@ config/
 | `.pauser` | PAUSER_ROLE — 暂停/恢复 Factory 域 |
 | **roles.bondIssuance** | |
 | `.admin` | BondIssuance 的 DEFAULT_ADMIN_ROLE — 管理所有角色 |
+| `.issuanceApprover` | ISSUANCE_APPROVER_ROLE — 审批/撤销认购申请 |
 | `.settlementAdmin` | SETTLEMENT_ADMIN_ROLE — 配置结算代币策略 |
 | `.pauser` | PAUSER_ROLE — 暂停/恢复认购、赎回等域 |
 | `.upgrader` | UPGRADER_ROLE — 执行 UUPS 代理升级 |
@@ -222,6 +224,7 @@ make export-abi
     },
     "bondIssuance": {
       "admin":            "0xSafe地址A",
+      "issuanceApprover": "0xSafe地址A",
       "settlementAdmin":  "0xSafe地址A",
       "pauser":           "0xSafe地址B",
       "upgrader":         "0xSafe地址C（技术团队）"

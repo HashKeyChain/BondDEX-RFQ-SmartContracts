@@ -122,17 +122,33 @@ error UnauthorizedOrderMaker(address caller, address maker);
 /// @notice Thrown when fee configuration violates the configured basis-point bounds.
 error InvalidFeeConfig(uint256 currentFeeBps, uint256 maxFeeBps);
 
+/// @notice Thrown when the current protocol fee exceeds the maker's signed limit.
+error FeeExceedsOrderLimit(uint16 orderMaxFeeBps, uint16 currentFeeBps);
+
 /// @notice Thrown when both parties in a trade are investors.
 error InvestorToInvestorRestricted(address partyA, address partyB);
 
 /// @notice Thrown when the caller is not the approved issuer for bond creation.
 error UnauthorizedIssuer(address caller, address expectedIssuer);
 
-/// @notice Thrown when updating subscription maxUnits below the already sold amount.
-error MaxUnitsBelowSoldUnits(
-    bytes32 offerId,
-    uint256 newMaxUnits,
-    uint256 currentSoldUnits
+/// @notice Thrown when the subscription approval record is not in the expected state.
+error SubscriptionApprovalNotActive(
+    bytes32 approvalId,
+    ApprovalStatus currentStatus
+);
+
+/// @notice Thrown when the subscription terms exceed the approved maxUnits cap.
+error MaxUnitsExceedsApproval(
+    bytes32 approvalId,
+    uint256 requested,
+    uint256 approved
+);
+
+/// @notice Thrown when a rescue request exceeds the balance not locked by redemption liabilities.
+error InsufficientRescuableBalance(
+    address token,
+    uint256 rescuableAmount,
+    uint256 requestedAmount
 );
 
 /// @notice Thrown when a bond configuration parameter is invalid.

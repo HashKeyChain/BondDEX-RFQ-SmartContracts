@@ -10,6 +10,7 @@ import {ComplianceModule} from "../src/compliance/ComplianceModule.sol";
 import {RFQSettlement} from "../src/RFQSettlement.sol";
 import {MockERC20Decimals} from "../test/mocks/MockERC20Decimals.sol";
 import {
+    ApprovalStatus,
     BondConfig,
     FeeConfig,
     Order,
@@ -246,14 +247,58 @@ contract Operations is BaseConfig {
     //  一级认购
     // ================================================================
 
-    /// @notice 创建认购窗口（发行人调用）
+    /// @notice 审批认购窗口（ISSUANCE_APPROVER_ROLE 调用）
+    /// @param approvalId 唯一审批 ID
+    /// @param issuerAddr 发行人地址
+    /// @param bondTokenAddr 债券代币地址
+    /// @param maxUnits 最大发行量上限
+    /// @param expiresAt 审批有效期 Unix 时间戳（0=永不过期）
+    function approveSubscription(
+        bytes32 approvalId,
+        address issuerAddr,
+        address bondTokenAddr,
+        uint256 maxUnits,
+        uint256 expiresAt
+    ) external {
+        (, address issuanceAddr, , ) = _deployment();
+        BondIssuance iss = BondIssuance(issuanceAddr);
+
+        vm.startBroadcast(_senderPk());
+        iss.approveSubscription(
+            approvalId,
+            issuerAddr,
+            bondTokenAddr,
+            maxUnits,
+            expiresAt
+        );
+        vm.stopBroadcast();
+
+        console2.log("Subscription approved:");
+        console2.logBytes32(approvalId);
+    }
+
+    /// @notice 撤销认购审批（ISSUANCE_APPROVER_ROLE 调用）
+    function revokeSubscriptionApproval(bytes32 approvalId) external {
+        (, address issuanceAddr, , ) = _deployment();
+        BondIssuance iss = BondIssuance(issuanceAddr);
+
+        vm.startBroadcast(_senderPk());
+        iss.revokeSubscriptionApproval(approvalId);
+        vm.stopBroadcast();
+
+        console2.log("Subscription approval revoked:");
+        console2.logBytes32(approvalId);
+    }
+
+    /// @notice 创建认购窗口（发行人调用，需先审批）
     function createSubscription(
         address bondTokenAddr,
         address settlementTokenAddr,
         uint256 unitPrice,
         uint256 maxUnits,
         uint256 opensAt,
-        uint256 closesAt
+        uint256 closesAt,
+        bytes32 approvalId
     ) external {
         (, address issuanceAddr, , ) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
@@ -268,7 +313,7 @@ contract Operations is BaseConfig {
         });
 
         vm.startBroadcast(_senderPk());
-        bytes32 offerId = iss.createSubscription(terms);
+        bytes32 offerId = iss.createSubscription(terms, approvalId);
         vm.stopBroadcast();
 
         console2.log("Subscription created:");
@@ -342,7 +387,8 @@ contract Operations is BaseConfig {
             side: OrderSide(side),
             expiry: expiry,
             nonce: nonce,
-            salt: salt
+            salt: salt,
+            maxFeeBps: 10_000
         });
 
         uint256 makerPk = vm.envUint("MAKER_PRIVATE_KEY");
@@ -384,7 +430,8 @@ contract Operations is BaseConfig {
             side: OrderSide(side),
             expiry: expiry,
             nonce: nonce,
-            salt: salt
+            salt: salt,
+            maxFeeBps: 10_000
         });
 
         vm.startBroadcast(_senderPk());
@@ -798,33 +845,50 @@ contract Operations is BaseConfig {
         console2.log("  status:   ", status);
     }
 
-    /// @notice 更新认购条件（发行人调用）
-    function updateSubscription(
-        bytes32 offerId,
-        address bondTokenAddr,
-        address settlementTokenAddr,
-        uint256 unitPrice,
-        uint256 maxUnits,
-        uint256 opensAt,
-        uint256 closesAt
-    ) external {
+    /// @notice 标记已过期的发行审批（任何人可调用）
+    function markIssuanceExpired(bytes32 approvalId) external {
+        (address factoryAddr, , , ) = _deployment();
+        BondFactory f = BondFactory(factoryAddr);
+
+        vm.startBroadcast(_senderPk());
+        f.markIssuanceExpired(approvalId);
+        vm.stopBroadcast();
+
+        console2.log("Issuance approval marked expired:");
+        console2.logBytes32(approvalId);
+    }
+
+    /// @notice 标记已过期的认购审批（任何人可调用）
+    function markSubscriptionExpired(bytes32 approvalId) external {
         (, address issuanceAddr, , ) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
-        SubscriptionTerms memory terms = SubscriptionTerms({
-            bondToken: bondTokenAddr,
-            settlementToken: settlementTokenAddr,
-            unitPrice: unitPrice,
-            maxUnits: maxUnits,
-            opensAt: opensAt,
-            closesAt: closesAt
-        });
-
         vm.startBroadcast(_senderPk());
-        iss.updateSubscription(offerId, terms);
+        iss.markSubscriptionExpired(approvalId);
         vm.stopBroadcast();
 
-        console2.log("Subscription updated:");
-        console2.logBytes32(offerId);
+        console2.log("Subscription approval marked expired:");
+        console2.logBytes32(approvalId);
+    }
+
+    /// @notice 查询认购审批
+    function querySubscriptionApproval(bytes32 approvalId) external view {
+        (, address issuanceAddr, , ) = _deployment();
+        BondIssuance iss = BondIssuance(issuanceAddr);
+
+        (
+            address issuerAddr,
+            address bondTokenAddr,
+            uint256 maxUnits,
+            uint256 expiresAt,
+            ApprovalStatus status
+        ) = iss.getSubscriptionApproval(approvalId);
+
+        console2.log("Subscription approval info:");
+        console2.log("  issuer:   ", issuerAddr);
+        console2.log("  bondToken:", bondTokenAddr);
+        console2.log("  maxUnits: ", maxUnits);
+        console2.log("  expiresAt:", expiresAt);
+        console2.log("  status:   ", uint8(status));
     }
 }

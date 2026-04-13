@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { Test } from "forge-std/Test.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {
+    ERC1967Proxy
+} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Test} from "forge-std/Test.sol";
 
-import { BondToken } from "../../src/BondToken.sol";
-import { ComplianceModule } from "../../src/compliance/ComplianceModule.sol";
-import { MockERC20Decimals } from "../mocks/MockERC20Decimals.sol";
-import { Role, Order, OrderSide, FeeConfig } from "../../src/types/BondTypes.sol";
-import { RFQSettlement } from "../../src/RFQSettlement.sol";
+import {BondToken} from "../../src/BondToken.sol";
+import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
+import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
+import {Role, Order, OrderSide, FeeConfig} from "../../src/types/BondTypes.sol";
+import {RFQSettlement} from "../../src/RFQSettlement.sol";
 
 abstract contract RFQSettlementFixtures is Test {
     using ECDSA for bytes32;
@@ -42,7 +44,8 @@ abstract contract RFQSettlementFixtures is Test {
                 new ERC1967Proxy(
                     address(complianceImplementation),
                     abi.encodeCall(
-                        ComplianceModule.initialize, (admin, factory, keccak256("policy"), 1)
+                        ComplianceModule.initialize,
+                        (admin, factory, keccak256("policy"), 1)
                     )
                 )
             )
@@ -84,7 +87,11 @@ abstract contract RFQSettlementFixtures is Test {
         settlement.setBondTokenRegistration(address(bondToken), true);
         settlement.setSettlementTokenPolicy(address(usdc), true);
         settlement.setFeeConfig(
-            FeeConfig({ feeRecipient: feeRecipient, currentFeeBps: 0, maxFeeBps: 1_000 })
+            FeeConfig({
+                feeRecipient: feeRecipient,
+                currentFeeBps: 0,
+                maxFeeBps: 1_000
+            })
         );
         vm.stopPrank();
 
@@ -110,23 +117,26 @@ abstract contract RFQSettlementFixtures is Test {
         bondToken.approve(address(settlement), type(uint256).max);
     }
 
-    function makeBuyOrder(uint256 bondAmount, uint256 quoteAmount, uint256 nonce, uint256 salt)
-        internal
-        view
-        returns (Order memory)
-    {
-        return Order({
-            maker: maker,
-            taker: investor,
-            bondToken: address(bondToken),
-            quoteToken: address(usdc),
-            bondAmount: bondAmount,
-            quoteAmount: quoteAmount,
-            side: OrderSide.BUY,
-            expiry: block.timestamp + 1 days,
-            nonce: nonce,
-            salt: salt
-        });
+    function makeBuyOrder(
+        uint256 bondAmount,
+        uint256 quoteAmount,
+        uint256 nonce,
+        uint256 salt
+    ) internal view returns (Order memory) {
+        return
+            Order({
+                maker: maker,
+                taker: investor,
+                bondToken: address(bondToken),
+                quoteToken: address(usdc),
+                bondAmount: bondAmount,
+                quoteAmount: quoteAmount,
+                side: OrderSide.BUY,
+                expiry: block.timestamp + 1 days,
+                nonce: nonce,
+                salt: salt,
+                maxFeeBps: 10_000
+            });
     }
 
     function makeBuyOrderForMaker(
@@ -136,40 +146,48 @@ abstract contract RFQSettlementFixtures is Test {
         uint256 nonce,
         uint256 salt
     ) internal view returns (Order memory) {
-        return Order({
-            maker: makerAddress,
-            taker: investor,
-            bondToken: address(bondToken),
-            quoteToken: address(usdc),
-            bondAmount: bondAmount,
-            quoteAmount: quoteAmount,
-            side: OrderSide.BUY,
-            expiry: block.timestamp + 1 days,
-            nonce: nonce,
-            salt: salt
-        });
+        return
+            Order({
+                maker: makerAddress,
+                taker: investor,
+                bondToken: address(bondToken),
+                quoteToken: address(usdc),
+                bondAmount: bondAmount,
+                quoteAmount: quoteAmount,
+                side: OrderSide.BUY,
+                expiry: block.timestamp + 1 days,
+                nonce: nonce,
+                salt: salt,
+                maxFeeBps: 10_000
+            });
     }
 
-    function makeSellOrder(uint256 bondAmount, uint256 quoteAmount, uint256 nonce, uint256 salt)
-        internal
-        view
-        returns (Order memory)
-    {
-        return Order({
-            maker: maker,
-            taker: investor,
-            bondToken: address(bondToken),
-            quoteToken: address(usdc),
-            bondAmount: bondAmount,
-            quoteAmount: quoteAmount,
-            side: OrderSide.SELL,
-            expiry: block.timestamp + 1 days,
-            nonce: nonce,
-            salt: salt
-        });
+    function makeSellOrder(
+        uint256 bondAmount,
+        uint256 quoteAmount,
+        uint256 nonce,
+        uint256 salt
+    ) internal view returns (Order memory) {
+        return
+            Order({
+                maker: maker,
+                taker: investor,
+                bondToken: address(bondToken),
+                quoteToken: address(usdc),
+                bondAmount: bondAmount,
+                quoteAmount: quoteAmount,
+                side: OrderSide.SELL,
+                expiry: block.timestamp + 1 days,
+                nonce: nonce,
+                salt: salt,
+                maxFeeBps: 10_000
+            });
     }
 
-    function signOrder(Order memory order, uint256 signerPk) internal view returns (bytes memory) {
+    function signOrder(
+        Order memory order,
+        uint256 signerPk
+    ) internal view returns (bytes memory) {
         bytes32 digest = settlement.hashOrder(order);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
         return abi.encodePacked(r, s, v);

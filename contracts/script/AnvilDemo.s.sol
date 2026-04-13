@@ -559,6 +559,21 @@ contract AnvilDemo is Script {
         uint256 maxUnits,
         uint256 unitPrice
     ) internal returns (bytes32 id) {
+        bytes32 subApprovalId = keccak256(
+            abi.encodePacked("demo-sub-", maxUnits, unitPrice)
+        );
+
+        vm.startBroadcast(ADMIN_PK);
+        issuance.approveSubscription(
+            subApprovalId,
+            issuer,
+            address(bondToken),
+            maxUnits,
+            block.timestamp + 7 days
+        );
+        vm.stopBroadcast();
+        console2.log("  Subscription approved, maxUnits:", maxUnits);
+
         vm.startBroadcast(ISSUER_PK);
         id = issuance.createSubscription(
             SubscriptionTerms({
@@ -568,7 +583,8 @@ contract AnvilDemo is Script {
                 maxUnits: maxUnits,
                 opensAt: block.timestamp,
                 closesAt: block.timestamp + 7 days
-            })
+            }),
+            subApprovalId
         );
         vm.stopBroadcast();
         console2.log("  Subscription created, maxUnits:", maxUnits);
@@ -626,7 +642,8 @@ contract AnvilDemo is Script {
                 side: side,
                 expiry: expiry,
                 nonce: settlement.currentNonce(maker),
-                salt: salt
+                salt: salt,
+                maxFeeBps: 10_000
             });
     }
 

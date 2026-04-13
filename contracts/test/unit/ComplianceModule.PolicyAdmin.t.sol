@@ -93,6 +93,31 @@ contract ComplianceModulePolicyAdminTest is Test {
         module.pauseDomain(PauseDomain.COMPLIANCE_ADMIN, true);
     }
 
+    function test_revertWhenSetWhitelistWithZeroAddress() public {
+        vm.prank(admin);
+        vm.expectRevert();
+        module.setWhitelist(address(0), true);
+    }
+
+    function test_revertWhenSetRoleWithZeroAddress() public {
+        vm.prank(admin);
+        vm.expectRevert();
+        module.setRole(address(0), Role.MARKET_MAKER);
+    }
+
+    function test_revertWhenComplianceAdminDomainPaused() public {
+        vm.prank(admin);
+        module.pauseDomain(PauseDomain.COMPLIANCE_ADMIN, true);
+
+        vm.prank(admin);
+        vm.expectRevert();
+        module.setWhitelist(account, true);
+
+        vm.prank(admin);
+        vm.expectRevert();
+        module.setRole(account, Role.MARKET_MAKER);
+    }
+
     function test_checkTransferEnforcesWhitelistAndDirection() public {
         address maker = makeAddr("maker");
         address investor = makeAddr("investor");

@@ -1,25 +1,41 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {PauseDomain, SubscriptionTerms} from "../types/BondTypes.sol";
+import {ApprovalStatus, PauseDomain, SubscriptionTerms} from "../types/BondTypes.sol";
 
 /// @title IBondIssuance
 /// @notice Interface for primary-market subscription management and post-maturity redemption flows.
 interface IBondIssuance {
-    /// @dev Creates one issuer-controlled subscription offer.
+    /// @dev Approves one subscription window for a specific issuer and bond token.
+    /// @param approvalId Unique approval identifier.
+    /// @param issuer Issuer address allowed to consume the approval.
+    /// @param bondToken Bond token that the subscription may target.
+    /// @param maxUnits Upper bound on bond units the issuer may offer.
+    /// @param expiresAt Optional expiry timestamp (0 = no expiry).
+    function approveSubscription(
+        bytes32 approvalId,
+        address issuer,
+        address bondToken,
+        uint256 maxUnits,
+        uint256 expiresAt
+    ) external;
+
+    /// @dev Revokes one active subscription approval.
+    /// @param approvalId Subscription approval identifier to revoke.
+    function revokeSubscriptionApproval(bytes32 approvalId) external;
+
+    /// @dev Marks an active-but-expired subscription approval as EXPIRED on-chain.
+    /// @param approvalId Approval identifier whose deadline has passed.
+    function markSubscriptionExpired(bytes32 approvalId) external;
+
+    /// @dev Creates one issuer-controlled subscription offer after consuming an approval.
     /// @param terms Subscription configuration payload.
+    /// @param approvalId Subscription approval identifier to consume.
     /// @return offerId Created subscription offer identifier.
     function createSubscription(
-        SubscriptionTerms calldata terms
+        SubscriptionTerms calldata terms,
+        bytes32 approvalId
     ) external returns (bytes32 offerId);
-
-    /// @dev Updates one active subscription offer.
-    /// @param offerId Subscription offer identifier.
-    /// @param terms Updated subscription configuration payload.
-    function updateSubscription(
-        bytes32 offerId,
-        SubscriptionTerms calldata terms
-    ) external;
 
     /// @dev Closes one subscription offer so it cannot accept further fills.
     /// @param offerId Subscription offer identifier.
@@ -120,10 +136,31 @@ interface IBondIssuance {
     ) external view returns (bool);
 
     /// @dev Allows the admin to recover tokens accidentally sent to this contract.
+    /// Protects outstanding redemption liabilities across all bond series.
     /// @param token Token address to rescue.
     /// @param to Recipient address.
     /// @param amount Amount to transfer.
     function rescueTokens(address token, address to, uint256 amount) external;
+
+    /// @dev Returns one subscription approval record.
+    /// @param approvalId Subscription approval identifier.
+    /// @return issuer Approved issuer address.
+    /// @return bondToken Approved bond token address.
+    /// @return maxUnits Maximum bond units approved.
+    /// @return expiresAt Expiry timestamp (0 = no expiry).
+    /// @return status Approval lifecycle status.
+    function getSubscriptionApproval(
+        bytes32 approvalId
+    )
+        external
+        view
+        returns (
+            address issuer,
+            address bondToken,
+            uint256 maxUnits,
+            uint256 expiresAt,
+            ApprovalStatus status
+        );
 
     /// @dev Returns whether one domain is paused.
     /// @param domain Domain to inspect.

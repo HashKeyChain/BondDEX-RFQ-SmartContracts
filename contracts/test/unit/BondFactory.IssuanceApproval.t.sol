@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {
+    ERC1967Proxy
+} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {BondFactory} from "../../src/BondFactory.sol";
@@ -21,7 +23,11 @@ contract BondFactoryIssuanceApprovalTest is Test {
         bytes32 metadataHash
     );
 
-    event IssuanceRevoked(bytes32 indexed approvalId, address indexed issuer, address revoker);
+    event IssuanceRevoked(
+        bytes32 indexed approvalId,
+        address indexed issuer,
+        address revoker
+    );
 
     event BondCreated(
         address indexed bondToken,
@@ -49,24 +55,49 @@ contract BondFactoryIssuanceApprovalTest is Test {
     function setUp() public {
         BondIssuance issuanceImplementation = new BondIssuance();
         issuance = BondIssuance(
-            address(new ERC1967Proxy(address(issuanceImplementation), abi.encodeCall(BondIssuance.initialize, (admin))))
+            address(
+                new ERC1967Proxy(
+                    address(issuanceImplementation),
+                    abi.encodeCall(BondIssuance.initialize, (admin))
+                )
+            )
         );
         complianceImplementation = new ComplianceModule();
         factory = new BondFactory(admin, address(issuance));
     }
 
     function test_approveIssuanceStoresActiveApproval() public {
+        vm.prank(admin);
+        factory.registerComplianceImplementation(
+            address(complianceImplementation),
+            type(IComplianceModule).interfaceId
+        );
+
         vm.expectEmit(true, true, false, true);
         emit IssuanceApproved(
-            approvalId, issuer, admin, block.timestamp + 1 days, address(complianceImplementation), metadataHash
+            approvalId,
+            issuer,
+            admin,
+            block.timestamp + 1 days,
+            address(complianceImplementation),
+            metadataHash
         );
         vm.prank(admin);
         factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, metadataHash
+            approvalId,
+            issuer,
+            address(complianceImplementation),
+            block.timestamp + 1 days,
+            metadataHash
         );
 
-        (address approvedIssuer, address implementation, ApprovalStatus status, uint256 expiresAt, bytes32 hash) =
-            factory.getIssuanceApproval(approvalId);
+        (
+            address approvedIssuer,
+            address implementation,
+            ApprovalStatus status,
+            uint256 expiresAt,
+            bytes32 hash
+        ) = factory.getIssuanceApproval(approvalId);
 
         assertEq(approvedIssuer, issuer);
         assertEq(implementation, address(complianceImplementation));
@@ -77,8 +108,16 @@ contract BondFactoryIssuanceApprovalTest is Test {
 
     function test_revokeIssuanceMarksApprovalRevoked() public {
         vm.startPrank(admin);
+        factory.registerComplianceImplementation(
+            address(complianceImplementation),
+            type(IComplianceModule).interfaceId
+        );
         factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, metadataHash
+            approvalId,
+            issuer,
+            address(complianceImplementation),
+            block.timestamp + 1 days,
+            metadataHash
         );
         vm.stopPrank();
 
@@ -87,17 +126,24 @@ contract BondFactoryIssuanceApprovalTest is Test {
         vm.prank(admin);
         factory.revokeIssuance(approvalId);
 
-        (, , ApprovalStatus status,,) = factory.getIssuanceApproval(approvalId);
+        (, , ApprovalStatus status, , ) = factory.getIssuanceApproval(
+            approvalId
+        );
         assertEq(uint8(status), uint8(ApprovalStatus.REVOKED));
     }
 
     function test_createBondConsumesApprovalAndStoresAddresses() public {
         vm.startPrank(admin);
         factory.registerComplianceImplementation(
-            address(complianceImplementation), type(IComplianceModule).interfaceId
+            address(complianceImplementation),
+            type(IComplianceModule).interfaceId
         );
         factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, metadataHash
+            approvalId,
+            issuer,
+            address(complianceImplementation),
+            block.timestamp + 1 days,
+            metadataHash
         );
         vm.stopPrank();
 
@@ -118,10 +164,20 @@ contract BondFactoryIssuanceApprovalTest is Test {
 
         vm.expectEmit(false, true, false, true);
         emit BondCreated(
-            address(0), issuer, address(0), "HashKey Bond", "HKB", 18, 1_000e6, 500, block.timestamp + 30 days, stablecoin
+            address(0),
+            issuer,
+            address(0),
+            "HashKey Bond",
+            "HKB",
+            18,
+            1_000e6,
+            500,
+            block.timestamp + 30 days,
+            stablecoin
         );
         vm.prank(issuer);
-        (address bondTokenAddress, address complianceAddress) = factory.createBond(config, approvalId);
+        (address bondTokenAddress, address complianceAddress) = factory
+            .createBond(config, approvalId);
 
         BondToken bondToken = BondToken(bondTokenAddress);
         ComplianceModule complianceModule = ComplianceModule(complianceAddress);
@@ -131,17 +187,24 @@ contract BondFactoryIssuanceApprovalTest is Test {
         assertEq(bondToken.complianceModule(), complianceAddress);
         assertEq(complianceModule.bondToken(), bondTokenAddress);
 
-        (, , ApprovalStatus status,,) = factory.getIssuanceApproval(approvalId);
+        (, , ApprovalStatus status, , ) = factory.getIssuanceApproval(
+            approvalId
+        );
         assertEq(uint8(status), uint8(ApprovalStatus.CONSUMED));
     }
 
     function test_revertWhenCreateBondUsesRevokedApproval() public {
         vm.startPrank(admin);
         factory.registerComplianceImplementation(
-            address(complianceImplementation), type(IComplianceModule).interfaceId
+            address(complianceImplementation),
+            type(IComplianceModule).interfaceId
         );
         factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, metadataHash
+            approvalId,
+            issuer,
+            address(complianceImplementation),
+            block.timestamp + 1 days,
+            metadataHash
         );
         factory.revokeIssuance(approvalId);
         vm.stopPrank();
