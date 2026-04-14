@@ -635,7 +635,9 @@ contract BondIssuance is
     }
 
     /// @inheritdoc IBondIssuance
-    /// @dev Returns the stored subscription terms and current fill status for one offer.
+    /// @dev Returns the stored subscription terms and the effective status for one offer.
+    /// When the stored status is ACTIVE but the closing timestamp has passed, the returned
+    /// status is CLOSED so that off-chain consumers do not need to cross-check timestamps.
     function getSubscription(
         bytes32 offerId
     )
@@ -653,6 +655,16 @@ contract BondIssuance is
         )
     {
         SubscriptionOffer memory offer = _subscriptionOffers[offerId];
+
+        SubscriptionStatus effectiveStatus = offer.status;
+        if (
+            effectiveStatus == SubscriptionStatus.ACTIVE &&
+            offer.closesAt != 0 &&
+            block.timestamp > offer.closesAt
+        ) {
+            effectiveStatus = SubscriptionStatus.CLOSED;
+        }
+
         return (
             offer.bondToken,
             offer.settlementToken,
@@ -661,7 +673,7 @@ contract BondIssuance is
             offer.soldUnits,
             offer.opensAt,
             offer.closesAt,
-            uint8(offer.status)
+            uint8(effectiveStatus)
         );
     }
 
