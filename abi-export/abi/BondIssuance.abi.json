@@ -250,6 +250,35 @@
   },
   {
     "type": "function",
+    "name": "getSettlementTokenPolicy",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "issuanceEnabled",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "settlementEnabled",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "redemptionEnabled",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getSubscription",
     "inputs": [
       {

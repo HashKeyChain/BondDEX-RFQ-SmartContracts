@@ -139,6 +139,22 @@ interface IBondIssuance {
         address token
     ) external view returns (bool);
 
+    /// @dev Returns the per-phase policy flags for one settlement token.
+    /// @param token Settlement token address.
+    /// @return issuanceEnabled True when the token may be used for subscriptions.
+    /// @return settlementEnabled True when the token may be used for secondary settlement.
+    /// @return redemptionEnabled True when the token may be used for redemption funding and payouts.
+    function getSettlementTokenPolicy(
+        address token
+    )
+        external
+        view
+        returns (
+            bool issuanceEnabled,
+            bool settlementEnabled,
+            bool redemptionEnabled
+        );
+
     /// @dev Allows the admin to recover tokens accidentally sent to this contract.
     /// Protects outstanding redemption liabilities across all bond series.
     /// @param token Token address to rescue.

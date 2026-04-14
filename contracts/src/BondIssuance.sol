@@ -802,6 +802,27 @@ contract BondIssuance is
             policy.redemptionEnabled;
     }
 
+    /// @inheritdoc IBondIssuance
+    /// @dev Returns the per-phase policy flags for one settlement token.
+    function getSettlementTokenPolicy(
+        address token
+    )
+        external
+        view
+        returns (
+            bool issuanceEnabled,
+            bool settlementEnabled,
+            bool redemptionEnabled
+        )
+    {
+        SettlementTokenPolicy memory policy = _settlementTokenPolicies[token];
+        return (
+            policy.issuanceEnabled,
+            policy.settlementEnabled,
+            policy.redemptionEnabled
+        );
+    }
+
     /// @dev Shared quote-cost helper used by tests and the subscription flow.
     /// Rounds up to protect the protocol from systematic under-payment.
     function _quoteSubscriptionCost(
@@ -892,6 +913,9 @@ contract BondIssuance is
     }
 
     /// @dev Shared redemption path used by direct and delegated claims.
+    /// Enforces holder whitelist check so that addresses removed for AML/sanctions
+    /// reasons cannot redeem. If a legitimate holder is accidentally removed from
+    /// the whitelist, the compliance admin can re-add them before they claim.
     function _claimFor(
         address bondTokenAddress,
         address holder,
@@ -914,6 +938,13 @@ contract BondIssuance is
                 bondToken.maturityTimestamp(),
                 block.timestamp
             );
+        }
+
+        IComplianceModule complianceModule = IComplianceModule(
+            bondToken.complianceModule()
+        );
+        if (!complianceModule.isWhitelisted(holder)) {
+            revert NotWhitelisted(holder);
         }
 
         _requireRedemptionTokenEnabled(bondToken.settlementToken());

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {NotWhitelisted} from "../../src/libraries/BondErrors.sol";
 import {PauseDomain} from "../../src/types/BondTypes.sol";
 import {BondIssuanceRedemptionFixtures} from "../helpers/BondIssuanceRedemptionFixtures.sol";
 
@@ -50,6 +51,22 @@ contract BondIssuanceClaimDelegateTest is BondIssuanceRedemptionFixtures {
 
         vm.prank(delegate);
         vm.expectRevert();
+        issuance.claimFor(address(bondToken), holder);
+    }
+
+    function test_revertWhenDelegateClaimsForNonWhitelistedHolder() public {
+        warpToMaturity();
+        vm.prank(issuer);
+        issuance.depositRedemption(address(bondToken), 100_301_369_800);
+
+        vm.prank(holder);
+        issuance.setClaimDelegate(delegate);
+
+        vm.prank(admin);
+        complianceModule.setWhitelist(holder, false);
+
+        vm.prank(delegate);
+        vm.expectRevert(abi.encodeWithSelector(NotWhitelisted.selector, holder));
         issuance.claimFor(address(bondToken), holder);
     }
 

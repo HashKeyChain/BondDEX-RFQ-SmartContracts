@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {NotWhitelisted} from "../../src/libraries/BondErrors.sol";
 import {PauseDomain} from "../../src/types/BondTypes.sol";
 import {BondIssuanceRedemptionFixtures} from "../helpers/BondIssuanceRedemptionFixtures.sol";
 
@@ -45,6 +46,62 @@ contract BondIssuanceClaimDirectTest is BondIssuanceRedemptionFixtures {
         vm.prank(holder);
         vm.expectRevert();
         issuance.claim(address(bondToken));
+    }
+
+    function test_revertWhenHolderNotWhitelisted() public {
+        warpToMaturity();
+
+        vm.prank(issuer);
+        issuance.depositRedemption(address(bondToken), 100_301_369_800);
+
+        vm.prank(admin);
+        complianceModule.setWhitelist(holder, false);
+
+        vm.prank(holder);
+        vm.expectRevert(abi.encodeWithSelector(NotWhitelisted.selector, holder));
+        issuance.claim(address(bondToken));
+    }
+
+    function test_getSettlementTokenPolicyReturnsCorrectFlags() public {
+        (bool iss, bool stl, bool red) = issuance.getSettlementTokenPolicy(address(usdc));
+        assertFalse(iss);
+        assertFalse(stl);
+        assertTrue(red);
+
+        vm.prank(admin);
+        issuance.setSettlementTokenPolicy(address(usdc), true, true, false);
+        (iss, stl, red) = issuance.getSettlementTokenPolicy(address(usdc));
+        assertTrue(iss);
+        assertTrue(stl);
+        assertFalse(red);
+
+        address unknownToken = makeAddr("unknown");
+        (iss, stl, red) = issuance.getSettlementTokenPolicy(unknownToken);
+        assertFalse(iss);
+        assertFalse(stl);
+        assertFalse(red);
+    }
+
+    function test_holderCanClaimAfterReAddedToWhitelist() public {
+        warpToMaturity();
+
+        vm.prank(issuer);
+        issuance.depositRedemption(address(bondToken), 100_301_369_800);
+
+        vm.prank(admin);
+        complianceModule.setWhitelist(holder, false);
+
+        vm.prank(holder);
+        vm.expectRevert(abi.encodeWithSelector(NotWhitelisted.selector, holder));
+        issuance.claim(address(bondToken));
+
+        vm.prank(admin);
+        complianceModule.setWhitelist(holder, true);
+
+        vm.prank(holder);
+        issuance.claim(address(bondToken));
+        assertEq(bondToken.balanceOf(holder), 0);
+        assertEq(usdc.balanceOf(holder), 100_301_369_800);
     }
 
     function test_claimIgnoresNonClaimPauseDomainsButRespectsClaimsPause() public {
