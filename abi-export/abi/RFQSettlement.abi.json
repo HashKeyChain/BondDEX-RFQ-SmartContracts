@@ -1402,6 +1402,27 @@
   },
   {
     "type": "error",
+    "name": "BondAlreadyMatured",
+    "inputs": [
+      {
+        "name": "bondToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "maturityTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "DomainAlreadySet",
     "inputs": [
       {

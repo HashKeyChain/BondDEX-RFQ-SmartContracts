@@ -18,6 +18,7 @@ import {
     DayCount
 } from "../../src/types/BondTypes.sol";
 import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
+import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
 
 contract BondFactoryIssuanceApprovalTest is Test {
     event IssuanceApproved(
@@ -51,7 +52,7 @@ contract BondFactoryIssuanceApprovalTest is Test {
 
     address internal admin = makeAddr("admin");
     address internal issuer = makeAddr("issuer");
-    address internal stablecoin = makeAddr("stablecoin");
+    address internal stablecoin;
     bytes32 internal approvalId = keccak256("approval");
     bytes32 internal metadataHash = keccak256("metadata");
 
@@ -60,6 +61,8 @@ contract BondFactoryIssuanceApprovalTest is Test {
     ComplianceModule internal complianceImplementation;
 
     function setUp() public {
+        stablecoin = address(new MockERC20Decimals("USDC", "USDC", 6));
+
         BondIssuance issuanceImplementation = new BondIssuance();
         issuance = BondIssuance(
             address(

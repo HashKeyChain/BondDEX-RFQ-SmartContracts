@@ -102,6 +102,9 @@ contract BondToken is ERC20, IBondToken {
         if (params_.maturityTimestamp <= block.timestamp) {
             revert InvalidBondConfig("maturityTimestamp must be in the future");
         }
+        if (params_.issueDate < block.timestamp) {
+            revert InvalidBondConfig("issueDate must not be in the past");
+        }
         if (params_.issueDate >= params_.maturityTimestamp) {
             revert InvalidIssueDate(
                 params_.issueDate,

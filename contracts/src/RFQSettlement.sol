@@ -11,8 +11,8 @@ import {
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {
-    ReentrancyGuard
-} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+    ReentrancyGuardTransient
+} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {
     AccessControlUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -28,6 +28,7 @@ import {RoleManaged} from "./abstracts/RoleManaged.sol";
 import {BondMath} from "./libraries/BondMath.sol";
 import {
     AccruedInterestMismatch,
+    BondAlreadyMatured,
     ExpiredDeadline,
     FeeCapImmutable,
     FeeExceedsOrderLimit,
@@ -69,7 +70,7 @@ contract RFQSettlement is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable,
-    ReentrancyGuard,
+    ReentrancyGuardTransient,
     DomainPausable,
     RoleManaged,
     IRFQSettlement
@@ -546,6 +547,17 @@ contract RFQSettlement is
 
         if (!isBondTokenRegistered(order.bondToken)) {
             revert UnregisteredBondToken(order.bondToken);
+        }
+
+        {
+            uint256 maturity = IBondToken(order.bondToken).maturityTimestamp();
+            if (block.timestamp >= maturity) {
+                revert BondAlreadyMatured(
+                    order.bondToken,
+                    maturity,
+                    block.timestamp
+                );
+            }
         }
 
         if (!isSettlementTokenEnabled(order.quoteToken)) {

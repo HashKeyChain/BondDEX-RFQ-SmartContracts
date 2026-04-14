@@ -10,8 +10,8 @@ import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {
-    ReentrancyGuard
-} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+    ReentrancyGuardTransient
+} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {
     AccessControlUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -65,7 +65,7 @@ contract BondIssuance is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable,
-    ReentrancyGuard,
+    ReentrancyGuardTransient,
     DomainPausable,
     RoleManaged,
     IBondIssuance

@@ -16,6 +16,7 @@ import {RoleManaged} from "../abstracts/RoleManaged.sol";
 import {
     BondTokenAlreadyBound,
     InvalidArrayLength,
+    InvalidBatchSize,
     InvalidParticipantRole,
     ZeroAddress
 } from "../libraries/BondErrors.sol";
@@ -60,6 +61,9 @@ contract ComplianceModule is
 
     /// @notice Transfer restriction code when settlement transfers are paused.
     uint8 public constant TRANSFERS_PAUSED_CODE = 7;
+
+    /// @notice Maximum number of accounts that may be updated in a single batch call.
+    uint256 internal constant MAX_BATCH_SIZE = 200;
 
     /// @notice Emitted when one whitelist entry changes.
     event WhitelistUpdated(
@@ -183,6 +187,9 @@ contract ComplianceModule is
         if (accounts.length != allowed.length) {
             revert InvalidArrayLength();
         }
+        if (accounts.length == 0 || accounts.length > MAX_BATCH_SIZE) {
+            revert InvalidBatchSize(accounts.length, MAX_BATCH_SIZE);
+        }
 
         for (uint256 i = 0; i < accounts.length; i++) {
             if (accounts[i] == address(0)) revert ZeroAddress();
@@ -222,6 +229,9 @@ contract ComplianceModule is
         _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         if (accounts.length != roles.length) {
             revert InvalidArrayLength();
+        }
+        if (accounts.length == 0 || accounts.length > MAX_BATCH_SIZE) {
+            revert InvalidBatchSize(accounts.length, MAX_BATCH_SIZE);
         }
 
         for (uint256 i = 0; i < accounts.length; i++) {

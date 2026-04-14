@@ -5,6 +5,9 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {
     ERC1967Proxy
 } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {
+    IERC20Metadata
+} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {BondToken} from "./BondToken.sol";
@@ -311,6 +314,17 @@ contract BondFactory is
         if (config.settlementToken == address(0)) {
             revert UnsupportedSettlementToken(config.settlementToken);
         }
+        try IERC20Metadata(config.settlementToken).decimals() returns (
+            uint8
+        ) {} catch {
+            revert UnsupportedSettlementToken(config.settlementToken);
+        }
+        if (bytes(config.name).length == 0) {
+            revert InvalidBondConfig("name must not be empty");
+        }
+        if (bytes(config.symbol).length == 0) {
+            revert InvalidBondConfig("symbol must not be empty");
+        }
 
         if (config.faceValue == 0) {
             revert InvalidBondConfig("faceValue must be > 0");
@@ -323,6 +337,9 @@ contract BondFactory is
         }
         if (config.couponRateBps > 10_000) {
             revert InvalidBondConfig("couponRateBps must be <= 10000");
+        }
+        if (config.issueDate < block.timestamp) {
+            revert InvalidBondConfig("issueDate must not be in the past");
         }
         if (config.issueDate >= config.maturityTimestamp) {
             revert InvalidIssueDate(config.issueDate, config.maturityTimestamp);

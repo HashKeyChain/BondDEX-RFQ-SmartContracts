@@ -22,11 +22,12 @@ import {
     InvalidBondConfig,
     InvalidIssueDate
 } from "../../src/libraries/BondErrors.sol";
+import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
 
 contract BondFactoryApprovalGuardsTest is Test {
     address internal admin = makeAddr("admin");
     address internal issuer = makeAddr("issuer");
-    address internal stablecoin = makeAddr("stablecoin");
+    address internal stablecoin;
     bytes32 internal approvalId = keccak256("approval");
     bytes32 internal metadataHash = keccak256("metadata");
 
@@ -35,6 +36,8 @@ contract BondFactoryApprovalGuardsTest is Test {
     ComplianceModule internal complianceImplementation;
 
     function setUp() public {
+        stablecoin = address(new MockERC20Decimals("USDC", "USDC", 6));
+
         BondIssuance issuanceImpl = new BondIssuance();
         issuance = BondIssuance(
             address(
