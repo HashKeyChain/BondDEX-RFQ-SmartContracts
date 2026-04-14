@@ -8,11 +8,7 @@ import {BondIssuanceRedemptionFixtures} from "../helpers/BondIssuanceRedemptionF
 contract BondIssuanceClaimDelegateTest is BondIssuanceRedemptionFixtures {
     event ClaimDelegateSet(address indexed holder, address indexed delegate, address operator);
     event RedemptionClaimed(
-        address indexed bondToken,
-        address indexed holder,
-        address indexed claimer,
-        uint256 bondAmount,
-        uint256 payout
+        address indexed bondToken, address indexed holder, address indexed claimer, uint256 bondAmount, uint256 payout
     );
 
     function setUp() public {

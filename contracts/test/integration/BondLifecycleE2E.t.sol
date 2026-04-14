@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {
-    ERC1967Proxy
-} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {BondFactory} from "../../src/BondFactory.sol";
@@ -46,20 +44,14 @@ contract BondLifecycleE2ETest is Test {
 
         BondIssuance issuanceImplementation = new BondIssuance();
         issuance = BondIssuance(
-            address(
-                new ERC1967Proxy(
-                    address(issuanceImplementation),
-                    abi.encodeCall(BondIssuance.initialize, (admin))
-                )
-            )
+            address(new ERC1967Proxy(address(issuanceImplementation), abi.encodeCall(BondIssuance.initialize, (admin))))
         );
 
         RFQSettlement settlementImplementation = new RFQSettlement();
         settlement = RFQSettlement(
             address(
                 new ERC1967Proxy(
-                    address(settlementImplementation),
-                    abi.encodeCall(RFQSettlement.initialize, (admin, 1_000))
+                    address(settlementImplementation), abi.encodeCall(RFQSettlement.initialize, (admin, 1_000))
                 )
             )
         );
@@ -69,26 +61,13 @@ contract BondLifecycleE2ETest is Test {
 
         bytes32 approvalId = keccak256("approval");
         vm.startPrank(admin);
-        factory.registerComplianceImplementation(
-            address(complianceImplementation),
-            type(IComplianceModule).interfaceId
-        );
+        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
         factory.approveIssuance(
-            approvalId,
-            issuer,
-            address(complianceImplementation),
-            block.timestamp + 1 days,
-            keccak256("metadata")
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, keccak256("metadata")
         );
         issuance.setSettlementTokenPolicy(address(usdc), true, false, true);
         settlement.setSettlementTokenPolicy(address(usdc), true);
-        settlement.setFeeConfig(
-            FeeConfig({
-                feeRecipient: feeRecipient,
-                currentFeeBps: 50,
-                maxFeeBps: 1_000
-            })
-        );
+        settlement.setFeeConfig(FeeConfig({feeRecipient: feeRecipient, currentFeeBps: 50, maxFeeBps: 1_000}));
         vm.stopPrank();
 
         BondConfig memory config = BondConfig({
@@ -112,12 +91,9 @@ contract BondLifecycleE2ETest is Test {
         });
 
         vm.prank(issuer);
-        (address bondTokenAddress, address complianceModuleAddress) = factory
-            .createBond(config, approvalId);
+        (address bondTokenAddress, address complianceModuleAddress) = factory.createBond(config, approvalId);
         BondToken bondToken = BondToken(bondTokenAddress);
-        ComplianceModule complianceModule = ComplianceModule(
-            complianceModuleAddress
-        );
+        ComplianceModule complianceModule = ComplianceModule(complianceModuleAddress);
 
         vm.startPrank(admin);
         complianceModule.setWhitelist(issuer, true);
@@ -132,13 +108,7 @@ contract BondLifecycleE2ETest is Test {
 
         bytes32 subApprovalId = keccak256("e2e-sub-approval");
         vm.prank(admin);
-        issuance.approveSubscription(
-            subApprovalId,
-            issuer,
-            bondTokenAddress,
-            100e18,
-            0
-        );
+        issuance.approveSubscription(subApprovalId, issuer, bondTokenAddress, 100e18, 0);
 
         vm.prank(issuer);
         bytes32 offerId = issuance.createSubscription(

@@ -48,28 +48,15 @@ contract Operations is BaseConfig {
     function _deployment()
         internal
         view
-        returns (
-            address factoryAddr,
-            address issuanceAddr,
-            address settlementAddr,
-            address complianceImplAddr
-        )
+        returns (address factoryAddr, address issuanceAddr, address settlementAddr, address complianceImplAddr)
     {
-        string memory path = string.concat(
-            DEPLOYMENTS_ROOT,
-            "/",
-            vm.toString(block.chainid),
-            ".json"
-        );
+        string memory path = string.concat(DEPLOYMENTS_ROOT, "/", vm.toString(block.chainid), ".json");
         string memory json = vm.readFile(path);
 
         factoryAddr = vm.parseJsonAddress(json, ".contracts.bondFactory");
         issuanceAddr = vm.parseJsonAddress(json, ".contracts.bondIssuance");
         settlementAddr = vm.parseJsonAddress(json, ".contracts.rfqSettlement");
-        complianceImplAddr = vm.parseJsonAddress(
-            json,
-            ".contracts.complianceImplementation"
-        );
+        complianceImplAddr = vm.parseJsonAddress(json, ".contracts.complianceImplementation");
     }
 
     /// @dev 获取 broadcast 私钥：优先 DEPLOYER_PRIVATE_KEY 环境变量
@@ -96,22 +83,12 @@ contract Operations is BaseConfig {
     /// @param approvalId 唯一审批 ID
     /// @param issuerAddr 发行人地址
     /// @param expiresAt 审批有效期 Unix 时间戳（0=永不过期）
-    function approveIssuance(
-        bytes32 approvalId,
-        address issuerAddr,
-        uint256 expiresAt
-    ) external {
-        (address factoryAddr, , , address compImpl) = _deployment();
+    function approveIssuance(bytes32 approvalId, address issuerAddr, uint256 expiresAt) external {
+        (address factoryAddr,,, address compImpl) = _deployment();
         BondFactory factory = BondFactory(factoryAddr);
 
         vm.startBroadcast(_senderPk());
-        factory.approveIssuance(
-            approvalId,
-            issuerAddr,
-            compImpl,
-            expiresAt,
-            keccak256("metadata")
-        );
+        factory.approveIssuance(approvalId, issuerAddr, compImpl, expiresAt, keccak256("metadata"));
         vm.stopBroadcast();
 
         console2.log("Issuance approved:");
@@ -146,27 +123,14 @@ contract Operations is BaseConfig {
     ) external {
         uint256 pk = _senderPk();
         BondConfig memory config = _buildBondConfig(
-            pk,
-            name_,
-            symbol_,
-            decimals_,
-            faceValue_,
-            couponRateBps_,
-            maturityTimestamp_,
-            settlementToken_
+            pk, name_, symbol_, decimals_, faceValue_, couponRateBps_, maturityTimestamp_, settlementToken_
         );
         _applyExtended(config, extendedData);
         _executeBondCreation(config, approvalId, pk);
     }
 
-    function _applyExtended(
-        BondConfig memory config,
-        bytes calldata data
-    ) internal pure {
-        (uint256 d, uint8 dc, uint8 f, uint8 c, bytes12 i) = abi.decode(
-            data,
-            (uint256, uint8, uint8, uint8, bytes12)
-        );
+    function _applyExtended(BondConfig memory config, bytes calldata data) internal pure {
+        (uint256 d, uint8 dc, uint8 f, uint8 c, bytes12 i) = abi.decode(data, (uint256, uint8, uint8, uint8, bytes12));
         config.issueDate = d;
         config.dayCountConvention = DayCount(dc);
         config.couponFrequency = CouponFrequency(f);
@@ -184,7 +148,7 @@ contract Operations is BaseConfig {
         uint256 maturityTimestamp_,
         address settlementToken_
     ) internal view returns (BondConfig memory config) {
-        (, , , address compImpl) = _deployment();
+        (,,, address compImpl) = _deployment();
         config.issuer = vm.addr(pk);
         config.name = name_;
         config.symbol = symbol_;
@@ -199,18 +163,11 @@ contract Operations is BaseConfig {
         config.policyVersion = 1;
     }
 
-    function _executeBondCreation(
-        BondConfig memory config,
-        bytes32 approvalId,
-        uint256 pk
-    ) internal {
-        (address factoryAddr, , , ) = _deployment();
+    function _executeBondCreation(BondConfig memory config, bytes32 approvalId, uint256 pk) internal {
+        (address factoryAddr,,,) = _deployment();
 
         vm.startBroadcast(pk);
-        (address bt, address cm) = BondFactory(factoryAddr).createBond(
-            config,
-            approvalId
-        );
+        (address bt, address cm) = BondFactory(factoryAddr).createBond(config, approvalId);
         vm.stopBroadcast();
 
         console2.log("Bond created:");
@@ -223,11 +180,7 @@ contract Operations is BaseConfig {
     // ================================================================
 
     /// @notice 设置单个地址白名单
-    function setWhitelist(
-        address complianceModuleAddr,
-        address account,
-        bool allowed
-    ) external {
+    function setWhitelist(address complianceModuleAddr, address account, bool allowed) external {
         ComplianceModule cm = ComplianceModule(complianceModuleAddr);
         vm.startBroadcast(_senderPk());
         cm.setWhitelist(account, allowed);
@@ -236,11 +189,9 @@ contract Operations is BaseConfig {
     }
 
     /// @notice 批量设置白名单
-    function batchSetWhitelist(
-        address complianceModuleAddr,
-        address[] calldata accounts,
-        bool[] calldata allowed
-    ) external {
+    function batchSetWhitelist(address complianceModuleAddr, address[] calldata accounts, bool[] calldata allowed)
+        external
+    {
         ComplianceModule cm = ComplianceModule(complianceModuleAddr);
         vm.startBroadcast(_senderPk());
         cm.batchSetWhitelist(accounts, allowed);
@@ -249,11 +200,7 @@ contract Operations is BaseConfig {
     }
 
     /// @notice 设置单个地址角色（0=NONE, 1=ISSUER, 2=MARKET_MAKER, 3=INVESTOR）
-    function setRole(
-        address complianceModuleAddr,
-        address account,
-        uint8 role
-    ) external {
+    function setRole(address complianceModuleAddr, address account, uint8 role) external {
         ComplianceModule cm = ComplianceModule(complianceModuleAddr);
         vm.startBroadcast(_senderPk());
         cm.setRole(account, Role(role));
@@ -262,11 +209,7 @@ contract Operations is BaseConfig {
     }
 
     /// @notice 批量设置角色
-    function batchSetRole(
-        address complianceModuleAddr,
-        address[] calldata accounts,
-        uint8[] calldata roles
-    ) external {
+    function batchSetRole(address complianceModuleAddr, address[] calldata accounts, uint8[] calldata roles) external {
         ComplianceModule cm = ComplianceModule(complianceModuleAddr);
 
         Role[] memory roleEnums = new Role[](roles.length);
@@ -281,20 +224,12 @@ contract Operations is BaseConfig {
     }
 
     /// @notice 注册/撤销授权转账 operator（COMPLIANCE_ADMIN_ROLE 调用）
-    function setTransferOperator(
-        address complianceModuleAddr,
-        address operatorAddr,
-        bool authorized
-    ) external {
+    function setTransferOperator(address complianceModuleAddr, address operatorAddr, bool authorized) external {
         ComplianceModule cm = ComplianceModule(complianceModuleAddr);
         vm.startBroadcast(_senderPk());
         cm.setTransferOperator(operatorAddr, authorized);
         vm.stopBroadcast();
-        console2.log(
-            "Transfer operator",
-            operatorAddr,
-            authorized ? "authorized" : "revoked"
-        );
+        console2.log("Transfer operator", operatorAddr, authorized ? "authorized" : "revoked");
     }
 
     // ================================================================
@@ -314,17 +249,11 @@ contract Operations is BaseConfig {
         uint256 maxUnits,
         uint256 expiresAt
     ) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         vm.startBroadcast(_senderPk());
-        iss.approveSubscription(
-            approvalId,
-            issuerAddr,
-            bondTokenAddr,
-            maxUnits,
-            expiresAt
-        );
+        iss.approveSubscription(approvalId, issuerAddr, bondTokenAddr, maxUnits, expiresAt);
         vm.stopBroadcast();
 
         console2.log("Subscription approved:");
@@ -333,7 +262,7 @@ contract Operations is BaseConfig {
 
     /// @notice 撤销认购审批（ISSUANCE_APPROVER_ROLE 调用）
     function revokeSubscriptionApproval(bytes32 approvalId) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         vm.startBroadcast(_senderPk());
@@ -354,7 +283,7 @@ contract Operations is BaseConfig {
         uint256 closesAt,
         bytes32 approvalId
     ) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         SubscriptionTerms memory terms = SubscriptionTerms({
@@ -376,7 +305,7 @@ contract Operations is BaseConfig {
 
     /// @notice 认购（做市商调用）
     function subscribe(bytes32 offerId, uint256 units) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         vm.startBroadcast(_senderPk());
@@ -389,7 +318,7 @@ contract Operations is BaseConfig {
 
     /// @notice 关闭认购窗口（发行人调用）
     function closeSubscription(bytes32 offerId) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         vm.startBroadcast(_senderPk());
@@ -430,7 +359,7 @@ contract Operations is BaseConfig {
         uint256 salt,
         uint256 accruedInterest
     ) external {
-        (, , address settlementAddr, ) = _deployment();
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         Order memory order = Order({
@@ -475,7 +404,7 @@ contract Operations is BaseConfig {
         uint256 salt,
         uint256 accruedInterest
     ) external {
-        (, , address settlementAddr, ) = _deployment();
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         Order memory order = Order({
@@ -504,7 +433,7 @@ contract Operations is BaseConfig {
 
     /// @notice 递增 nonce floor（maker 调用）
     function incrementNonce() external {
-        (, , address settlementAddr, ) = _deployment();
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         uint256 pk = _senderPk();
@@ -519,7 +448,7 @@ contract Operations is BaseConfig {
 
     /// @notice 设置最小 nonce（maker 调用）
     function setMinimumNonce(uint256 newMin) external {
-        (, , address settlementAddr, ) = _deployment();
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         vm.startBroadcast(_senderPk());
@@ -535,7 +464,7 @@ contract Operations is BaseConfig {
 
     /// @notice 发行人存入赎回资金
     function depositRedemption(address bondTokenAddr, uint256 amount) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         vm.startBroadcast(_senderPk());
@@ -547,7 +476,7 @@ contract Operations is BaseConfig {
 
     /// @notice 持有人领取赎回款
     function claim(address bondTokenAddr) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         vm.startBroadcast(_senderPk());
@@ -559,7 +488,7 @@ contract Operations is BaseConfig {
 
     /// @notice 代理领取赎回款（资金打给 holder）
     function claimFor(address bondTokenAddr, address holder) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         vm.startBroadcast(_senderPk());
@@ -571,7 +500,7 @@ contract Operations is BaseConfig {
 
     /// @notice 设置领取代理人
     function setClaimDelegate(address delegateAddr) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         vm.startBroadcast(_senderPk());
@@ -587,7 +516,7 @@ contract Operations is BaseConfig {
 
     /// @notice 暂停/恢复 Factory 域（PAUSER_ROLE 调用）
     function pauseDomainFactory(uint8 domain, bool paused) external {
-        (address factoryAddr, , , ) = _deployment();
+        (address factoryAddr,,,) = _deployment();
         BondFactory f = BondFactory(factoryAddr);
 
         vm.startBroadcast(_senderPk());
@@ -599,7 +528,7 @@ contract Operations is BaseConfig {
 
     /// @notice 暂停/恢复 Issuance 域（PAUSER_ROLE 调用）
     function pauseDomainIssuance(uint8 domain, bool paused) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         vm.startBroadcast(_senderPk());
@@ -611,75 +540,46 @@ contract Operations is BaseConfig {
 
     /// @notice 暂停/恢复 Settlement 域（PAUSER_ROLE 调用）
     function pauseDomainSettlement(uint8 domain, bool paused) external {
-        (, , address settlementAddr, ) = _deployment();
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         vm.startBroadcast(_senderPk());
         stl.pauseDomain(PauseDomain(domain), paused);
         vm.stopBroadcast();
 
-        console2.log(
-            "Settlement domain",
-            domain,
-            paused ? "paused" : "unpaused"
-        );
+        console2.log("Settlement domain", domain, paused ? "paused" : "unpaused");
     }
 
     /// @notice 暂停/恢复 ComplianceModule 域（PAUSER_ROLE 调用）
-    function pauseDomainCompliance(
-        address complianceModuleAddr,
-        uint8 domain,
-        bool paused
-    ) external {
+    function pauseDomainCompliance(address complianceModuleAddr, uint8 domain, bool paused) external {
         ComplianceModule cm = ComplianceModule(complianceModuleAddr);
 
         vm.startBroadcast(_senderPk());
         cm.pauseDomain(PauseDomain(domain), paused);
         vm.stopBroadcast();
 
-        console2.log(
-            "Compliance domain",
-            domain,
-            paused ? "paused" : "unpaused"
-        );
+        console2.log("Compliance domain", domain, paused ? "paused" : "unpaused");
     }
 
     /// @notice 注册/注销债券代币用于 RFQ 交易（SETTLEMENT_ADMIN_ROLE 调用）
-    function setBondTokenRegistration(
-        address bondTokenAddr,
-        bool registered
-    ) external {
-        (, , address settlementAddr, ) = _deployment();
+    function setBondTokenRegistration(address bondTokenAddr, bool registered) external {
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         vm.startBroadcast(_senderPk());
         stl.setBondTokenRegistration(bondTokenAddr, registered);
         vm.stopBroadcast();
 
-        console2.log(
-            "Bond token",
-            bondTokenAddr,
-            registered ? "registered" : "unregistered"
-        );
+        console2.log("Bond token", bondTokenAddr, registered ? "registered" : "unregistered");
     }
 
     /// @notice 更新 RFQ 手续费配置（SETTLEMENT_ADMIN_ROLE 调用）
-    function setFeeConfig(
-        address feeRecipient,
-        uint16 currentFeeBps,
-        uint16 maxFeeBps
-    ) external {
-        (, , address settlementAddr, ) = _deployment();
+    function setFeeConfig(address feeRecipient, uint16 currentFeeBps, uint16 maxFeeBps) external {
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         vm.startBroadcast(_senderPk());
-        stl.setFeeConfig(
-            FeeConfig({
-                feeRecipient: feeRecipient,
-                currentFeeBps: currentFeeBps,
-                maxFeeBps: maxFeeBps
-            })
-        );
+        stl.setFeeConfig(FeeConfig({feeRecipient: feeRecipient, currentFeeBps: currentFeeBps, maxFeeBps: maxFeeBps}));
         vm.stopBroadcast();
 
         console2.log("Fee config updated:", currentFeeBps, "bps");
@@ -687,7 +587,7 @@ contract Operations is BaseConfig {
 
     /// @notice 设置应计利息容差窗口（SETTLEMENT_ADMIN_ROLE 调用）
     function setAiToleranceSeconds(uint256 toleranceSeconds) external {
-        (, , address settlementAddr, ) = _deployment();
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
         vm.startBroadcast(_senderPk());
         stl.setAiToleranceSeconds(toleranceSeconds);
@@ -697,7 +597,7 @@ contract Operations is BaseConfig {
 
     /// @notice 紧急代币救援（DEFAULT_ADMIN_ROLE 调用）
     function rescueTokens(address token, address to, uint256 amount) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         vm.startBroadcast(_senderPk());
@@ -709,7 +609,7 @@ contract Operations is BaseConfig {
 
     /// @notice 释放超额赎回负债（DEFAULT_ADMIN_ROLE 调用，债券到期后）
     function releaseExcessRedemption(address bondTokenAddr) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         vm.startBroadcast(_senderPk());
@@ -720,11 +620,7 @@ contract Operations is BaseConfig {
     }
 
     /// @notice ERC-20 approve（通用工具，适用于任何代币）
-    function approveToken(
-        address token,
-        address spender,
-        uint256 amount
-    ) external {
+    function approveToken(address token, address spender, uint256 amount) external {
         vm.startBroadcast(_senderPk());
         IERC20(token).approve(spender, amount);
         vm.stopBroadcast();
@@ -736,17 +632,9 @@ contract Operations is BaseConfig {
     function mintMockUSDC(address to, uint256 amount) external {
         require(block.chainid == 31337, "mintMockUSDC: Anvil only");
 
-        string memory path = string.concat(
-            DEPLOYMENTS_ROOT,
-            "/",
-            vm.toString(block.chainid),
-            ".json"
-        );
+        string memory path = string.concat(DEPLOYMENTS_ROOT, "/", vm.toString(block.chainid), ".json");
         string memory json = vm.readFile(path);
-        address tokenAddr = vm.parseJsonAddress(
-            json,
-            ".configuration.settlementTokens[0].token"
-        );
+        address tokenAddr = vm.parseJsonAddress(json, ".configuration.settlementTokens[0].token");
 
         vm.startBroadcast(_senderPk());
         MockERC20Decimals(tokenAddr).mint(to, amount);
@@ -761,7 +649,7 @@ contract Operations is BaseConfig {
 
     /// @notice 查询订单状态
     function queryOrderStatus(bytes32 orderHash) external view {
-        (, , address settlementAddr, ) = _deployment();
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         bool consumed = stl.isOrderConsumed(orderHash);
@@ -774,14 +662,10 @@ contract Operations is BaseConfig {
 
     /// @notice 查询赎回状态
     function queryRedemptionState(address bondTokenAddr) external view {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
-        (
-            uint256 fundedAmount,
-            uint256 claimedAmount,
-            uint256 lastFundingAt
-        ) = iss.getRedemptionState(bondTokenAddr);
+        (uint256 fundedAmount, uint256 claimedAmount, uint256 lastFundingAt) = iss.getRedemptionState(bondTokenAddr);
 
         console2.log("Redemption state:");
         console2.log("  funded:       ", fundedAmount);
@@ -791,7 +675,7 @@ contract Operations is BaseConfig {
 
     /// @notice 查询认购信息
     function querySubscription(bytes32 offerId) external view {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         (
@@ -817,10 +701,7 @@ contract Operations is BaseConfig {
     }
 
     /// @notice 查询白名单与角色
-    function queryCompliance(
-        address complianceModuleAddr,
-        address account
-    ) external view {
+    function queryCompliance(address complianceModuleAddr, address account) external view {
         ComplianceModule cm = ComplianceModule(complianceModuleAddr);
 
         bool whitelisted = cm.isWhitelisted(account);
@@ -833,7 +714,7 @@ contract Operations is BaseConfig {
 
     /// @notice 查询手续费配置
     function queryFeeConfig() external view {
-        (, , address settlementAddr, ) = _deployment();
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         FeeConfig memory fc = stl.feeConfig();
@@ -845,7 +726,7 @@ contract Operations is BaseConfig {
 
     /// @notice 查询应计利息容差
     function queryAiTolerance() external view {
-        (, , address settlementAddr, ) = _deployment();
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
         uint256 tolerance = stl.aiToleranceSeconds();
         console2.log("AI tolerance:", tolerance, "seconds");
@@ -853,7 +734,7 @@ contract Operations is BaseConfig {
 
     /// @notice 查询 maker nonce
     function queryNonce(address makerAddr) external view {
-        (, , address settlementAddr, ) = _deployment();
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         uint256 nonce = stl.currentNonce(makerAddr);
@@ -862,7 +743,7 @@ contract Operations is BaseConfig {
 
     /// @notice 查询债券代币是否已注册
     function queryBondTokenRegistration(address bondTokenAddr) external view {
-        (, , address settlementAddr, ) = _deployment();
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         bool registered = stl.isBondTokenRegistered(bondTokenAddr);
@@ -870,13 +751,8 @@ contract Operations is BaseConfig {
     }
 
     /// @notice 预估手续费（基于 dirty amount = quoteAmount + accruedInterest）
-    function queryFee(
-        address bondTokenAddr,
-        address partyA,
-        address partyB,
-        uint256 dirtyAmount
-    ) external view {
-        (, , address settlementAddr, ) = _deployment();
+    function queryFee(address bondTokenAddr, address partyA, address partyB, uint256 dirtyAmount) external view {
+        (,, address settlementAddr,) = _deployment();
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         uint256 fee = stl.quoteFee(bondTokenAddr, partyA, partyB, dirtyAmount);
@@ -891,40 +767,25 @@ contract Operations is BaseConfig {
 
     /// @notice 批量查询 bond + USDC 余额
     /// @dev 需传入 bondToken 地址，USDC 地址从 deployments JSON 获取
-    function queryBondBalances(
-        address bondTokenAddr,
-        address[] calldata accounts
-    ) external view {
-        string memory path = string.concat(
-            DEPLOYMENTS_ROOT,
-            "/",
-            vm.toString(block.chainid),
-            ".json"
-        );
+    function queryBondBalances(address bondTokenAddr, address[] calldata accounts) external view {
+        string memory path = string.concat(DEPLOYMENTS_ROOT, "/", vm.toString(block.chainid), ".json");
         string memory json = vm.readFile(path);
-        address usdcAddr = vm.parseJsonAddress(
-            json,
-            ".configuration.settlementTokens[0].token"
-        );
+        address usdcAddr = vm.parseJsonAddress(json, ".configuration.settlementTokens[0].token");
 
         console2.log("Bond & USDC balances:");
         for (uint256 i = 0; i < accounts.length; i++) {
             console2.log("  account:", accounts[i]);
-            console2.log(
-                "    bond:",
-                IERC20(bondTokenAddr).balanceOf(accounts[i])
-            );
+            console2.log("    bond:", IERC20(bondTokenAddr).balanceOf(accounts[i]));
             console2.log("    USDC:", IERC20(usdcAddr).balanceOf(accounts[i]));
         }
     }
 
     /// @notice 查询认购剩余额度
     function queryRemainingUnits(bytes32 offerId) external view {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
-        (, , , uint256 maxUnits, uint256 soldUnits, , , uint8 status) = iss
-            .getSubscription(offerId);
+        (,,, uint256 maxUnits, uint256 soldUnits,,, uint8 status) = iss.getSubscription(offerId);
 
         uint256 remaining = maxUnits - soldUnits;
         console2.log("Subscription remaining:");
@@ -936,7 +797,7 @@ contract Operations is BaseConfig {
 
     /// @notice 标记已过期的发行审批（任何人可调用）
     function markIssuanceExpired(bytes32 approvalId) external {
-        (address factoryAddr, , , ) = _deployment();
+        (address factoryAddr,,,) = _deployment();
         BondFactory f = BondFactory(factoryAddr);
 
         vm.startBroadcast(_senderPk());
@@ -949,7 +810,7 @@ contract Operations is BaseConfig {
 
     /// @notice 标记已过期的认购审批（任何人可调用）
     function markSubscriptionExpired(bytes32 approvalId) external {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
         vm.startBroadcast(_senderPk());
@@ -962,16 +823,11 @@ contract Operations is BaseConfig {
 
     /// @notice 查询认购审批
     function querySubscriptionApproval(bytes32 approvalId) external view {
-        (, address issuanceAddr, , ) = _deployment();
+        (, address issuanceAddr,,) = _deployment();
         BondIssuance iss = BondIssuance(issuanceAddr);
 
-        (
-            address issuerAddr,
-            address bondTokenAddr,
-            uint256 maxUnits,
-            uint256 expiresAt,
-            ApprovalStatus status
-        ) = iss.getSubscriptionApproval(approvalId);
+        (address issuerAddr, address bondTokenAddr, uint256 maxUnits, uint256 expiresAt, ApprovalStatus status) =
+            iss.getSubscriptionApproval(approvalId);
 
         console2.log("Subscription approval info:");
         console2.log("  issuer:   ", issuerAddr);

@@ -14,10 +14,7 @@ interface IComplianceModule {
     /// @dev Batch-updates whitelist status for multiple accounts.
     /// @param accounts Accounts to update.
     /// @param allowed Whitelist flags aligned by index.
-    function batchSetWhitelist(
-        address[] calldata accounts,
-        bool[] calldata allowed
-    ) external;
+    function batchSetWhitelist(address[] calldata accounts, bool[] calldata allowed) external;
 
     /// @dev Sets the role for one account within the bound bond policy.
     /// @param account Account to update.
@@ -27,18 +24,12 @@ interface IComplianceModule {
     /// @dev Batch-updates roles for multiple accounts.
     /// @param accounts Accounts to update.
     /// @param roles Roles aligned by index.
-    function batchSetRole(
-        address[] calldata accounts,
-        Role[] calldata roles
-    ) external;
+    function batchSetRole(address[] calldata accounts, Role[] calldata roles) external;
 
     /// @dev Updates provider-facing policy metadata for the compliance module.
     /// @param policyId Policy identifier.
     /// @param policyVersion Policy version number.
-    function setPolicyMetadata(
-        bytes32 policyId,
-        uint256 policyVersion
-    ) external;
+    function setPolicyMetadata(bytes32 policyId, uint256 policyVersion) external;
 
     /// @dev Sets the paused state for one compliance-controlled domain.
     /// @param domain Domain to update.
@@ -66,12 +57,7 @@ interface IComplianceModule {
     /// @param amount Transfer amount in smallest bond units.
     /// @param operator Address initiating the transfer (msg.sender on the bond token).
     /// @return restrictionCode Numeric restriction code where zero means success.
-    function checkTransfer(
-        address from,
-        address to,
-        uint256 amount,
-        address operator
-    ) external view returns (uint8);
+    function checkTransfer(address from, address to, uint256 amount, address operator) external view returns (uint8);
 
     /// @dev Registers or removes an authorized transfer operator (e.g. RFQSettlement).
     /// Only authorized operators may trigger user-to-user bond transfers.

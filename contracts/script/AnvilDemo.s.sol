@@ -53,24 +53,15 @@ contract AnvilDemo is Script {
     //  Anvil 预设私钥 (#1 - #9)
     // ═══════════════════════════════════════════════════════════════
 
-    uint256 internal constant ADMIN_PK =
-        0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d;
-    uint256 internal constant ISSUER_PK =
-        0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a;
-    uint256 internal constant MAKER_A_PK =
-        0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6;
-    uint256 internal constant MAKER_B_PK =
-        0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a;
-    uint256 internal constant MAKER_C_PK =
-        0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba;
-    uint256 internal constant INVESTOR_A_PK =
-        0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e;
-    uint256 internal constant INVESTOR_B_PK =
-        0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356;
-    uint256 internal constant INVESTOR_C_PK =
-        0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97;
-    uint256 internal constant DELEGATE_PK =
-        0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6;
+    uint256 internal constant ADMIN_PK = 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d;
+    uint256 internal constant ISSUER_PK = 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a;
+    uint256 internal constant MAKER_A_PK = 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6;
+    uint256 internal constant MAKER_B_PK = 0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a;
+    uint256 internal constant MAKER_C_PK = 0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba;
+    uint256 internal constant INVESTOR_A_PK = 0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e;
+    uint256 internal constant INVESTOR_B_PK = 0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356;
+    uint256 internal constant INVESTOR_C_PK = 0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97;
+    uint256 internal constant DELEGATE_PK = 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6;
 
     bytes32 internal constant APPROVAL_ID = keccak256("demo-bond-001");
 
@@ -114,9 +105,7 @@ contract AnvilDemo is Script {
         // 2026-01-09 00:12 UTC — 起息日后 12 分钟，进入 RFQ
         vm.warp(ISSUE_DATE + 12 minutes);
         console2.log("");
-        console2.log(
-            ">>> Time warped to issueDate + 12 min (2026-01-09 00:12 UTC)"
-        );
+        console2.log(">>> Time warped to issueDate + 12 min (2026-01-09 00:12 UTC)");
         _step7_firstTrades();
 
         // +2 天 ≈ 2026-01-11
@@ -149,9 +138,7 @@ contract AnvilDemo is Script {
         // 2027-01-09 00:00:01 UTC — 到期日 + 1 秒
         vm.warp(MATURITY + 1);
         console2.log("");
-        console2.log(
-            ">>> Time warped to maturity + 1 (2027-01-09 00:00:01 UTC)"
-        );
+        console2.log(">>> Time warped to maturity + 1 (2027-01-09 00:00:01 UTC)");
         _step16_redemption();
         _step17_extras();
 
@@ -254,25 +241,11 @@ contract AnvilDemo is Script {
 
     function _loadDeployment() internal {
         string memory json = vm.readFile("../deployments/31337.json");
-        factory = BondFactory(
-            vm.parseJsonAddress(json, ".contracts.bondFactory")
-        );
-        issuance = BondIssuance(
-            vm.parseJsonAddress(json, ".contracts.bondIssuance")
-        );
-        settlement = RFQSettlement(
-            vm.parseJsonAddress(json, ".contracts.rfqSettlement")
-        );
-        complianceImpl = vm.parseJsonAddress(
-            json,
-            ".contracts.complianceImplementation"
-        );
-        usdc = MockERC20Decimals(
-            vm.parseJsonAddress(
-                json,
-                ".configuration.settlementTokens[0].token"
-            )
-        );
+        factory = BondFactory(vm.parseJsonAddress(json, ".contracts.bondFactory"));
+        issuance = BondIssuance(vm.parseJsonAddress(json, ".contracts.bondIssuance"));
+        settlement = RFQSettlement(vm.parseJsonAddress(json, ".contracts.rfqSettlement"));
+        complianceImpl = vm.parseJsonAddress(json, ".contracts.complianceImplementation");
+        usdc = MockERC20Decimals(vm.parseJsonAddress(json, ".configuration.settlementTokens[0].token"));
         console2.log("--- Deployment loaded ---");
         console2.log("  Factory:    ", address(factory));
         console2.log("  Issuance:   ", address(issuance));
@@ -324,13 +297,7 @@ contract AnvilDemo is Script {
         console2.log("  maturity:  2027-01-09 (issueDate + 365 days)");
 
         vm.startBroadcast(ADMIN_PK);
-        factory.approveIssuance(
-            APPROVAL_ID,
-            issuer,
-            complianceImpl,
-            SUB_CLOSES,
-            keccak256("demo-metadata")
-        );
+        factory.approveIssuance(APPROVAL_ID, issuer, complianceImpl, SUB_CLOSES, keccak256("demo-metadata"));
         vm.stopBroadcast();
         console2.log("  Issuance approved");
 
@@ -394,9 +361,7 @@ contract AnvilDemo is Script {
         settlement.setBondTokenRegistration(address(bondToken), true);
         vm.stopBroadcast();
 
-        console2.log(
-            "  Whitelisted: issuer, makerA, makerB, investorA, investorB, delegate"
-        );
+        console2.log("  Whitelisted: issuer, makerA, makerB, investorA, investorB, delegate");
         console2.log("  NOT whitelisted: makerC, investorC");
         console2.log("  RFQSettlement registered as transfer operator");
         console2.log("  BondToken registered for RFQ settlement");
@@ -411,21 +376,14 @@ contract AnvilDemo is Script {
     function _phase4_subscription() internal {
         console2.log("");
         console2.log("=== Phase 4: Primary Subscription ===");
-        console2.log(
-            "  Window: 2026-01-01 ~ 2026-01-08, 1000 bonds @ 1000 USDC"
-        );
+        console2.log("  Window: 2026-01-01 ~ 2026-01-08, 1000 bonds @ 1000 USDC");
 
         offerId = _createOffer(1000, 1_000e6);
 
         _subscribe(MAKER_A_PK, offerId, 800);
         console2.log("  makerA subscribed 800 bonds");
 
-        _subscribeShouldFail(
-            MAKER_B_PK,
-            offerId,
-            500,
-            "SubscriptionCapExceeded"
-        );
+        _subscribeShouldFail(MAKER_B_PK, offerId, 500, "SubscriptionCapExceeded");
 
         uint256 remaining = _queryRemaining(offerId);
         console2.log("  Remaining units:", remaining);
@@ -435,15 +393,8 @@ contract AnvilDemo is Script {
 
         _subscribeShouldFail(MAKER_C_PK, offerId, 10, "NotWhitelisted");
 
-        console2.log(
-            "  [4a] makerA tries direct transfer to makerB - UNAUTHORIZED_OPERATOR"
-        );
-        _directTransferShouldFail(
-            MAKER_A_PK,
-            makerB,
-            10,
-            "TransferRestricted(8)"
-        );
+        console2.log("  [4a] makerA tries direct transfer to makerB - UNAUTHORIZED_OPERATOR");
+        _directTransferShouldFail(MAKER_A_PK, makerB, 10, "TransferRestricted(8)");
 
         _logBalances("After Subscription");
     }
@@ -457,15 +408,8 @@ contract AnvilDemo is Script {
         console2.log("=== Step 7: First RFQ Trades (issueDate + 12 min) ===");
 
         console2.log("");
-        console2.log(
-            "  [7x] makerA tries direct transfer to investorA - UNAUTHORIZED_OPERATOR"
-        );
-        _directTransferShouldFail(
-            MAKER_A_PK,
-            investorA,
-            10,
-            "TransferRestricted(8)"
-        );
+        console2.log("  [7x] makerA tries direct transfer to investorA - UNAUTHORIZED_OPERATOR");
+        _directTransferShouldFail(MAKER_A_PK, investorA, 10, "TransferRestricted(8)");
 
         console2.log("");
         console2.log("  [7a] investorA buys 10 from makerA @ 2000 USDC each");
@@ -484,9 +428,7 @@ contract AnvilDemo is Script {
 
     function _step8_investorBBuys() internal {
         console2.log("");
-        console2.log(
-            "=== Step 8: investorB buys 190 from makerB @ 2000 USDC (+2 days) ==="
-        );
+        console2.log("=== Step 8: investorB buys 190 from makerB @ 2000 USDC (+2 days) ===");
         _rfqFill(MAKER_B_PK, INVESTOR_B_PK, 190, 380_000e6, OrderSide.BUY);
 
         _logBalances("After Step 8");
@@ -501,24 +443,10 @@ contract AnvilDemo is Script {
         console2.log("=== Step 9: Compliance Restrictions ===");
 
         console2.log("  [9a] makerC tries to make order - NOT whitelisted");
-        _rfqFillShouldFail(
-            MAKER_C_PK,
-            INVESTOR_A_PK,
-            1,
-            1_000e6,
-            OrderSide.BUY,
-            "NotWhitelisted"
-        );
+        _rfqFillShouldFail(MAKER_C_PK, INVESTOR_A_PK, 1, 1_000e6, OrderSide.BUY, "NotWhitelisted");
 
         console2.log("  [9b] investorC tries to take order - NOT whitelisted");
-        _rfqFillShouldFail(
-            MAKER_A_PK,
-            INVESTOR_C_PK,
-            1,
-            1_000e6,
-            OrderSide.BUY,
-            "NotWhitelisted"
-        );
+        _rfqFillShouldFail(MAKER_A_PK, INVESTOR_C_PK, 1, 1_000e6, OrderSide.BUY, "NotWhitelisted");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -529,26 +457,10 @@ contract AnvilDemo is Script {
         console2.log("");
         console2.log("=== Step 10: Cancel + Sell (+1 month) ===");
 
-        console2.log(
-            "  [10a] investorA sells 10 to makerB @ 4000 USDC - CANCEL"
-        );
+        console2.log("  [10a] investorA sells 10 to makerB @ 4000 USDC - CANCEL");
         uint256 cancelSalt = _nextSalt++;
-        _rfqCancel(
-            MAKER_B_PK,
-            investorA,
-            10,
-            40_000e6,
-            OrderSide.SELL,
-            cancelSalt
-        );
-        _rfqFillCancelledShouldFail(
-            MAKER_B_PK,
-            INVESTOR_A_PK,
-            10,
-            40_000e6,
-            OrderSide.SELL,
-            cancelSalt
-        );
+        _rfqCancel(MAKER_B_PK, investorA, 10, 40_000e6, OrderSide.SELL, cancelSalt);
+        _rfqFillCancelledShouldFail(MAKER_B_PK, INVESTOR_A_PK, 10, 40_000e6, OrderSide.SELL, cancelSalt);
 
         console2.log("  [10b] investorA sells 10 to makerB @ 5000 USDC each");
         _rfqFill(MAKER_B_PK, INVESTOR_A_PK, 10, 50_000e6, OrderSide.SELL);
@@ -564,16 +476,8 @@ contract AnvilDemo is Script {
         console2.log("");
         console2.log("=== Step 11: Expiry + Buy (+2 months) ===");
 
-        console2.log(
-            "  [11a] investorA buys 90 from makerA @ 2000 USDC - EXPIRED"
-        );
-        _rfqFillExpired(
-            MAKER_A_PK,
-            INVESTOR_A_PK,
-            90,
-            180_000e6,
-            OrderSide.BUY
-        );
+        console2.log("  [11a] investorA buys 90 from makerA @ 2000 USDC - EXPIRED");
+        _rfqFillExpired(MAKER_A_PK, INVESTOR_A_PK, 90, 180_000e6, OrderSide.BUY);
 
         console2.log("  [11b] investorA buys 90 from makerA @ 2000 USDC each");
         _rfqFill(MAKER_A_PK, INVESTOR_A_PK, 90, 180_000e6, OrderSide.BUY);
@@ -587,9 +491,7 @@ contract AnvilDemo is Script {
 
     function _step12_mmTrade() internal {
         console2.log("");
-        console2.log(
-            "=== Step 12: MM-to-MM trade (+3 months, no fee, with AI) ==="
-        );
+        console2.log("=== Step 12: MM-to-MM trade (+3 months, no fee, with AI) ===");
         console2.log("  makerB buys 100 from makerA @ 2000 USDC each");
         _rfqFill(MAKER_A_PK, MAKER_B_PK, 100, 200_000e6, OrderSide.BUY);
 
@@ -603,17 +505,8 @@ contract AnvilDemo is Script {
     function _step13_investorRestriction() internal {
         console2.log("");
         console2.log("=== Step 13: Investor-to-Investor Restriction ===");
-        console2.log(
-            "  investorB tries to make order - INVESTOR cannot be maker"
-        );
-        _rfqFillShouldFail(
-            INVESTOR_B_PK,
-            INVESTOR_A_PK,
-            1,
-            1_000e6,
-            OrderSide.BUY,
-            "InvalidParticipantRole"
-        );
+        console2.log("  investorB tries to make order - INVESTOR cannot be maker");
+        _rfqFillShouldFail(INVESTOR_B_PK, INVESTOR_A_PK, 1, 1_000e6, OrderSide.BUY, "InvalidParticipantRole");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -698,23 +591,13 @@ contract AnvilDemo is Script {
     // ═══════════════════════════════════════════════════════════════
 
     function _approveAll() internal {
-        uint256[7] memory pks = [
-            MAKER_A_PK,
-            MAKER_B_PK,
-            MAKER_C_PK,
-            INVESTOR_A_PK,
-            INVESTOR_B_PK,
-            INVESTOR_C_PK,
-            DELEGATE_PK
-        ];
+        uint256[7] memory pks =
+            [MAKER_A_PK, MAKER_B_PK, MAKER_C_PK, INVESTOR_A_PK, INVESTOR_B_PK, INVESTOR_C_PK, DELEGATE_PK];
         for (uint256 i = 0; i < pks.length; i++) {
             vm.startBroadcast(pks[i]);
             usdc.approve(address(issuance), type(uint256).max);
             usdc.approve(address(settlement), type(uint256).max);
-            IERC20(address(bondToken)).approve(
-                address(settlement),
-                type(uint256).max
-            );
+            IERC20(address(bondToken)).approve(address(settlement), type(uint256).max);
             vm.stopBroadcast();
         }
 
@@ -729,22 +612,11 @@ contract AnvilDemo is Script {
     //  原子操作：认购
     // ═══════════════════════════════════════════════════════════════
 
-    function _createOffer(
-        uint256 maxUnits,
-        uint256 unitPrice
-    ) internal returns (bytes32 id) {
-        bytes32 subApprovalId = keccak256(
-            abi.encodePacked("demo-sub-", maxUnits, unitPrice)
-        );
+    function _createOffer(uint256 maxUnits, uint256 unitPrice) internal returns (bytes32 id) {
+        bytes32 subApprovalId = keccak256(abi.encodePacked("demo-sub-", maxUnits, unitPrice));
 
         vm.startBroadcast(ADMIN_PK);
-        issuance.approveSubscription(
-            subApprovalId,
-            issuer,
-            address(bondToken),
-            maxUnits,
-            SUB_CLOSES
-        );
+        issuance.approveSubscription(subApprovalId, issuer, address(bondToken), maxUnits, SUB_CLOSES);
         vm.stopBroadcast();
 
         vm.startBroadcast(ISSUER_PK);
@@ -769,12 +641,7 @@ contract AnvilDemo is Script {
         vm.stopBroadcast();
     }
 
-    function _subscribeShouldFail(
-        uint256 pk,
-        bytes32 id,
-        uint256 units,
-        string memory reason
-    ) internal {
+    function _subscribeShouldFail(uint256 pk, bytes32 id, uint256 units, string memory reason) internal {
         vm.prank(vm.addr(pk));
         try issuance.subscribe(id, units) {
             console2.log("  [ERROR] Should have reverted!");
@@ -784,8 +651,7 @@ contract AnvilDemo is Script {
     }
 
     function _queryRemaining(bytes32 id) internal view returns (uint256) {
-        (, , , uint256 maxUnits, uint256 soldUnits, , , ) = issuance
-            .getSubscription(id);
+        (,,, uint256 maxUnits, uint256 soldUnits,,,) = issuance.getSubscription(id);
         return maxUnits - soldUnits;
     }
 
@@ -809,47 +675,29 @@ contract AnvilDemo is Script {
         uint256 salt
     ) internal view returns (Order memory) {
         address maker = vm.addr(makerPk);
-        return
-            Order({
-                maker: maker,
-                taker: taker,
-                bondToken: address(bondToken),
-                quoteToken: address(usdc),
-                bondAmount: bondAmt,
-                quoteAmount: quoteAmt,
-                side: side,
-                expiry: expiry,
-                nonce: settlement.currentNonce(maker),
-                salt: salt,
-                maxFeeBps: 10_000,
-                accruedInterest: _computeAI(bondAmt)
-            });
+        return Order({
+            maker: maker,
+            taker: taker,
+            bondToken: address(bondToken),
+            quoteToken: address(usdc),
+            bondAmount: bondAmt,
+            quoteAmount: quoteAmt,
+            side: side,
+            expiry: expiry,
+            nonce: settlement.currentNonce(maker),
+            salt: salt,
+            maxFeeBps: 10_000,
+            accruedInterest: _computeAI(bondAmt)
+        });
     }
 
-    function _rfqFill(
-        uint256 makerPk,
-        uint256 takerPk,
-        uint256 bondAmt,
-        uint256 quoteAmt,
-        OrderSide side
-    ) internal {
+    function _rfqFill(uint256 makerPk, uint256 takerPk, uint256 bondAmt, uint256 quoteAmt, OrderSide side) internal {
         address taker = vm.addr(takerPk);
         uint256 salt = _nextSalt++;
-        Order memory order = _buildOrder(
-            makerPk,
-            taker,
-            bondAmt,
-            quoteAmt,
-            side,
-            block.timestamp + 1 days,
-            salt
-        );
+        Order memory order = _buildOrder(makerPk, taker, bondAmt, quoteAmt, side, block.timestamp + 1 days, salt);
         bytes memory sig = _signOrder(order, makerPk);
 
-        uint256[2] memory snap = [
-            usdc.balanceOf(taker),
-            usdc.balanceOf(vm.addr(makerPk))
-        ];
+        uint256[2] memory snap = [usdc.balanceOf(taker), usdc.balanceOf(vm.addr(makerPk))];
 
         vm.startBroadcast(takerPk);
         settlement.fillOrder(order, sig);
@@ -859,12 +707,7 @@ contract AnvilDemo is Script {
         _logTradeResult(taker, vm.addr(makerPk), snap, side);
     }
 
-    function _logTradeResult(
-        address taker,
-        address maker,
-        uint256[2] memory snapBefore,
-        OrderSide side
-    ) internal view {
+    function _logTradeResult(address taker, address maker, uint256[2] memory snapBefore, OrderSide side) internal view {
         uint256 takerNow = usdc.balanceOf(taker);
         uint256 makerNow = usdc.balanceOf(maker);
         if (side == OrderSide.BUY) {
@@ -892,15 +735,7 @@ contract AnvilDemo is Script {
     ) internal {
         address taker = vm.addr(takerPk);
         uint256 salt = _nextSalt++;
-        Order memory order = _buildOrder(
-            makerPk,
-            taker,
-            bondAmt,
-            quoteAmt,
-            side,
-            block.timestamp + 1 days,
-            salt
-        );
+        Order memory order = _buildOrder(makerPk, taker, bondAmt, quoteAmt, side, block.timestamp + 1 days, salt);
         bytes memory sig = _signOrder(order, makerPk);
 
         vm.prank(taker);
@@ -911,23 +746,10 @@ contract AnvilDemo is Script {
         }
     }
 
-    function _rfqCancel(
-        uint256 makerPk,
-        address taker,
-        uint256 bondAmt,
-        uint256 quoteAmt,
-        OrderSide side,
-        uint256 salt
-    ) internal {
-        Order memory order = _buildOrder(
-            makerPk,
-            taker,
-            bondAmt,
-            quoteAmt,
-            side,
-            block.timestamp + 1 days,
-            salt
-        );
+    function _rfqCancel(uint256 makerPk, address taker, uint256 bondAmt, uint256 quoteAmt, OrderSide side, uint256 salt)
+        internal
+    {
+        Order memory order = _buildOrder(makerPk, taker, bondAmt, quoteAmt, side, block.timestamp + 1 days, salt);
         vm.startBroadcast(makerPk);
         settlement.cancelOrder(order);
         vm.stopBroadcast();
@@ -946,15 +768,7 @@ contract AnvilDemo is Script {
         uint256 salt
     ) internal {
         address taker = vm.addr(takerPk);
-        Order memory order = _buildOrder(
-            makerPk,
-            taker,
-            bondAmt,
-            quoteAmt,
-            side,
-            block.timestamp + 1 days,
-            salt
-        );
+        Order memory order = _buildOrder(makerPk, taker, bondAmt, quoteAmt, side, block.timestamp + 1 days, salt);
         bytes memory sig = _signOrder(order, makerPk);
 
         vm.prank(taker);
@@ -965,24 +779,12 @@ contract AnvilDemo is Script {
         }
     }
 
-    function _rfqFillExpired(
-        uint256 makerPk,
-        uint256 takerPk,
-        uint256 bondAmt,
-        uint256 quoteAmt,
-        OrderSide side
-    ) internal {
+    function _rfqFillExpired(uint256 makerPk, uint256 takerPk, uint256 bondAmt, uint256 quoteAmt, OrderSide side)
+        internal
+    {
         address taker = vm.addr(takerPk);
         uint256 salt = _nextSalt++;
-        Order memory order = _buildOrder(
-            makerPk,
-            taker,
-            bondAmt,
-            quoteAmt,
-            side,
-            block.timestamp - 1,
-            salt
-        );
+        Order memory order = _buildOrder(makerPk, taker, bondAmt, quoteAmt, side, block.timestamp - 1, salt);
         bytes memory sig = _signOrder(order, makerPk);
 
         vm.prank(taker);
@@ -1009,11 +811,7 @@ contract AnvilDemo is Script {
         vm.stopBroadcast();
     }
 
-    function _claimForShouldFail(
-        uint256 callerPk,
-        address holder,
-        string memory reason
-    ) internal {
+    function _claimForShouldFail(uint256 callerPk, address holder, string memory reason) internal {
         vm.prank(vm.addr(callerPk));
         try issuance.claimFor(address(bondToken), holder) {
             console2.log("  [ERROR] Should have reverted!");
@@ -1022,10 +820,7 @@ contract AnvilDemo is Script {
         }
     }
 
-    function _setClaimDelegate(
-        uint256 holderPk,
-        address delegateAddr
-    ) internal {
+    function _setClaimDelegate(uint256 holderPk, address delegateAddr) internal {
         vm.startBroadcast(holderPk);
         issuance.setClaimDelegate(delegateAddr);
         vm.stopBroadcast();
@@ -1041,21 +836,13 @@ contract AnvilDemo is Script {
     //  工具函数
     // ═══════════════════════════════════════════════════════════════
 
-    function _signOrder(
-        Order memory order,
-        uint256 pk
-    ) internal view returns (bytes memory) {
+    function _signOrder(Order memory order, uint256 pk) internal view returns (bytes memory) {
         bytes32 digest = settlement.hashOrder(order);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
         return abi.encodePacked(r, s, v);
     }
 
-    function _directTransferShouldFail(
-        uint256 senderPk,
-        address to,
-        uint256 amount,
-        string memory reason
-    ) internal {
+    function _directTransferShouldFail(uint256 senderPk, address to, uint256 amount, string memory reason) internal {
         vm.prank(vm.addr(senderPk));
         try bondToken.transfer(to, amount) {
             console2.log("    [ERROR] Should have reverted!");
@@ -1075,10 +862,7 @@ contract AnvilDemo is Script {
 
     function _logBalance(string memory name, address account) internal view {
         console2.log(
-            string.concat("    ", name, " | bond: "),
-            bondToken.balanceOf(account),
-            "| USDC:",
-            usdc.balanceOf(account)
+            string.concat("    ", name, " | bond: "), bondToken.balanceOf(account), "| USDC:", usdc.balanceOf(account)
         );
     }
 
@@ -1104,14 +888,8 @@ contract AnvilDemo is Script {
         _logBalance("feeRecip  ", fc.feeRecipient);
 
         console2.log("  --- Contracts ---");
-        console2.log(
-            "    Issuance   | USDC:",
-            usdc.balanceOf(address(issuance))
-        );
-        console2.log(
-            "    Settlement | USDC:",
-            usdc.balanceOf(address(settlement))
-        );
+        console2.log("    Issuance   | USDC:", usdc.balanceOf(address(issuance)));
+        console2.log("    Settlement | USDC:", usdc.balanceOf(address(settlement)));
 
         console2.log("");
         console2.log("========================================");

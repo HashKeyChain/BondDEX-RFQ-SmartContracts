@@ -16,10 +16,7 @@ interface IRFQSettlement {
     /// @dev Executes multiple final signed orders atomically.
     /// @param orders Final EIP-712 order payloads.
     /// @param signatures Maker signatures aligned by index.
-    function batchFillOrders(
-        Order[] calldata orders,
-        bytes[] calldata signatures
-    ) external;
+    function batchFillOrders(Order[] calldata orders, bytes[] calldata signatures) external;
 
     /// @dev Cancels one signed order by hashable payload.
     /// @param order Final EIP-712 order payload.
@@ -49,10 +46,7 @@ interface IRFQSettlement {
     /// Only registered bond tokens may appear in executable orders.
     /// @param bondToken Bond token address.
     /// @param registered Whether the token should be registered.
-    function setBondTokenRegistration(
-        address bondToken,
-        bool registered
-    ) external;
+    function setBondTokenRegistration(address bondToken, bool registered) external;
 
     /// @dev Updates the tolerance window for accrued interest validation.
     /// @param toleranceSeconds Maximum allowed deviation in seconds.
@@ -61,9 +55,7 @@ interface IRFQSettlement {
     /// @dev Returns whether a bond token is registered for RFQ settlement.
     /// @param bondToken Bond token address.
     /// @return registered True when the bond token is registered.
-    function isBondTokenRegistered(
-        address bondToken
-    ) external view returns (bool);
+    function isBondTokenRegistered(address bondToken) external view returns (bool);
 
     /// @dev Sets the paused state for one settlement-controlled domain.
     /// @param domain Domain to update.
@@ -101,9 +93,7 @@ interface IRFQSettlement {
     /// @dev Returns whether one settlement token is enabled.
     /// @param token Settlement token address.
     /// @return enabled True when the token is enabled.
-    function isSettlementTokenEnabled(
-        address token
-    ) external view returns (bool);
+    function isSettlementTokenEnabled(address token) external view returns (bool);
 
     /// @dev Returns the current accrued interest tolerance in seconds.
     /// @return seconds Tolerance window.
@@ -121,12 +111,10 @@ interface IRFQSettlement {
     /// @param partyB Second participant address.
     /// @param dirtyAmount The full settlement amount (quoteAmount + accruedInterest).
     /// @return feeAmount Estimated fee.
-    function quoteFee(
-        address bondToken,
-        address partyA,
-        address partyB,
-        uint256 dirtyAmount
-    ) external view returns (uint256 feeAmount);
+    function quoteFee(address bondToken, address partyA, address partyB, uint256 dirtyAmount)
+        external
+        view
+        returns (uint256 feeAmount);
 
     /// @dev Allows the admin to recover tokens accidentally sent to this contract.
     /// @param token Token address to rescue.

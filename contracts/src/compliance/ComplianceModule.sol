@@ -1,15 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {
-    AccessControlUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {
-    Initializable
-} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {
-    UUPSUpgradeable
-} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import {DomainPausable} from "../abstracts/DomainPausable.sol";
 import {RoleManaged} from "../abstracts/RoleManaged.sol";
@@ -87,26 +81,15 @@ contract ComplianceModule is
     );
 
     /// @notice Emitted when the compliance module is bound to its bond token.
-    event BondTokenBound(
-        address indexed bondToken,
-        address indexed complianceModule
-    );
+    event BondTokenBound(address indexed bondToken, address indexed complianceModule);
 
     /// @notice Emitted when provider-facing compliance metadata changes.
     event PolicyMetadataUpdated(
-        address indexed bondToken,
-        address indexed complianceModule,
-        bytes32 policyId,
-        uint256 policyVersion
+        address indexed bondToken, address indexed complianceModule, bytes32 policyId, uint256 policyVersion
     );
 
     /// @notice Emitted when an authorized transfer operator is added or removed.
-    event TransferOperatorUpdated(
-        address indexed bondToken,
-        address indexed operator,
-        bool authorized,
-        address admin
-    );
+    event TransferOperatorUpdated(address indexed bondToken, address indexed operator, bool authorized, address admin);
 
     /// @notice Bound bond token governed by this module.
     address public bondToken;
@@ -135,12 +118,10 @@ contract ComplianceModule is
     }
 
     /// @dev Initializes role holders and provider-facing policy metadata.
-    function initialize(
-        address admin,
-        address factory,
-        bytes32 policyId_,
-        uint256 policyVersion_
-    ) external initializer {
+    function initialize(address admin, address factory, bytes32 policyId_, uint256 policyVersion_)
+        external
+        initializer
+    {
         if (admin == address(0) || factory == address(0)) {
             revert ZeroAddress();
         }
@@ -158,9 +139,7 @@ contract ComplianceModule is
     }
 
     /// @dev Binds the per-bond compliance instance to exactly one bond token.
-    function bindBondToken(
-        address bondToken_
-    ) external onlyRole(BOND_FACTORY_ROLE) {
+    function bindBondToken(address bondToken_) external onlyRole(BOND_FACTORY_ROLE) {
         if (bondToken_ == address(0)) {
             revert ZeroAddress();
         }
@@ -175,28 +154,19 @@ contract ComplianceModule is
 
     /// @inheritdoc IComplianceModule
     /// @dev Updates whitelist status for one account and emits the canonical audit event.
-    function setWhitelist(
-        address account,
-        bool allowed
-    ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+    function setWhitelist(address account, bool allowed) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         if (account == address(0)) revert ZeroAddress();
         _whitelist[account] = allowed;
-        emit WhitelistUpdated(
-            bondToken,
-            account,
-            address(this),
-            allowed,
-            msg.sender
-        );
+        emit WhitelistUpdated(bondToken, account, address(this), allowed, msg.sender);
     }
 
     /// @inheritdoc IComplianceModule
     /// @dev Batch-updates whitelist state for multiple accounts.
-    function batchSetWhitelist(
-        address[] calldata accounts,
-        bool[] calldata allowed
-    ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+    function batchSetWhitelist(address[] calldata accounts, bool[] calldata allowed)
+        external
+        onlyRole(COMPLIANCE_ADMIN_ROLE)
+    {
         _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         if (accounts.length != allowed.length) {
             revert InvalidArrayLength();
@@ -208,23 +178,14 @@ contract ComplianceModule is
         for (uint256 i = 0; i < accounts.length; i++) {
             if (accounts[i] == address(0)) revert ZeroAddress();
             _whitelist[accounts[i]] = allowed[i];
-            emit WhitelistUpdated(
-                bondToken,
-                accounts[i],
-                address(this),
-                allowed[i],
-                msg.sender
-            );
+            emit WhitelistUpdated(bondToken, accounts[i], address(this), allowed[i], msg.sender);
         }
     }
 
     /// @inheritdoc IComplianceModule
     /// @dev Assigns one compliance role to one account. Setting Role.NONE clears
     /// the previous role assignment. Valid values: NONE, ISSUER, MARKET_MAKER, INVESTOR.
-    function setRole(
-        address account,
-        Role role
-    ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+    function setRole(address account, Role role) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         if (account == address(0)) revert ZeroAddress();
         if (uint8(role) > uint8(Role.INVESTOR)) {
             revert InvalidParticipantRole(account, Role.INVESTOR, role);
@@ -236,10 +197,7 @@ contract ComplianceModule is
 
     /// @inheritdoc IComplianceModule
     /// @dev Batch-updates role assignments for multiple accounts.
-    function batchSetRole(
-        address[] calldata accounts,
-        Role[] calldata roles
-    ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+    function batchSetRole(address[] calldata accounts, Role[] calldata roles) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         if (accounts.length != roles.length) {
             revert InvalidArrayLength();
@@ -251,63 +209,34 @@ contract ComplianceModule is
         for (uint256 i = 0; i < accounts.length; i++) {
             if (accounts[i] == address(0)) revert ZeroAddress();
             if (uint8(roles[i]) > uint8(Role.INVESTOR)) {
-                revert InvalidParticipantRole(
-                    accounts[i],
-                    Role.INVESTOR,
-                    roles[i]
-                );
+                revert InvalidParticipantRole(accounts[i], Role.INVESTOR, roles[i]);
             }
             _roles[accounts[i]] = roles[i];
-            emit RoleUpdated(
-                bondToken,
-                accounts[i],
-                address(this),
-                roles[i],
-                msg.sender
-            );
+            emit RoleUpdated(bondToken, accounts[i], address(this), roles[i], msg.sender);
         }
     }
 
     /// @inheritdoc IComplianceModule
     /// @dev Updates provider-facing policy metadata without touching whitelist state.
-    function setPolicyMetadata(
-        bytes32 policyId_,
-        uint256 policyVersion_
-    ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+    function setPolicyMetadata(bytes32 policyId_, uint256 policyVersion_) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         _policyId = policyId_;
         _policyVersion = policyVersion_;
-        emit PolicyMetadataUpdated(
-            bondToken,
-            address(this),
-            policyId_,
-            policyVersion_
-        );
+        emit PolicyMetadataUpdated(bondToken, address(this), policyId_, policyVersion_);
     }
 
     /// @inheritdoc IComplianceModule
     /// @dev Toggles one compliance-controlled pause domain.
-    function pauseDomain(
-        PauseDomain domain,
-        bool paused
-    ) external onlyRole(PAUSER_ROLE) {
+    function pauseDomain(PauseDomain domain, bool paused) external onlyRole(PAUSER_ROLE) {
         _setDomainPaused(domain, paused);
     }
 
     /// @inheritdoc IComplianceModule
     /// @dev Registers or removes an authorized transfer operator.
-    function setTransferOperator(
-        address operator,
-        bool authorized
-    ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+    function setTransferOperator(address operator, bool authorized) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         if (operator == address(0)) revert ZeroAddress();
         _authorizedOperators[operator] = authorized;
-        emit TransferOperatorUpdated(
-            bondToken,
-            operator,
-            authorized,
-            msg.sender
-        );
+        emit TransferOperatorUpdated(bondToken, operator, authorized, msg.sender);
     }
 
     /// @inheritdoc IComplianceModule
@@ -330,9 +259,7 @@ contract ComplianceModule is
 
     /// @inheritdoc IComplianceModule
     /// @dev Exposes inherited pause state for interface compliance and monitoring.
-    function isDomainPaused(
-        PauseDomain domain
-    ) public view override(DomainPausable, IComplianceModule) returns (bool) {
+    function isDomainPaused(PauseDomain domain) public view override(DomainPausable, IComplianceModule) returns (bool) {
         return super.isDomainPaused(domain);
     }
 
@@ -343,12 +270,7 @@ contract ComplianceModule is
     /// The `operator` parameter is the address that initiated the transfer on the bond token
     /// (msg.sender to transfer/transferFrom). Only authorized operators (e.g. RFQSettlement)
     /// may trigger user-to-user transfers, ensuring all trades go through the platform.
-    function checkTransfer(
-        address from,
-        address to,
-        uint256,
-        address operator
-    ) external view returns (uint8) {
+    function checkTransfer(address from, address to, uint256, address operator) external view returns (uint8) {
         if (bondToken == address(0)) {
             return UNBOUND_BOND_CODE;
         }
@@ -400,16 +322,10 @@ contract ComplianceModule is
     }
 
     /// @dev Declares ERC165 support for the compliance module interface.
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override(AccessControlUpgradeable) returns (bool) {
-        return
-            interfaceId == type(IComplianceModule).interfaceId ||
-            super.supportsInterface(interfaceId);
+    function supportsInterface(bytes4 interfaceId) public view override(AccessControlUpgradeable) returns (bool) {
+        return interfaceId == type(IComplianceModule).interfaceId || super.supportsInterface(interfaceId);
     }
 
     /// @dev Restricts UUPS upgrades to the configured upgrader role.
-    function _authorizeUpgrade(
-        address
-    ) internal override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) {}
 }

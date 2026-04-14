@@ -5,13 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {BondToken} from "../../src/BondToken.sol";
 import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
-import {
-    BondCategory,
-    CouponFrequency,
-    DayCount,
-    PauseDomain,
-    Role
-} from "../../src/types/BondTypes.sol";
+import {BondCategory, CouponFrequency, DayCount, PauseDomain, Role} from "../../src/types/BondTypes.sol";
 
 contract MinimalComplianceMock is IComplianceModule {
     function setWhitelist(address, bool) external {}
@@ -20,30 +14,32 @@ contract MinimalComplianceMock is IComplianceModule {
     function batchSetRole(address[] calldata, Role[] calldata) external {}
     function setPolicyMetadata(bytes32, uint256) external {}
     function pauseDomain(PauseDomain, bool) external {}
+
     function isWhitelisted(address) external pure returns (bool) {
         return true;
     }
+
     function roleOf(address) external pure returns (Role) {
         return Role.MARKET_MAKER;
     }
+
     function isDomainPaused(PauseDomain) external pure returns (bool) {
         return false;
     }
-    function checkTransfer(
-        address,
-        address,
-        uint256,
-        address
-    ) external pure returns (uint8) {
+
+    function checkTransfer(address, address, uint256, address) external pure returns (uint8) {
         return 0;
     }
     function setTransferOperator(address, bool) external {}
+
     function isTransferOperator(address) external pure returns (bool) {
         return true;
     }
+
     function policyId() external pure returns (bytes32) {
         return bytes32(0);
     }
+
     function policyVersion() external pure returns (uint256) {
         return 1;
     }
@@ -104,9 +100,7 @@ contract BondTokenAccruedInterestAndMessagesTest is Test {
     function test_accruedInterestCapsAtMaturity() public {
         uint256 maturity = bondToken.maturityTimestamp();
         uint256 aiAtMaturity = bondToken.accruedInterestPerUnit(maturity);
-        uint256 aiBeyond = bondToken.accruedInterestPerUnit(
-            maturity + 365 days
-        );
+        uint256 aiBeyond = bondToken.accruedInterestPerUnit(maturity + 365 days);
 
         assertEq(aiAtMaturity, aiBeyond);
     }
@@ -122,24 +116,15 @@ contract BondTokenAccruedInterestAndMessagesTest is Test {
     // ── messageForTransferRestriction ─────────────────────────────
 
     function test_messageForCode0ReturnsSuccess() public view {
-        assertEq(
-            keccak256(bytes(bondToken.messageForTransferRestriction(0))),
-            keccak256("SUCCESS")
-        );
+        assertEq(keccak256(bytes(bondToken.messageForTransferRestriction(0))), keccak256("SUCCESS"));
     }
 
     function test_messageForCode8ReturnsUnauthorizedOperator() public view {
-        assertEq(
-            keccak256(bytes(bondToken.messageForTransferRestriction(8))),
-            keccak256("UNAUTHORIZED_OPERATOR")
-        );
+        assertEq(keccak256(bytes(bondToken.messageForTransferRestriction(8))), keccak256("UNAUTHORIZED_OPERATOR"));
     }
 
     function test_messageForUnknownCodeReturnsUnknown() public view {
-        assertEq(
-            keccak256(bytes(bondToken.messageForTransferRestriction(99))),
-            keccak256("UNKNOWN_RESTRICTION")
-        );
+        assertEq(keccak256(bytes(bondToken.messageForTransferRestriction(99))), keccak256("UNKNOWN_RESTRICTION"));
     }
 
     function test_allKnownRestrictionCodesHaveMessages() public view {
@@ -155,10 +140,7 @@ contract BondTokenAccruedInterestAndMessagesTest is Test {
             "UNAUTHORIZED_OPERATOR"
         ];
         for (uint8 i = 0; i < 9; i++) {
-            assertEq(
-                keccak256(bytes(bondToken.messageForTransferRestriction(i))),
-                keccak256(bytes(expected[i]))
-            );
+            assertEq(keccak256(bytes(bondToken.messageForTransferRestriction(i))), keccak256(bytes(expected[i])));
         }
     }
 }

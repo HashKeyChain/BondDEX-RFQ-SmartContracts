@@ -15,13 +15,10 @@ abstract contract BaseConfig is Script {
     string internal constant CONFIG_ROOT = "../config";
 
     function _isSupportedChain(uint256 chainId) internal pure returns (bool) {
-        return
-            chainId == HSK_TESTNET_CHAIN_ID || chainId == HSK_MAINNET_CHAIN_ID;
+        return chainId == HSK_TESTNET_CHAIN_ID || chainId == HSK_MAINNET_CHAIN_ID;
     }
 
-    function _networkLabel(
-        uint256 chainId
-    ) internal pure returns (string memory) {
+    function _networkLabel(uint256 chainId) internal pure returns (string memory) {
         if (chainId == HSK_TESTNET_CHAIN_ID) {
             return "testnet";
         }
@@ -34,9 +31,7 @@ abstract contract BaseConfig is Script {
     }
 
     /// @dev 返回指定环境的配置文件路径，如 ../config/testnet.json
-    function _configFile(
-        string memory env
-    ) internal pure returns (string memory) {
+    function _configFile(string memory env) internal pure returns (string memory) {
         return string.concat(CONFIG_ROOT, "/", env, ".json");
     }
 

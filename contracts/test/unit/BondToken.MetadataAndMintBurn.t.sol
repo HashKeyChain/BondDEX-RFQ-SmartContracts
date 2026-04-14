@@ -5,13 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {BondToken} from "../../src/BondToken.sol";
 import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
-import {
-    BondCategory,
-    CouponFrequency,
-    DayCount,
-    PauseDomain,
-    Role
-} from "../../src/types/BondTypes.sol";
+import {BondCategory, CouponFrequency, DayCount, PauseDomain, Role} from "../../src/types/BondTypes.sol";
 
 contract StaticRestrictionComplianceMock is IComplianceModule {
     uint8 internal _restrictionCode;
@@ -26,19 +20,41 @@ contract StaticRestrictionComplianceMock is IComplianceModule {
     function batchSetWhitelist(address[] calldata, bool[] calldata) external {}
     function setRole(address, Role) external {}
     function batchSetRole(address[] calldata, Role[] calldata) external {}
+
     function setPolicyMetadata(bytes32 policyId_, uint256 policyVersion_) external {
         _policyId = policyId_;
         _policyVersion = policyVersion_;
     }
     function pauseDomain(PauseDomain, bool) external {}
-    function isWhitelisted(address) external pure returns (bool) { return true; }
-    function roleOf(address) external pure returns (Role) { return Role.MARKET_MAKER; }
-    function isDomainPaused(PauseDomain) external pure returns (bool) { return false; }
-    function checkTransfer(address, address, uint256, address) external view returns (uint8) { return _restrictionCode; }
+
+    function isWhitelisted(address) external pure returns (bool) {
+        return true;
+    }
+
+    function roleOf(address) external pure returns (Role) {
+        return Role.MARKET_MAKER;
+    }
+
+    function isDomainPaused(PauseDomain) external pure returns (bool) {
+        return false;
+    }
+
+    function checkTransfer(address, address, uint256, address) external view returns (uint8) {
+        return _restrictionCode;
+    }
     function setTransferOperator(address, bool) external {}
-    function isTransferOperator(address) external pure returns (bool) { return true; }
-    function policyId() external view returns (bytes32) { return _policyId; }
-    function policyVersion() external view returns (uint256) { return _policyVersion; }
+
+    function isTransferOperator(address) external pure returns (bool) {
+        return true;
+    }
+
+    function policyId() external view returns (bytes32) {
+        return _policyId;
+    }
+
+    function policyVersion() external view returns (uint256) {
+        return _policyVersion;
+    }
 }
 
 contract BondTokenMetadataAndMintBurnTest is Test {

@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {
-    ERC1967Proxy
-} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {BondFactory} from "../../src/BondFactory.sol";
@@ -37,12 +35,7 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
 
         BondIssuance issuanceImplementation = new BondIssuance();
         issuance = BondIssuance(
-            address(
-                new ERC1967Proxy(
-                    address(issuanceImplementation),
-                    abi.encodeCall(BondIssuance.initialize, (admin))
-                )
-            )
+            address(new ERC1967Proxy(address(issuanceImplementation), abi.encodeCall(BondIssuance.initialize, (admin))))
         );
 
         complianceImplementation = new ComplianceModule();
@@ -51,16 +44,9 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
 
     function test_launchAndSubscribeEndToEnd() public {
         vm.startPrank(admin);
-        factory.registerComplianceImplementation(
-            address(complianceImplementation),
-            type(IComplianceModule).interfaceId
-        );
+        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
         factory.approveIssuance(
-            approvalId,
-            issuer,
-            address(complianceImplementation),
-            block.timestamp + 1 days,
-            keccak256("metadata")
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, keccak256("metadata")
         );
         issuance.setSettlementTokenPolicy(address(usdc), true, false, false);
         vm.stopPrank();
@@ -86,13 +72,10 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
         });
 
         vm.prank(issuer);
-        (address bondTokenAddress, address complianceModuleAddress) = factory
-            .createBond(config, approvalId);
+        (address bondTokenAddress, address complianceModuleAddress) = factory.createBond(config, approvalId);
 
         BondToken bondToken = BondToken(bondTokenAddress);
-        ComplianceModule complianceModule = ComplianceModule(
-            complianceModuleAddress
-        );
+        ComplianceModule complianceModule = ComplianceModule(complianceModuleAddress);
 
         vm.startPrank(admin);
         complianceModule.setWhitelist(issuer, true);
@@ -103,13 +86,7 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
 
         bytes32 subApprovalId = keccak256("us1-sub-approval");
         vm.prank(admin);
-        issuance.approveSubscription(
-            subApprovalId,
-            issuer,
-            bondTokenAddress,
-            500e18,
-            0
-        );
+        issuance.approveSubscription(subApprovalId, issuer, bondTokenAddress, 500e18, 0);
 
         vm.prank(issuer);
         bytes32 offerId = issuance.createSubscription(
@@ -136,20 +113,11 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
         assertEq(bondToken.complianceModule(), complianceModuleAddress);
     }
 
-    function test_revertWhenSubscriptionUsesUnsupportedSettlementToken()
-        public
-    {
+    function test_revertWhenSubscriptionUsesUnsupportedSettlementToken() public {
         vm.startPrank(admin);
-        factory.registerComplianceImplementation(
-            address(complianceImplementation),
-            type(IComplianceModule).interfaceId
-        );
+        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
         factory.approveIssuance(
-            approvalId,
-            issuer,
-            address(complianceImplementation),
-            block.timestamp + 1 days,
-            keccak256("metadata")
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, keccak256("metadata")
         );
         vm.stopPrank();
 
@@ -174,12 +142,9 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
         });
 
         vm.prank(issuer);
-        (address bondTokenAddress, address complianceModuleAddress) = factory
-            .createBond(config, approvalId);
+        (address bondTokenAddress, address complianceModuleAddress) = factory.createBond(config, approvalId);
 
-        ComplianceModule complianceModule = ComplianceModule(
-            complianceModuleAddress
-        );
+        ComplianceModule complianceModule = ComplianceModule(complianceModuleAddress);
         vm.startPrank(admin);
         complianceModule.setWhitelist(issuer, true);
         complianceModule.setRole(issuer, Role.ISSUER);
@@ -189,13 +154,7 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
 
         bytes32 subApprovalId2 = keccak256("us1-sub-approval-2");
         vm.prank(admin);
-        issuance.approveSubscription(
-            subApprovalId2,
-            issuer,
-            bondTokenAddress,
-            500e18,
-            0
-        );
+        issuance.approveSubscription(subApprovalId2, issuer, bondTokenAddress, 500e18, 0);
 
         vm.prank(issuer);
         vm.expectRevert();

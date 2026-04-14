@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {
-    ERC1967Proxy
-} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {console2} from "forge-std/console2.sol";
 
 import {BondFactory} from "../src/BondFactory.sol";
@@ -25,12 +23,9 @@ import {DeployJsonWriter} from "./DeployJsonWriter.s.sol";
 contract FullDeploy is DeployConfigParser, DeployJsonWriter {
     // ─── 角色常量 ────────────────────────────────────────────────
 
-    bytes32 internal constant ISSUANCE_APPROVER_ROLE =
-        keccak256("ISSUANCE_APPROVER_ROLE");
-    bytes32 internal constant COMPLIANCE_ADMIN_ROLE =
-        keccak256("COMPLIANCE_ADMIN_ROLE");
-    bytes32 internal constant SETTLEMENT_ADMIN_ROLE =
-        keccak256("SETTLEMENT_ADMIN_ROLE");
+    bytes32 internal constant ISSUANCE_APPROVER_ROLE = keccak256("ISSUANCE_APPROVER_ROLE");
+    bytes32 internal constant COMPLIANCE_ADMIN_ROLE = keccak256("COMPLIANCE_ADMIN_ROLE");
+    bytes32 internal constant SETTLEMENT_ADMIN_ROLE = keccak256("SETTLEMENT_ADMIN_ROLE");
     bytes32 internal constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 internal constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
@@ -41,18 +36,12 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
     }
 
     function testnet() external {
-        require(
-            block.chainid == HSK_TESTNET_CHAIN_ID,
-            "chainId mismatch: expected 133 (testnet)"
-        );
+        require(block.chainid == HSK_TESTNET_CHAIN_ID, "chainId mismatch: expected 133 (testnet)");
         _run("testnet");
     }
 
     function mainnet() external {
-        require(
-            block.chainid == HSK_MAINNET_CHAIN_ID,
-            "chainId mismatch: expected 177 (mainnet)"
-        );
+        require(block.chainid == HSK_MAINNET_CHAIN_ID, "chainId mismatch: expected 177 (mainnet)");
         _run("mainnet");
     }
 
@@ -77,24 +66,17 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
 
     // ─── 合约部署 ────────────────────────────────────────────────
 
-    function _deployAll(
-        DeployConfig memory cfg
-    ) internal returns (DeployResult memory r) {
+    function _deployAll(DeployConfig memory cfg) internal returns (DeployResult memory r) {
         r.complianceImpl = address(new ComplianceModule());
 
         r.bondIssuanceImpl = address(new BondIssuance());
-        r.bondIssuance = address(
-            new ERC1967Proxy(
-                r.bondIssuanceImpl,
-                abi.encodeCall(BondIssuance.initialize, (cfg.deployer))
-            )
-        );
+        r.bondIssuance =
+            address(new ERC1967Proxy(r.bondIssuanceImpl, abi.encodeCall(BondIssuance.initialize, (cfg.deployer))));
 
         r.rfqSettlementImpl = address(new RFQSettlement());
         r.rfqSettlement = address(
             new ERC1967Proxy(
-                r.rfqSettlementImpl,
-                abi.encodeCall(RFQSettlement.initialize, (cfg.deployer, cfg.maxFeeBps))
+                r.rfqSettlementImpl, abi.encodeCall(RFQSettlement.initialize, (cfg.deployer, cfg.maxFeeBps))
             )
         );
 
@@ -103,42 +85,25 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
 
     // ─── 配置 + 授权 + 移交 ──────────────────────────────────────
 
-    function _configureAll(
-        DeployConfig memory cfg,
-        DeployResult memory r,
-        TokenPolicy[] memory tokens
-    ) internal {
+    function _configureAll(DeployConfig memory cfg, DeployResult memory r, TokenPolicy[] memory tokens) internal {
         BondFactory factory = BondFactory(r.bondFactory);
         BondIssuance issuance = BondIssuance(r.bondIssuance);
         RFQSettlement settlement = RFQSettlement(r.rfqSettlement);
 
         // ① 注册 ComplianceModule 实现模板
-        factory.registerComplianceImplementation(
-            r.complianceImpl,
-            type(IComplianceModule).interfaceId
-        );
+        factory.registerComplianceImplementation(r.complianceImpl, type(IComplianceModule).interfaceId);
 
         // ② 配置全部结算代币策略
         for (uint256 i = 0; i < tokens.length; i++) {
             issuance.setSettlementTokenPolicy(
-                tokens[i].token,
-                tokens[i].issuanceEnabled,
-                tokens[i].settlementEnabled,
-                tokens[i].redemptionEnabled
+                tokens[i].token, tokens[i].issuanceEnabled, tokens[i].settlementEnabled, tokens[i].redemptionEnabled
             );
-            settlement.setSettlementTokenPolicy(
-                tokens[i].token,
-                tokens[i].rfqSettlementEnabled
-            );
+            settlement.setSettlementTokenPolicy(tokens[i].token, tokens[i].rfqSettlementEnabled);
         }
 
         // ③ 配置 RFQ 手续费
         settlement.setFeeConfig(
-            FeeConfig({
-                feeRecipient: cfg.feeRecipient,
-                currentFeeBps: cfg.currentFeeBps,
-                maxFeeBps: cfg.maxFeeBps
-            })
+            FeeConfig({feeRecipient: cfg.feeRecipient, currentFeeBps: cfg.currentFeeBps, maxFeeBps: cfg.maxFeeBps})
         );
 
         // ④ 设置 platformAdmin
@@ -155,34 +120,22 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
         }
     }
 
-    function _grantFactoryRoles(
-        BondFactory factory,
-        DeployConfig memory cfg
-    ) internal {
+    function _grantFactoryRoles(BondFactory factory, DeployConfig memory cfg) internal {
         factory.grantRole(0x00, cfg.factoryAdmin);
         factory.grantRole(ISSUANCE_APPROVER_ROLE, cfg.factoryIssuanceApprover);
         factory.grantRole(COMPLIANCE_ADMIN_ROLE, cfg.factoryComplianceAdmin);
         factory.grantRole(PAUSER_ROLE, cfg.factoryPauser);
     }
 
-    function _grantIssuanceRoles(
-        BondIssuance issuance,
-        DeployConfig memory cfg
-    ) internal {
+    function _grantIssuanceRoles(BondIssuance issuance, DeployConfig memory cfg) internal {
         issuance.grantRole(0x00, cfg.issuanceAdmin);
-        issuance.grantRole(
-            ISSUANCE_APPROVER_ROLE,
-            cfg.issuanceIssuanceApprover
-        );
+        issuance.grantRole(ISSUANCE_APPROVER_ROLE, cfg.issuanceIssuanceApprover);
         issuance.grantRole(SETTLEMENT_ADMIN_ROLE, cfg.issuanceSettlementAdmin);
         issuance.grantRole(PAUSER_ROLE, cfg.issuancePauser);
         issuance.grantRole(UPGRADER_ROLE, cfg.issuanceUpgrader);
     }
 
-    function _grantSettlementRoles(
-        RFQSettlement settlement,
-        DeployConfig memory cfg
-    ) internal {
+    function _grantSettlementRoles(RFQSettlement settlement, DeployConfig memory cfg) internal {
         settlement.grantRole(0x00, cfg.rfqAdmin);
         settlement.grantRole(SETTLEMENT_ADMIN_ROLE, cfg.rfqSettlementAdmin);
         settlement.grantRole(PAUSER_ROLE, cfg.rfqPauser);
@@ -202,102 +155,46 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
 
         // ── BondFactory ──
         retained += _renounceIf(
-            factory,
-            ISSUANCE_APPROVER_ROLE,
-            d,
-            cfg.factoryIssuanceApprover,
-            "BondFactory.ISSUANCE_APPROVER_ROLE"
+            factory, ISSUANCE_APPROVER_ROLE, d, cfg.factoryIssuanceApprover, "BondFactory.ISSUANCE_APPROVER_ROLE"
         );
         retained += _renounceIf(
-            factory,
-            COMPLIANCE_ADMIN_ROLE,
-            d,
-            cfg.factoryComplianceAdmin,
-            "BondFactory.COMPLIANCE_ADMIN_ROLE"
+            factory, COMPLIANCE_ADMIN_ROLE, d, cfg.factoryComplianceAdmin, "BondFactory.COMPLIANCE_ADMIN_ROLE"
         );
-        retained += _renounceIf(
-            factory,
-            PAUSER_ROLE,
-            d,
-            cfg.factoryPauser,
-            "BondFactory.PAUSER_ROLE"
-        );
+        retained += _renounceIf(factory, PAUSER_ROLE, d, cfg.factoryPauser, "BondFactory.PAUSER_ROLE");
         // DEFAULT_ADMIN_ROLE: setPlatformAdmin 也会授予 admin，两者都要检查
         if (cfg.factoryAdmin != d && cfg.platformAdmin != d) {
             factory.renounceRole(0x00, d);
         } else {
-            console2.log(
-                "  [RETAINED] BondFactory.DEFAULT_ADMIN_ROLE -> deployer"
-            );
+            console2.log("  [RETAINED] BondFactory.DEFAULT_ADMIN_ROLE -> deployer");
             retained++;
         }
 
         // ── BondIssuance ──
         retained += _renounceIf(
-            issuance,
-            ISSUANCE_APPROVER_ROLE,
-            d,
-            cfg.issuanceIssuanceApprover,
-            "BondIssuance.ISSUANCE_APPROVER_ROLE"
+            issuance, ISSUANCE_APPROVER_ROLE, d, cfg.issuanceIssuanceApprover, "BondIssuance.ISSUANCE_APPROVER_ROLE"
         );
         retained += _renounceIf(
-            issuance,
-            SETTLEMENT_ADMIN_ROLE,
-            d,
-            cfg.issuanceSettlementAdmin,
-            "BondIssuance.SETTLEMENT_ADMIN_ROLE"
+            issuance, SETTLEMENT_ADMIN_ROLE, d, cfg.issuanceSettlementAdmin, "BondIssuance.SETTLEMENT_ADMIN_ROLE"
         );
-        retained += _renounceIf(
-            issuance,
-            PAUSER_ROLE,
-            d,
-            cfg.issuancePauser,
-            "BondIssuance.PAUSER_ROLE"
-        );
-        retained += _renounceIf(
-            issuance,
-            UPGRADER_ROLE,
-            d,
-            cfg.issuanceUpgrader,
-            "BondIssuance.UPGRADER_ROLE"
-        );
+        retained += _renounceIf(issuance, PAUSER_ROLE, d, cfg.issuancePauser, "BondIssuance.PAUSER_ROLE");
+        retained += _renounceIf(issuance, UPGRADER_ROLE, d, cfg.issuanceUpgrader, "BondIssuance.UPGRADER_ROLE");
         if (cfg.issuanceAdmin != d) {
             issuance.renounceRole(0x00, d);
         } else {
-            console2.log(
-                "  [RETAINED] BondIssuance.DEFAULT_ADMIN_ROLE -> deployer"
-            );
+            console2.log("  [RETAINED] BondIssuance.DEFAULT_ADMIN_ROLE -> deployer");
             retained++;
         }
 
         // ── RFQSettlement ──
         retained += _renounceIf(
-            settlement,
-            SETTLEMENT_ADMIN_ROLE,
-            d,
-            cfg.rfqSettlementAdmin,
-            "RFQSettlement.SETTLEMENT_ADMIN_ROLE"
+            settlement, SETTLEMENT_ADMIN_ROLE, d, cfg.rfqSettlementAdmin, "RFQSettlement.SETTLEMENT_ADMIN_ROLE"
         );
-        retained += _renounceIf(
-            settlement,
-            PAUSER_ROLE,
-            d,
-            cfg.rfqPauser,
-            "RFQSettlement.PAUSER_ROLE"
-        );
-        retained += _renounceIf(
-            settlement,
-            UPGRADER_ROLE,
-            d,
-            cfg.rfqUpgrader,
-            "RFQSettlement.UPGRADER_ROLE"
-        );
+        retained += _renounceIf(settlement, PAUSER_ROLE, d, cfg.rfqPauser, "RFQSettlement.PAUSER_ROLE");
+        retained += _renounceIf(settlement, UPGRADER_ROLE, d, cfg.rfqUpgrader, "RFQSettlement.UPGRADER_ROLE");
         if (cfg.rfqAdmin != d) {
             settlement.renounceRole(0x00, d);
         } else {
-            console2.log(
-                "  [RETAINED] RFQSettlement.DEFAULT_ADMIN_ROLE -> deployer"
-            );
+            console2.log("  [RETAINED] RFQSettlement.DEFAULT_ADMIN_ROLE -> deployer");
             retained++;
         }
 
@@ -307,13 +204,10 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
     }
 
     /// @dev 若 assignee != deployer 则 renounce 该角色；否则保留并记录警告。返回 1 表示保留，0 表示已撤销。
-    function _renounceIf(
-        BondFactory target,
-        bytes32 role,
-        address deployer,
-        address assignee,
-        string memory label
-    ) internal returns (uint256) {
+    function _renounceIf(BondFactory target, bytes32 role, address deployer, address assignee, string memory label)
+        internal
+        returns (uint256)
+    {
         if (assignee != deployer) {
             target.renounceRole(role, deployer);
             return 0;
@@ -322,13 +216,10 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
         return 1;
     }
 
-    function _renounceIf(
-        BondIssuance target,
-        bytes32 role,
-        address deployer,
-        address assignee,
-        string memory label
-    ) internal returns (uint256) {
+    function _renounceIf(BondIssuance target, bytes32 role, address deployer, address assignee, string memory label)
+        internal
+        returns (uint256)
+    {
         if (assignee != deployer) {
             target.renounceRole(role, deployer);
             return 0;
@@ -337,13 +228,10 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
         return 1;
     }
 
-    function _renounceIf(
-        RFQSettlement target,
-        bytes32 role,
-        address deployer,
-        address assignee,
-        string memory label
-    ) internal returns (uint256) {
+    function _renounceIf(RFQSettlement target, bytes32 role, address deployer, address assignee, string memory label)
+        internal
+        returns (uint256)
+    {
         if (assignee != deployer) {
             target.renounceRole(role, deployer);
             return 0;

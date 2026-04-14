@@ -41,23 +41,25 @@ abstract contract BondIssuanceRedemptionFixtures is Test {
             )
         );
 
-        bondToken = new BondToken(BondToken.ConstructorParams({
-            issuer: issuer,
-            name: "HashKey Bond",
-            symbol: "HKB",
-            decimals: 18,
-            faceValue: 1_000e6,
-            couponRateBps: 500,
-            maturityTimestamp: block.timestamp + 30 days,
-            settlementToken: address(usdc),
-            complianceModule: address(complianceModule),
-            issuanceController: address(issuance),
-            issueDate: block.timestamp + 8 days,
-            dayCountConvention: DayCount.ACT_365,
-            couponFrequency: CouponFrequency.BULLET,
-            bondCategory: BondCategory.CORPORATE,
-            isin: bytes12(0)
-        }));
+        bondToken = new BondToken(
+            BondToken.ConstructorParams({
+                issuer: issuer,
+                name: "HashKey Bond",
+                symbol: "HKB",
+                decimals: 18,
+                faceValue: 1_000e6,
+                couponRateBps: 500,
+                maturityTimestamp: block.timestamp + 30 days,
+                settlementToken: address(usdc),
+                complianceModule: address(complianceModule),
+                issuanceController: address(issuance),
+                issueDate: block.timestamp + 8 days,
+                dayCountConvention: DayCount.ACT_365,
+                couponFrequency: CouponFrequency.BULLET,
+                bondCategory: BondCategory.CORPORATE,
+                isin: bytes12(0)
+            })
+        );
 
         vm.prank(factory);
         complianceModule.bindBondToken(address(bondToken));

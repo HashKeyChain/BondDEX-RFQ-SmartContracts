@@ -71,9 +71,7 @@ interface IBondToken {
     /// BondIssuance to compute redemption payouts.
     /// @param timestamp Point in time for the calculation.
     /// @return amount Accrued interest in settlement-token units.
-    function accruedInterestPerUnit(
-        uint256 timestamp
-    ) external view returns (uint256);
+    function accruedInterestPerUnit(uint256 timestamp) external view returns (uint256);
 
     /// @dev Evaluates one transfer restriction using ERC1404-style numeric codes.
     /// Uses msg.sender as the operator — off-chain callers should use the 4-param overload.
@@ -81,11 +79,7 @@ interface IBondToken {
     /// @param to Receiver address.
     /// @param amount Transfer amount in smallest bond units.
     /// @return restrictionCode Numeric restriction code where zero means success.
-    function detectTransferRestriction(
-        address from,
-        address to,
-        uint256 amount
-    ) external view returns (uint8);
+    function detectTransferRestriction(address from, address to, uint256 amount) external view returns (uint8);
 
     /// @dev Off-chain variant: pass the intended operator (e.g. RFQSettlement) to preview
     /// whether the transfer would succeed through that operator.
@@ -94,17 +88,13 @@ interface IBondToken {
     /// @param amount Transfer amount in smallest bond units.
     /// @param operator Address that would initiate the transfer.
     /// @return restrictionCode Numeric restriction code where zero means success.
-    function detectTransferRestriction(
-        address from,
-        address to,
-        uint256 amount,
-        address operator
-    ) external view returns (uint8);
+    function detectTransferRestriction(address from, address to, uint256 amount, address operator)
+        external
+        view
+        returns (uint8);
 
     /// @dev Returns the stable human-readable message for one restriction code.
     /// @param restrictionCode Numeric restriction code.
     /// @return message Restriction message string.
-    function messageForTransferRestriction(
-        uint8 restrictionCode
-    ) external pure returns (string memory);
+    function messageForTransferRestriction(uint8 restrictionCode) external pure returns (string memory);
 }

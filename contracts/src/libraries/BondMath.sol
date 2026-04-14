@@ -16,11 +16,7 @@ library BondMath {
     /// @param fromDecimals Decimals used by the source amount.
     /// @param toDecimals Decimals required by the destination amount.
     /// @return scaledAmount Amount represented in the destination decimal system.
-    function scaleAmount(
-        uint256 amount,
-        uint8 fromDecimals,
-        uint8 toDecimals
-    ) internal pure returns (uint256) {
+    function scaleAmount(uint256 amount, uint8 fromDecimals, uint8 toDecimals) internal pure returns (uint256) {
         if (fromDecimals == toDecimals) {
             return amount;
         }
@@ -36,10 +32,7 @@ library BondMath {
     /// @param amount Base amount.
     /// @param bps Basis-point multiplier.
     /// @return scaledAmount Rounded-down result.
-    function mulBps(
-        uint256 amount,
-        uint256 bps
-    ) internal pure returns (uint256) {
+    function mulBps(uint256 amount, uint256 bps) internal pure returns (uint256) {
         if (bps > BPS_DENOMINATOR) {
             revert InvalidBasisPoints(bps);
         }
@@ -51,10 +44,7 @@ library BondMath {
     /// @param amount Base amount.
     /// @param bps Basis-point multiplier.
     /// @return scaledAmount Rounded-up result.
-    function mulBpsUp(
-        uint256 amount,
-        uint256 bps
-    ) internal pure returns (uint256) {
+    function mulBpsUp(uint256 amount, uint256 bps) internal pure returns (uint256) {
         if (bps > BPS_DENOMINATOR) {
             revert InvalidBasisPoints(bps);
         }

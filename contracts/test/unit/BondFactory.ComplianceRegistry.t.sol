@@ -9,10 +9,7 @@ import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
 
 contract BondFactoryComplianceRegistryTest is Test {
     event ComplianceImplementationRegistered(
-        address indexed implementation,
-        address indexed registrar,
-        bytes4 interfaceId,
-        bool enabled
+        address indexed implementation, address indexed registrar, bytes4 interfaceId, bool enabled
     );
 
     address internal admin = makeAddr("admin");
@@ -31,18 +28,14 @@ contract BondFactoryComplianceRegistryTest is Test {
             address(complianceImplementation), admin, type(IComplianceModule).interfaceId, true
         );
         vm.prank(admin);
-        factory.registerComplianceImplementation(
-            address(complianceImplementation), type(IComplianceModule).interfaceId
-        );
+        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
 
         assertTrue(factory.isComplianceImplementationApproved(address(complianceImplementation)));
     }
 
     function test_disableComplianceImplementationClearsApproval() public {
         vm.startPrank(admin);
-        factory.registerComplianceImplementation(
-            address(complianceImplementation), type(IComplianceModule).interfaceId
-        );
+        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
         factory.disableComplianceImplementation(address(complianceImplementation));
         vm.stopPrank();
 
@@ -52,8 +45,6 @@ contract BondFactoryComplianceRegistryTest is Test {
     function test_revertWhenNonAdminRegistersImplementation() public {
         vm.prank(other);
         vm.expectRevert();
-        factory.registerComplianceImplementation(
-            address(complianceImplementation), type(IComplianceModule).interfaceId
-        );
+        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
     }
 }

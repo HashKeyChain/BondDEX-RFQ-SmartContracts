@@ -2,9 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {
-    ERC1967Proxy
-} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {Order, OrderSide} from "../../src/types/BondTypes.sol";
@@ -34,8 +32,7 @@ contract RFQSettlementDomainForkTest is Test {
         RFQSettlement settlement = RFQSettlement(
             address(
                 new ERC1967Proxy(
-                    address(implementation),
-                    abi.encodeCall(RFQSettlement.initialize, (address(this), 1_000))
+                    address(implementation), abi.encodeCall(RFQSettlement.initialize, (address(this), 1_000))
                 )
             )
         );

@@ -25,10 +25,7 @@ contract ComplianceModulePolicyAdminTest is Test {
     );
 
     event PolicyMetadataUpdated(
-        address indexed bondToken,
-        address indexed complianceModule,
-        bytes32 policyId,
-        uint256 policyVersion
+        address indexed bondToken, address indexed complianceModule, bytes32 policyId, uint256 policyVersion
     );
 
     address internal admin = makeAddr("admin");

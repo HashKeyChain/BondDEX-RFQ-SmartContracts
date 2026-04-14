@@ -2,25 +2,14 @@
 pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {
-    BondIssuanceRedemptionFixtures
-} from "../helpers/BondIssuanceRedemptionFixtures.sol";
+import {BondIssuanceRedemptionFixtures} from "../helpers/BondIssuanceRedemptionFixtures.sol";
 import {BondToken} from "../../src/BondToken.sol";
 import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
-import {
-    ERC1967Proxy
-} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {BondCategory, CouponFrequency, DayCount, Role} from "../../src/types/BondTypes.sol";
 
-contract BondIssuanceRescueAndRedemptionIsolationTest is
-    BondIssuanceRedemptionFixtures
-{
-    event TokensRescued(
-        address indexed token,
-        address indexed to,
-        uint256 amount,
-        address indexed operator
-    );
+contract BondIssuanceRescueAndRedemptionIsolationTest is BondIssuanceRedemptionFixtures {
+    event TokensRescued(address indexed token, address indexed to, uint256 amount, address indexed operator);
 
     function setUp() public {
         deployRedemptionFixtures();
@@ -59,10 +48,7 @@ contract BondIssuanceRescueAndRedemptionIsolationTest is
             address(
                 new ERC1967Proxy(
                     address(complianceImplB),
-                    abi.encodeCall(
-                        ComplianceModule.initialize,
-                        (admin, factory, keccak256("policyB"), 1)
-                    )
+                    abi.encodeCall(ComplianceModule.initialize, (admin, factory, keccak256("policyB"), 1))
                 )
             )
         );
@@ -124,9 +110,7 @@ contract BondIssuanceRescueAndRedemptionIsolationTest is
         assertEq(bondToken.balanceOf(holder), 0);
 
         // bond B 的资金不受影响
-        (uint256 fundedB, uint256 claimedB, ) = issuance.getRedemptionState(
-            address(bondTokenB)
-        );
+        (uint256 fundedB, uint256 claimedB,) = issuance.getRedemptionState(address(bondTokenB));
         assertEq(fundedB, 25_061_643_800);
         assertEq(claimedB, 0);
 
@@ -141,11 +125,7 @@ contract BondIssuanceRescueAndRedemptionIsolationTest is
 
     // ─── 多存后自动释放超额负债（所有 bond 赎回后） ─────────────
 
-    event ExcessRedemptionReleased(
-        address indexed bondToken,
-        address indexed settlementToken,
-        uint256 excessAmount
-    );
+    event ExcessRedemptionReleased(address indexed bondToken, address indexed settlementToken, uint256 excessAmount);
 
     function test_excessLiabilityAutoReleasedAfterAllClaims() public {
         uint256 exactPayout = 100_301_369_800;

@@ -55,18 +55,10 @@ error SubscriptionNotActive(bytes32 offerId);
 error SubscriptionWindowClosed(bytes32 offerId, uint256 currentTimestamp);
 
 /// @notice Thrown when a subscription request exceeds remaining offer capacity.
-error SubscriptionCapExceeded(
-    bytes32 offerId,
-    uint256 requestedUnits,
-    uint256 remainingUnits
-);
+error SubscriptionCapExceeded(bytes32 offerId, uint256 requestedUnits, uint256 remainingUnits);
 
 /// @notice Thrown when an account does not hold the compliance role required for an action.
-error InvalidParticipantRole(
-    address account,
-    Role requiredRole,
-    Role actualRole
-);
+error InvalidParticipantRole(address account, Role requiredRole, Role actualRole);
 
 /// @notice Thrown when an account is not present in the active whitelist.
 error NotWhitelisted(address account);
@@ -75,21 +67,13 @@ error NotWhitelisted(address account);
 error NotYetImplemented();
 
 /// @notice Thrown when a redemption claim is attempted before bond maturity.
-error BondNotMatured(
-    address bondToken,
-    uint256 maturityTimestamp,
-    uint256 currentTimestamp
-);
+error BondNotMatured(address bondToken, uint256 maturityTimestamp, uint256 currentTimestamp);
 
 /// @notice Thrown when a holder has no redeemable bond balance.
 error NoClaimableBalance(address holder, address bondToken);
 
 /// @notice Thrown when available redemption funding is lower than the required payout.
-error InsufficientRedemptionFunding(
-    address bondToken,
-    uint256 availableAmount,
-    uint256 requiredAmount
-);
+error InsufficientRedemptionFunding(address bondToken, uint256 availableAmount, uint256 requiredAmount);
 
 /// @notice Thrown when a caller is neither the holder nor the configured claim delegate.
 error UnauthorizedClaimCaller(address caller, address holder, address delegate);
@@ -104,11 +88,7 @@ error OrderAlreadyConsumed(bytes32 orderHash);
 error OrderAlreadyCancelled(bytes32 orderHash);
 
 /// @notice Thrown when an order nonce is below the maker's current nonce floor.
-error InvalidOrderNonce(
-    address maker,
-    uint256 providedNonce,
-    uint256 minimumValidNonce
-);
+error InvalidOrderNonce(address maker, uint256 providedNonce, uint256 minimumValidNonce);
 
 /// @notice Thrown when an order is bound to a different taker than the caller.
 error InvalidOrderTaker(address expectedTaker, address actualCaller);
@@ -135,24 +115,13 @@ error InvestorToInvestorRestricted(address partyA, address partyB);
 error UnauthorizedIssuer(address caller, address expectedIssuer);
 
 /// @notice Thrown when the subscription approval record is not in the expected state.
-error SubscriptionApprovalNotActive(
-    bytes32 approvalId,
-    ApprovalStatus currentStatus
-);
+error SubscriptionApprovalNotActive(bytes32 approvalId, ApprovalStatus currentStatus);
 
 /// @notice Thrown when the subscription terms exceed the approved maxUnits cap.
-error MaxUnitsExceedsApproval(
-    bytes32 approvalId,
-    uint256 requested,
-    uint256 approved
-);
+error MaxUnitsExceedsApproval(bytes32 approvalId, uint256 requested, uint256 approved);
 
 /// @notice Thrown when a rescue request exceeds the balance not locked by redemption liabilities.
-error InsufficientRescuableBalance(
-    address token,
-    uint256 rescuableAmount,
-    uint256 requestedAmount
-);
+error InsufficientRescuableBalance(address token, uint256 rescuableAmount, uint256 requestedAmount);
 
 /// @notice Thrown when a bond configuration parameter is invalid.
 error InvalidBondConfig(string reason);
@@ -167,18 +136,10 @@ error UnregisteredBondToken(address bondToken);
 error InvalidSubscriptionWindow(uint256 opensAt, uint256 closesAt);
 
 /// @notice Thrown when a subscription is attempted for a bond that has already matured.
-error BondAlreadyMatured(
-    address bondToken,
-    uint256 maturityTimestamp,
-    uint256 currentTimestamp
-);
+error BondAlreadyMatured(address bondToken, uint256 maturityTimestamp, uint256 currentTimestamp);
 
 /// @notice Thrown when the declared accrued interest deviates from the on-chain calculation beyond tolerance.
-error AccruedInterestMismatch(
-    uint256 declared,
-    uint256 expected,
-    uint256 tolerance
-);
+error AccruedInterestMismatch(uint256 declared, uint256 expected, uint256 tolerance);
 
 /// @notice Thrown when issueDate is not strictly before maturityTimestamp.
 error InvalidIssueDate(uint256 issueDate, uint256 maturityTimestamp);
@@ -196,7 +157,4 @@ error InvalidAiTolerance(uint256 provided, uint256 min, uint256 max);
 error SubscriptionWindowMissingCloseTime();
 
 /// @notice Thrown when a subscription window closing time is not in the future.
-error SubscriptionWindowAlreadyClosed(
-    uint256 closesAt,
-    uint256 currentTimestamp
-);
+error SubscriptionWindowAlreadyClosed(uint256 closesAt, uint256 currentTimestamp);

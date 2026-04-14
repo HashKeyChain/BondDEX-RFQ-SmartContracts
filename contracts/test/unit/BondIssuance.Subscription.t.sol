@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {
-    ERC1967Proxy
-} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {BondIssuance} from "../../src/BondIssuance.sol";
@@ -14,11 +12,7 @@ import {BondCategory, CouponFrequency, DayCount, Role, SubscriptionTerms} from "
 
 contract BondIssuanceSubscriptionTest is Test {
     event SettlementTokenPolicyUpdated(
-        address indexed token,
-        bool issuanceEnabled,
-        bool settlementEnabled,
-        bool redemptionEnabled,
-        address operator
+        address indexed token, bool issuanceEnabled, bool settlementEnabled, bool redemptionEnabled, address operator
     );
 
     event Subscribed(
@@ -46,12 +40,7 @@ contract BondIssuanceSubscriptionTest is Test {
 
         BondIssuance issuanceImplementation = new BondIssuance();
         issuance = BondIssuance(
-            address(
-                new ERC1967Proxy(
-                    address(issuanceImplementation),
-                    abi.encodeCall(BondIssuance.initialize, (admin))
-                )
-            )
+            address(new ERC1967Proxy(address(issuanceImplementation), abi.encodeCall(BondIssuance.initialize, (admin))))
         );
 
         ComplianceModule complianceImplementation = new ComplianceModule();
@@ -59,10 +48,7 @@ contract BondIssuanceSubscriptionTest is Test {
             address(
                 new ERC1967Proxy(
                     address(complianceImplementation),
-                    abi.encodeCall(
-                        ComplianceModule.initialize,
-                        (admin, factory, keccak256("policy"), 1)
-                    )
+                    abi.encodeCall(ComplianceModule.initialize, (admin, factory, keccak256("policy"), 1))
                 )
             )
         );
@@ -100,13 +86,7 @@ contract BondIssuanceSubscriptionTest is Test {
 
     function test_adminCanEnableSettlementTokenForIssuance() public {
         vm.expectEmit(true, false, false, true);
-        emit SettlementTokenPolicyUpdated(
-            address(usdc),
-            true,
-            false,
-            false,
-            admin
-        );
+        emit SettlementTokenPolicyUpdated(address(usdc), true, false, false, admin);
         vm.prank(admin);
         issuance.setSettlementTokenPolicy(address(usdc), true, false, false);
 
@@ -119,13 +99,7 @@ contract BondIssuanceSubscriptionTest is Test {
 
         bytes32 approvalId = keccak256("sub-approval-1");
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId,
-            issuer,
-            address(bondToken),
-            500e18,
-            0
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 500e18, 0);
 
         SubscriptionTerms memory terms = SubscriptionTerms({
             bondToken: address(bondToken),
@@ -145,14 +119,7 @@ contract BondIssuanceSubscriptionTest is Test {
 
         uint256 expectedCost = 105_000e6;
         vm.expectEmit(true, true, true, true);
-        emit Subscribed(
-            offerId,
-            address(bondToken),
-            maker,
-            address(usdc),
-            100e18,
-            expectedCost
-        );
+        emit Subscribed(offerId, address(bondToken), maker, address(usdc), 100e18, expectedCost);
         vm.prank(maker);
         issuance.subscribe(offerId, 100e18);
 
@@ -166,13 +133,7 @@ contract BondIssuanceSubscriptionTest is Test {
 
         bytes32 approvalId = keccak256("sub-approval-2");
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId,
-            issuer,
-            address(bondToken),
-            100e18,
-            0
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 100e18, 0);
 
         SubscriptionTerms memory terms = SubscriptionTerms({
             bondToken: address(bondToken),

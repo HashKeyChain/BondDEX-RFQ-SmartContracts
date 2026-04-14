@@ -8,11 +8,7 @@ import {PauseDomain} from "../types/BondTypes.sol";
 /// @notice Lightweight pause switch that lets each lifecycle domain be stopped independently.
 abstract contract DomainPausable {
     /// @notice Emitted when the paused state of one domain changes.
-    event PauseDomainUpdated(
-        PauseDomain indexed domain,
-        bool paused,
-        address indexed operator
-    );
+    event PauseDomainUpdated(PauseDomain indexed domain, bool paused, address indexed operator);
 
     /// @dev Pause state keyed by lifecycle domain.
     mapping(PauseDomain domain => bool paused) private _pausedDomains;
@@ -25,9 +21,7 @@ abstract contract DomainPausable {
     /// @notice Returns whether the domain is currently paused.
     /// @param domain Lifecycle domain to inspect.
     /// @return paused True when the domain is paused.
-    function isDomainPaused(
-        PauseDomain domain
-    ) public view virtual returns (bool) {
+    function isDomainPaused(PauseDomain domain) public view virtual returns (bool) {
         return _pausedDomains[domain];
     }
 

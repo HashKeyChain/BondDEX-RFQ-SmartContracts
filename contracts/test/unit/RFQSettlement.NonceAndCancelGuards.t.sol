@@ -41,17 +41,13 @@ contract RFQSettlementNonceAndCancelGuardsTest is RFQSettlementFixtures {
         settlement.incrementNonce();
 
         vm.prank(maker);
-        vm.expectRevert(
-            abi.encodeWithSelector(InvalidOrderNonce.selector, maker, 1, 2)
-        );
+        vm.expectRevert(abi.encodeWithSelector(InvalidOrderNonce.selector, maker, 1, 2));
         settlement.setMinimumNonce(1);
     }
 
     function test_revertWhenSetMinimumNonceEqualToCurrent() public {
         vm.prank(maker);
-        vm.expectRevert(
-            abi.encodeWithSelector(InvalidOrderNonce.selector, maker, 0, 1)
-        );
+        vm.expectRevert(abi.encodeWithSelector(InvalidOrderNonce.selector, maker, 0, 1));
         settlement.setMinimumNonce(0);
     }
 

@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {
-    ApprovalStatus,
-    PauseDomain,
-    SubscriptionTerms
-} from "../types/BondTypes.sol";
+import {ApprovalStatus, PauseDomain, SubscriptionTerms} from "../types/BondTypes.sol";
 
 /// @title IBondIssuance
 /// @notice Interface for primary-market subscription management and post-maturity redemption flows.
@@ -36,10 +32,7 @@ interface IBondIssuance {
     /// @param terms Subscription configuration payload.
     /// @param approvalId Subscription approval identifier to consume.
     /// @return offerId Created subscription offer identifier.
-    function createSubscription(
-        SubscriptionTerms calldata terms,
-        bytes32 approvalId
-    ) external returns (bytes32 offerId);
+    function createSubscription(SubscriptionTerms calldata terms, bytes32 approvalId) external returns (bytes32 offerId);
 
     /// @dev Closes one subscription offer so it cannot accept further fills.
     /// @param offerId Subscription offer identifier.
@@ -95,9 +88,7 @@ interface IBondIssuance {
     /// @return opensAt Opening timestamp.
     /// @return closesAt Closing timestamp.
     /// @return status Offer status enum value.
-    function getSubscription(
-        bytes32 offerId
-    )
+    function getSubscription(bytes32 offerId)
         external
         view
         returns (
@@ -121,39 +112,25 @@ interface IBondIssuance {
     /// @return fundedAmount Total deposited amount.
     /// @return claimedAmount Total claimed amount.
     /// @return lastFundingAt Latest deposit timestamp.
-    function getRedemptionState(
-        address bondToken
-    )
+    function getRedemptionState(address bondToken)
         external
         view
-        returns (
-            uint256 fundedAmount,
-            uint256 claimedAmount,
-            uint256 lastFundingAt
-        );
+        returns (uint256 fundedAmount, uint256 claimedAmount, uint256 lastFundingAt);
 
     /// @dev Returns whether one token is enabled in any issuance-controlled flow.
     /// @param token Settlement token address.
     /// @return enabled True when the token is enabled for at least one flow.
-    function isSettlementTokenEnabled(
-        address token
-    ) external view returns (bool);
+    function isSettlementTokenEnabled(address token) external view returns (bool);
 
     /// @dev Returns the per-phase policy flags for one settlement token.
     /// @param token Settlement token address.
     /// @return issuanceEnabled True when the token may be used for subscriptions.
     /// @return settlementEnabled True when the token may be used for secondary settlement.
     /// @return redemptionEnabled True when the token may be used for redemption funding and payouts.
-    function getSettlementTokenPolicy(
-        address token
-    )
+    function getSettlementTokenPolicy(address token)
         external
         view
-        returns (
-            bool issuanceEnabled,
-            bool settlementEnabled,
-            bool redemptionEnabled
-        );
+        returns (bool issuanceEnabled, bool settlementEnabled, bool redemptionEnabled);
 
     /// @dev Allows the admin to recover tokens accidentally sent to this contract.
     /// Protects outstanding redemption liabilities across all bond series.
@@ -175,18 +152,10 @@ interface IBondIssuance {
     /// @return maxUnits Maximum bond units approved.
     /// @return expiresAt Expiry timestamp (0 = no expiry).
     /// @return status Approval lifecycle status.
-    function getSubscriptionApproval(
-        bytes32 approvalId
-    )
+    function getSubscriptionApproval(bytes32 approvalId)
         external
         view
-        returns (
-            address issuer,
-            address bondToken,
-            uint256 maxUnits,
-            uint256 expiresAt,
-            ApprovalStatus status
-        );
+        returns (address issuer, address bondToken, uint256 maxUnits, uint256 expiresAt, ApprovalStatus status);
 
     /// @dev Returns whether one domain is paused.
     /// @param domain Domain to inspect.

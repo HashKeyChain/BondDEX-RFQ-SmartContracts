@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {
-    ERC1967Proxy
-} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {BondIssuance} from "../../src/BondIssuance.sol";
@@ -44,24 +42,15 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         usdc = new MockERC20Decimals("Mock USDC", "mUSDC", 6);
 
         BondIssuance impl = new BondIssuance();
-        issuance = BondIssuance(
-            address(
-                new ERC1967Proxy(
-                    address(impl),
-                    abi.encodeCall(BondIssuance.initialize, (admin))
-                )
-            )
-        );
+        issuance =
+            BondIssuance(address(new ERC1967Proxy(address(impl), abi.encodeCall(BondIssuance.initialize, (admin)))));
 
         ComplianceModule complianceImpl = new ComplianceModule();
         module = ComplianceModule(
             address(
                 new ERC1967Proxy(
                     address(complianceImpl),
-                    abi.encodeCall(
-                        ComplianceModule.initialize,
-                        (admin, factory, keccak256("p"), 1)
-                    )
+                    abi.encodeCall(ComplianceModule.initialize, (admin, factory, keccak256("p"), 1))
                 )
             )
         );
@@ -132,9 +121,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         issuance.closeSubscription(offerId);
 
         vm.prank(issuer);
-        vm.expectRevert(
-            abi.encodeWithSelector(SubscriptionNotActive.selector, offerId)
-        );
+        vm.expectRevert(abi.encodeWithSelector(SubscriptionNotActive.selector, offerId));
         issuance.closeSubscription(offerId);
     }
 
@@ -144,15 +131,12 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         vm.prank(maker);
         issuance.subscribe(offerId, 10e18);
 
-        (, , , , uint256 soldUnits, , , uint8 status) = issuance
-            .getSubscription(offerId);
+        (,,,, uint256 soldUnits,,, uint8 status) = issuance.getSubscription(offerId);
         assertEq(soldUnits, 10e18);
         assertEq(status, uint8(SubscriptionStatus.CLOSED));
 
         vm.prank(issuer);
-        vm.expectRevert(
-            abi.encodeWithSelector(SubscriptionNotActive.selector, offerId)
-        );
+        vm.expectRevert(abi.encodeWithSelector(SubscriptionNotActive.selector, offerId));
         issuance.closeSubscription(offerId);
     }
 
@@ -162,21 +146,10 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         bytes32 approvalId = keccak256("test-approval");
 
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId,
-            issuer,
-            address(bondToken),
-            100e18,
-            block.timestamp + 1 days
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 100e18, block.timestamp + 1 days);
 
-        (
-            address approvedIssuer,
-            address approvedBond,
-            uint256 maxUnits,
-            uint256 expiresAt,
-            ApprovalStatus status
-        ) = issuance.getSubscriptionApproval(approvalId);
+        (address approvedIssuer, address approvedBond, uint256 maxUnits, uint256 expiresAt, ApprovalStatus status) =
+            issuance.getSubscriptionApproval(approvalId);
 
         assertEq(approvedIssuer, issuer);
         assertEq(approvedBond, address(bondToken));
@@ -189,33 +162,19 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         bytes32 approvalId = keccak256("test-approval");
         vm.prank(issuer);
         vm.expectRevert();
-        issuance.approveSubscription(
-            approvalId,
-            issuer,
-            address(bondToken),
-            100e18,
-            0
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 100e18, 0);
     }
 
     function test_revokeSubscriptionApprovalSucceeds() public {
         bytes32 approvalId = keccak256("test-revoke");
 
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId,
-            issuer,
-            address(bondToken),
-            100e18,
-            0
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 100e18, 0);
 
         vm.prank(admin);
         issuance.revokeSubscriptionApproval(approvalId);
 
-        (, , , , ApprovalStatus status) = issuance.getSubscriptionApproval(
-            approvalId
-        );
+        (,,,, ApprovalStatus status) = issuance.getSubscriptionApproval(approvalId);
         assertEq(uint8(status), uint8(ApprovalStatus.REVOKED));
     }
 
@@ -241,13 +200,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         bytes32 approvalId = keccak256("small-approval");
 
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId,
-            issuer,
-            address(bondToken),
-            50e18,
-            0
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 50e18, 0);
 
         SubscriptionTerms memory terms = SubscriptionTerms({
             bondToken: address(bondToken),
@@ -259,14 +212,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         });
 
         vm.prank(issuer);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                MaxUnitsExceedsApproval.selector,
-                approvalId,
-                100e18,
-                50e18
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(MaxUnitsExceedsApproval.selector, approvalId, 100e18, 50e18));
         issuance.createSubscription(terms, approvalId);
     }
 
@@ -274,13 +220,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         bytes32 approvalId = keccak256("revoked-approval");
 
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId,
-            issuer,
-            address(bondToken),
-            100e18,
-            0
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 100e18, 0);
         vm.prank(admin);
         issuance.revokeSubscriptionApproval(approvalId);
 
@@ -295,11 +235,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
 
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                SubscriptionApprovalNotActive.selector,
-                approvalId,
-                ApprovalStatus.REVOKED
-            )
+            abi.encodeWithSelector(SubscriptionApprovalNotActive.selector, approvalId, ApprovalStatus.REVOKED)
         );
         issuance.createSubscription(terms, approvalId);
     }
@@ -308,13 +244,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         bytes32 approvalId = keccak256("expired-approval");
 
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId,
-            issuer,
-            address(bondToken),
-            100e18,
-            block.timestamp + 1 hours
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 100e18, block.timestamp + 1 hours);
 
         vm.warp(block.timestamp + 2 hours);
 
@@ -336,13 +266,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         bytes32 approvalId = keccak256("consumed-approval");
 
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId,
-            issuer,
-            address(bondToken),
-            100e18,
-            0
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 100e18, 0);
 
         SubscriptionTerms memory terms = SubscriptionTerms({
             bondToken: address(bondToken),
@@ -358,11 +282,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
 
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                SubscriptionApprovalNotActive.selector,
-                approvalId,
-                ApprovalStatus.CONSUMED
-            )
+            abi.encodeWithSelector(SubscriptionApprovalNotActive.selector, approvalId, ApprovalStatus.CONSUMED)
         );
         issuance.createSubscription(terms, approvalId);
     }
@@ -373,15 +293,13 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         bytes32 approvalId = keccak256("expirable-sub");
 
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId, issuer, address(bondToken), 100e18, block.timestamp + 1 hours
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 100e18, block.timestamp + 1 hours);
 
         vm.warp(block.timestamp + 2 hours);
 
         issuance.markSubscriptionExpired(approvalId);
 
-        (, , , , ApprovalStatus status) = issuance.getSubscriptionApproval(approvalId);
+        (,,,, ApprovalStatus status) = issuance.getSubscriptionApproval(approvalId);
         assertEq(uint8(status), uint8(ApprovalStatus.EXPIRED));
     }
 
@@ -393,9 +311,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
     function test_revertWhenMarkSubExpiredNotYetExpired() public {
         bytes32 approvalId = keccak256("not-yet-sub");
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId, issuer, address(bondToken), 100e18, block.timestamp + 1 days
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 100e18, block.timestamp + 1 days);
 
         vm.expectRevert();
         issuance.markSubscriptionExpired(approvalId);
@@ -404,9 +320,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
     function test_revertWhenMarkSubExpiredOnNoExpiry() public {
         bytes32 approvalId = keccak256("no-expiry-sub");
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId, issuer, address(bondToken), 100e18, 0
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 100e18, 0);
 
         vm.expectRevert();
         issuance.markSubscriptionExpired(approvalId);
@@ -415,9 +329,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
     function test_revertWhenMarkSubExpiredOnRevoked() public {
         bytes32 approvalId = keccak256("revoked-sub-mark");
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId, issuer, address(bondToken), 100e18, block.timestamp + 1 hours
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), 100e18, block.timestamp + 1 hours);
         vm.prank(admin);
         issuance.revokeSubscriptionApproval(approvalId);
 
@@ -433,13 +345,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         bytes32 approvalId = bytes32(++_nextApprovalId);
 
         vm.prank(admin);
-        issuance.approveSubscription(
-            approvalId,
-            issuer,
-            address(bondToken),
-            maxUnits,
-            0
-        );
+        issuance.approveSubscription(approvalId, issuer, address(bondToken), maxUnits, 0);
 
         SubscriptionTerms memory terms = SubscriptionTerms({
             bondToken: address(bondToken),

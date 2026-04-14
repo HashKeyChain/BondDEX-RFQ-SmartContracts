@@ -14,11 +14,7 @@ abstract contract DeployJsonWriter is BaseConfig {
 
     // ─── 写入 ────────────────────────────────────────────────────
 
-    function _writeOutput(
-        DeployConfig memory cfg,
-        DeployResult memory r,
-        TokenPolicy[] memory tokens
-    ) internal {
+    function _writeOutput(DeployConfig memory cfg, DeployResult memory r, TokenPolicy[] memory tokens) internal {
         string memory json = string.concat(
             _jsonHeader(),
             _jsonMeta(cfg),
@@ -28,23 +24,16 @@ abstract contract DeployJsonWriter is BaseConfig {
             _jsonHandoff(cfg),
             "}\n"
         );
-        string memory filePath = string.concat(
-            DEPLOYMENTS_ROOT,
-            "/",
-            block.chainid.toString(),
-            ".json"
-        );
+        string memory filePath = string.concat(DEPLOYMENTS_ROOT, "/", block.chainid.toString(), ".json");
         vm.writeFile(filePath, json);
     }
 
     // ─── 日志 ────────────────────────────────────────────────────
 
-    function _logResult(
-        string memory env,
-        DeployConfig memory cfg,
-        DeployResult memory r,
-        TokenPolicy[] memory tokens
-    ) internal pure {
+    function _logResult(string memory env, DeployConfig memory cfg, DeployResult memory r, TokenPolicy[] memory tokens)
+        internal
+        pure
+    {
         console2.log(string.concat("\n[", env, "] Full deployment complete"));
         console2.log("  BondFactory:       ", r.bondFactory);
         console2.log("  BondIssuance:      ", r.bondIssuance);
@@ -62,181 +51,148 @@ abstract contract DeployJsonWriter is BaseConfig {
     // ─── JSON 片段 ───────────────────────────────────────────────
 
     function _jsonHeader() internal view returns (string memory) {
+        return string.concat(
+            "{\n",
+            '  "version": "',
+            RELEASE_VERSION,
+            '",\n',
+            '  "chainId": ',
+            block.chainid.toString(),
+            ",\n",
+            '  "network": "',
+            _envName(block.chainid),
+            '",\n',
+            '  "deployedAt": ',
+            block.timestamp.toString(),
+            ",\n",
+            '  "blockNumber": ',
+            block.number.toString(),
+            ",\n"
+        );
+    }
+
+    function _jsonMeta(DeployConfig memory cfg) internal pure returns (string memory) {
         return
             string.concat(
-                "{\n",
-                '  "version": "',
-                RELEASE_VERSION,
-                '",\n',
-                '  "chainId": ',
-                block.chainid.toString(),
-                ",\n",
-                '  "network": "',
-                _envName(block.chainid),
-                '",\n',
-                '  "deployedAt": ',
-                block.timestamp.toString(),
-                ",\n",
-                '  "blockNumber": ',
-                block.number.toString(),
-                ",\n"
+                '  "deployer": ', _qa(cfg.deployer), ",\n", '  "platformAdmin": ', _qa(cfg.platformAdmin), ",\n"
             );
     }
 
-    function _jsonMeta(
-        DeployConfig memory cfg
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                '  "deployer": ',
-                _qa(cfg.deployer),
-                ",\n",
-                '  "platformAdmin": ',
-                _qa(cfg.platformAdmin),
-                ",\n"
-            );
+    function _jsonContracts(DeployResult memory r) internal pure returns (string memory) {
+        return string.concat(
+            '  "contracts": {\n',
+            '    "bondFactory": ',
+            _qa(r.bondFactory),
+            ",\n",
+            '    "bondIssuance": ',
+            _qa(r.bondIssuance),
+            ",\n",
+            _jsonContractsImpl(r),
+            "  },\n"
+        );
     }
 
-    function _jsonContracts(
-        DeployResult memory r
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                '  "contracts": {\n',
-                '    "bondFactory": ',
-                _qa(r.bondFactory),
-                ",\n",
-                '    "bondIssuance": ',
-                _qa(r.bondIssuance),
-                ",\n",
-                _jsonContractsImpl(r),
-                "  },\n"
-            );
+    function _jsonContractsImpl(DeployResult memory r) internal pure returns (string memory) {
+        return string.concat(
+            '    "bondIssuanceImplementation": ',
+            _qa(r.bondIssuanceImpl),
+            ",\n",
+            '    "rfqSettlement": ',
+            _qa(r.rfqSettlement),
+            ",\n",
+            '    "rfqSettlementImplementation": ',
+            _qa(r.rfqSettlementImpl),
+            ",\n",
+            '    "complianceImplementation": ',
+            _qa(r.complianceImpl),
+            "\n"
+        );
     }
 
-    function _jsonContractsImpl(
-        DeployResult memory r
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                '    "bondIssuanceImplementation": ',
-                _qa(r.bondIssuanceImpl),
-                ",\n",
-                '    "rfqSettlement": ',
-                _qa(r.rfqSettlement),
-                ",\n",
-                '    "rfqSettlementImplementation": ',
-                _qa(r.rfqSettlementImpl),
-                ",\n",
-                '    "complianceImplementation": ',
-                _qa(r.complianceImpl),
-                "\n"
-            );
+    function _jsonConfig(DeployConfig memory cfg, DeployResult memory r, TokenPolicy[] memory tokens)
+        internal
+        view
+        returns (string memory)
+    {
+        uint256 aiTolerance = RFQSettlement(r.rfqSettlement).aiToleranceSeconds();
+        return string.concat(
+            '  "configuration": {\n',
+            _jsonTokenPolicies(tokens),
+            _jsonFeeConfig(cfg),
+            '    "aiToleranceSeconds": ',
+            aiTolerance.toString(),
+            ",\n",
+            '    "complianceImplementationRegistered": true\n',
+            "  },\n"
+        );
     }
 
-    function _jsonConfig(
-        DeployConfig memory cfg,
-        DeployResult memory r,
-        TokenPolicy[] memory tokens
-    ) internal view returns (string memory) {
-        uint256 aiTolerance = RFQSettlement(r.rfqSettlement)
-            .aiToleranceSeconds();
-        return
-            string.concat(
-                '  "configuration": {\n',
-                _jsonTokenPolicies(tokens),
-                _jsonFeeConfig(cfg),
-                '    "aiToleranceSeconds": ',
-                aiTolerance.toString(),
-                ",\n",
-                '    "complianceImplementationRegistered": true\n',
-                "  },\n"
-            );
-    }
-
-    function _jsonTokenPolicies(
-        TokenPolicy[] memory tokens
-    ) internal pure returns (string memory) {
+    function _jsonTokenPolicies(TokenPolicy[] memory tokens) internal pure returns (string memory) {
         string memory items = "";
         for (uint256 i = 0; i < tokens.length; i++) {
             if (i > 0) items = string.concat(items, ",\n");
             items = string.concat(items, _jsonSingleToken(tokens[i]));
         }
-        return
-            string.concat('    "settlementTokens": [\n', items, "\n    ],\n");
+        return string.concat('    "settlementTokens": [\n', items, "\n    ],\n");
     }
 
-    function _jsonSingleToken(
-        TokenPolicy memory t
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                "      {\n",
-                '        "token": ',
-                _qa(t.token),
-                ",\n",
-                _jsonSingleTokenPolicy(t),
-                '        "rfqSettlementEnabled": ',
-                _bs(t.rfqSettlementEnabled),
-                "\n",
-                "      }"
-            );
+    function _jsonSingleToken(TokenPolicy memory t) internal pure returns (string memory) {
+        return string.concat(
+            "      {\n",
+            '        "token": ',
+            _qa(t.token),
+            ",\n",
+            _jsonSingleTokenPolicy(t),
+            '        "rfqSettlementEnabled": ',
+            _bs(t.rfqSettlementEnabled),
+            "\n",
+            "      }"
+        );
     }
 
-    function _jsonSingleTokenPolicy(
-        TokenPolicy memory t
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                '        "bondIssuancePolicy": {\n',
-                '          "issuanceEnabled": ',
-                _bs(t.issuanceEnabled),
-                ",\n",
-                '          "settlementEnabled": ',
-                _bs(t.settlementEnabled),
-                ",\n",
-                '          "redemptionEnabled": ',
-                _bs(t.redemptionEnabled),
-                "\n",
-                "        },\n"
-            );
+    function _jsonSingleTokenPolicy(TokenPolicy memory t) internal pure returns (string memory) {
+        return string.concat(
+            '        "bondIssuancePolicy": {\n',
+            '          "issuanceEnabled": ',
+            _bs(t.issuanceEnabled),
+            ",\n",
+            '          "settlementEnabled": ',
+            _bs(t.settlementEnabled),
+            ",\n",
+            '          "redemptionEnabled": ',
+            _bs(t.redemptionEnabled),
+            "\n",
+            "        },\n"
+        );
     }
 
-    function _jsonFeeConfig(
-        DeployConfig memory cfg
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                '    "feeConfig": {\n',
-                '      "feeRecipient": ',
-                _qa(cfg.feeRecipient),
-                ",\n",
-                '      "currentFeeBps": ',
-                uint256(cfg.currentFeeBps).toString(),
-                ",\n",
-                '      "maxFeeBps": ',
-                uint256(cfg.maxFeeBps).toString(),
-                "\n",
-                "    },\n"
-            );
+    function _jsonFeeConfig(DeployConfig memory cfg) internal pure returns (string memory) {
+        return string.concat(
+            '    "feeConfig": {\n',
+            '      "feeRecipient": ',
+            _qa(cfg.feeRecipient),
+            ",\n",
+            '      "currentFeeBps": ',
+            uint256(cfg.currentFeeBps).toString(),
+            ",\n",
+            '      "maxFeeBps": ',
+            uint256(cfg.maxFeeBps).toString(),
+            "\n",
+            "    },\n"
+        );
     }
 
-    function _jsonRoles(
-        DeployConfig memory cfg
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                '  "roles": {\n',
-                _jsonFactoryRolesOut(cfg),
-                _jsonIssuanceRolesOut(cfg),
-                _jsonSettlementRolesOut(cfg),
-                "  },\n"
-            );
+    function _jsonRoles(DeployConfig memory cfg) internal pure returns (string memory) {
+        return string.concat(
+            '  "roles": {\n',
+            _jsonFactoryRolesOut(cfg),
+            _jsonIssuanceRolesOut(cfg),
+            _jsonSettlementRolesOut(cfg),
+            "  },\n"
+        );
     }
 
-    function _jsonFactoryRolesOut(
-        DeployConfig memory cfg
-    ) internal pure returns (string memory) {
+    function _jsonFactoryRolesOut(DeployConfig memory cfg) internal pure returns (string memory) {
         string memory adminNote = cfg.platformAdmin != cfg.factoryAdmin
             ? string.concat(
                 '      "DEFAULT_ADMIN_ROLE_NOTE": "platformAdmin ',
@@ -244,87 +200,77 @@ abstract contract DeployJsonWriter is BaseConfig {
                 ' also holds DEFAULT_ADMIN_ROLE via setPlatformAdmin side-effect",\n'
             )
             : "";
-        return
-            string.concat(
-                '    "bondFactory": {\n',
-                '      "DEFAULT_ADMIN_ROLE": ',
-                _qa(cfg.factoryAdmin),
-                ",\n",
-                adminNote,
-                '      "ISSUANCE_APPROVER_ROLE": ',
-                _qa(cfg.factoryIssuanceApprover),
-                ",\n",
-                '      "COMPLIANCE_ADMIN_ROLE": ',
-                _qa(cfg.factoryComplianceAdmin),
-                ",\n",
-                '      "PAUSER_ROLE": ',
-                _qa(cfg.factoryPauser),
-                "\n",
-                "    },\n"
-            );
+        return string.concat(
+            '    "bondFactory": {\n',
+            '      "DEFAULT_ADMIN_ROLE": ',
+            _qa(cfg.factoryAdmin),
+            ",\n",
+            adminNote,
+            '      "ISSUANCE_APPROVER_ROLE": ',
+            _qa(cfg.factoryIssuanceApprover),
+            ",\n",
+            '      "COMPLIANCE_ADMIN_ROLE": ',
+            _qa(cfg.factoryComplianceAdmin),
+            ",\n",
+            '      "PAUSER_ROLE": ',
+            _qa(cfg.factoryPauser),
+            "\n",
+            "    },\n"
+        );
     }
 
-    function _jsonIssuanceRolesOut(
-        DeployConfig memory cfg
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                '    "bondIssuance": {\n',
-                '      "DEFAULT_ADMIN_ROLE": ',
-                _qa(cfg.issuanceAdmin),
-                ",\n",
-                '      "ISSUANCE_APPROVER_ROLE": ',
-                _qa(cfg.issuanceIssuanceApprover),
-                ",\n",
-                '      "SETTLEMENT_ADMIN_ROLE": ',
-                _qa(cfg.issuanceSettlementAdmin),
-                ",\n",
-                '      "PAUSER_ROLE": ',
-                _qa(cfg.issuancePauser),
-                ",\n",
-                '      "UPGRADER_ROLE": ',
-                _qa(cfg.issuanceUpgrader),
-                "\n",
-                "    },\n"
-            );
+    function _jsonIssuanceRolesOut(DeployConfig memory cfg) internal pure returns (string memory) {
+        return string.concat(
+            '    "bondIssuance": {\n',
+            '      "DEFAULT_ADMIN_ROLE": ',
+            _qa(cfg.issuanceAdmin),
+            ",\n",
+            '      "ISSUANCE_APPROVER_ROLE": ',
+            _qa(cfg.issuanceIssuanceApprover),
+            ",\n",
+            '      "SETTLEMENT_ADMIN_ROLE": ',
+            _qa(cfg.issuanceSettlementAdmin),
+            ",\n",
+            '      "PAUSER_ROLE": ',
+            _qa(cfg.issuancePauser),
+            ",\n",
+            '      "UPGRADER_ROLE": ',
+            _qa(cfg.issuanceUpgrader),
+            "\n",
+            "    },\n"
+        );
     }
 
-    function _jsonSettlementRolesOut(
-        DeployConfig memory cfg
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                '    "rfqSettlement": {\n',
-                '      "DEFAULT_ADMIN_ROLE": ',
-                _qa(cfg.rfqAdmin),
-                ",\n",
-                '      "SETTLEMENT_ADMIN_ROLE": ',
-                _qa(cfg.rfqSettlementAdmin),
-                ",\n",
-                '      "PAUSER_ROLE": ',
-                _qa(cfg.rfqPauser),
-                ",\n",
-                '      "UPGRADER_ROLE": ',
-                _qa(cfg.rfqUpgrader),
-                "\n",
-                "    }\n"
-            );
+    function _jsonSettlementRolesOut(DeployConfig memory cfg) internal pure returns (string memory) {
+        return string.concat(
+            '    "rfqSettlement": {\n',
+            '      "DEFAULT_ADMIN_ROLE": ',
+            _qa(cfg.rfqAdmin),
+            ",\n",
+            '      "SETTLEMENT_ADMIN_ROLE": ',
+            _qa(cfg.rfqSettlementAdmin),
+            ",\n",
+            '      "PAUSER_ROLE": ',
+            _qa(cfg.rfqPauser),
+            ",\n",
+            '      "UPGRADER_ROLE": ',
+            _qa(cfg.rfqUpgrader),
+            "\n",
+            "    }\n"
+        );
     }
 
-    function _jsonHandoff(
-        DeployConfig memory cfg
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                '  "handoff": {\n',
-                '    "deployerRolesRevoked": ',
-                _bs(cfg.revokeDeployer),
-                ",\n",
-                '    "deployer": ',
-                _qa(cfg.deployer),
-                "\n",
-                "  }\n"
-            );
+    function _jsonHandoff(DeployConfig memory cfg) internal pure returns (string memory) {
+        return string.concat(
+            '  "handoff": {\n',
+            '    "deployerRolesRevoked": ',
+            _bs(cfg.revokeDeployer),
+            ",\n",
+            '    "deployer": ',
+            _qa(cfg.deployer),
+            "\n",
+            "  }\n"
+        );
     }
 
     // ─── 字符串工具 ──────────────────────────────────────────────

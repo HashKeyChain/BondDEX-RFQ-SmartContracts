@@ -7,16 +7,13 @@ import {ZeroAddress} from "../libraries/BondErrors.sol";
 /// @notice Shared role identifiers and address validation helpers for BondDEX control-plane contracts.
 abstract contract RoleManaged {
     /// @notice Role allowed to approve or revoke new bond issuance packets.
-    bytes32 internal constant ISSUANCE_APPROVER_ROLE =
-        keccak256("ISSUANCE_APPROVER_ROLE");
+    bytes32 internal constant ISSUANCE_APPROVER_ROLE = keccak256("ISSUANCE_APPROVER_ROLE");
 
     /// @notice Role allowed to manage compliance implementations and bond-level policy admins.
-    bytes32 internal constant COMPLIANCE_ADMIN_ROLE =
-        keccak256("COMPLIANCE_ADMIN_ROLE");
+    bytes32 internal constant COMPLIANCE_ADMIN_ROLE = keccak256("COMPLIANCE_ADMIN_ROLE");
 
     /// @notice Role allowed to manage settlement-token policy and fee configuration.
-    bytes32 internal constant SETTLEMENT_ADMIN_ROLE =
-        keccak256("SETTLEMENT_ADMIN_ROLE");
+    bytes32 internal constant SETTLEMENT_ADMIN_ROLE = keccak256("SETTLEMENT_ADMIN_ROLE");
 
     /// @notice Emergency role allowed to pause lifecycle domains.
     bytes32 internal constant PAUSER_ROLE = keccak256("PAUSER_ROLE");

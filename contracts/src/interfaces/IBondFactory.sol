@@ -31,10 +31,7 @@ interface IBondFactory {
     /// @dev Registers one compliance implementation that future bonds may instantiate.
     /// @param implementation Compliance implementation address.
     /// @param interfaceId ERC165 interface identifier expected from the implementation.
-    function registerComplianceImplementation(
-        address implementation,
-        bytes4 interfaceId
-    ) external;
+    function registerComplianceImplementation(address implementation, bytes4 interfaceId) external;
 
     /// @dev Disables one previously approved compliance implementation.
     /// @param implementation Compliance implementation address.
@@ -45,10 +42,9 @@ interface IBondFactory {
     /// @param approvalId Active issuance approval identifier.
     /// @return bondToken Deployed bond token address.
     /// @return complianceModule Deployed per-bond compliance module address.
-    function createBond(
-        BondConfig calldata config,
-        bytes32 approvalId
-    ) external returns (address bondToken, address complianceModule);
+    function createBond(BondConfig calldata config, bytes32 approvalId)
+        external
+        returns (address bondToken, address complianceModule);
 
     /// @dev Sets the paused state for one factory-controlled domain.
     /// @param domain Domain to update.
@@ -67,9 +63,7 @@ interface IBondFactory {
     /// @return status Current approval status.
     /// @return expiresAt Expiry timestamp.
     /// @return metadataHash Offchain issuance packet reference.
-    function getIssuanceApproval(
-        bytes32 approvalId
-    )
+    function getIssuanceApproval(bytes32 approvalId)
         external
         view
         returns (
@@ -83,15 +77,11 @@ interface IBondFactory {
     /// @dev Returns whether one compliance implementation is approved for bond creation.
     /// @param implementation Compliance implementation address.
     /// @return approved True when the implementation is approved.
-    function isComplianceImplementationApproved(
-        address implementation
-    ) external view returns (bool);
+    function isComplianceImplementationApproved(address implementation) external view returns (bool);
 
     /// @dev Returns the created bond token and compliance module addresses for one approval.
     /// @param approvalId Unique approval identifier.
     /// @return bondToken Deployed bond token address.
     /// @return complianceModule Deployed compliance module address.
-    function getBondAddresses(
-        bytes32 approvalId
-    ) external view returns (address bondToken, address complianceModule);
+    function getBondAddresses(bytes32 approvalId) external view returns (address bondToken, address complianceModule);
 }

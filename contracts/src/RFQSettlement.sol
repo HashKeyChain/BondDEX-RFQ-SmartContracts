@@ -2,29 +2,15 @@
 pragma solidity ^0.8.28;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {
-    MessageHashUtils
-} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {
-    IERC20Metadata
-} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {
-    SafeERC20
-} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {
-    ReentrancyGuardTransient
-} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
-import {
-    AccessControlUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {
-    Initializable
-} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {
-    UUPSUpgradeable
-} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import {DomainPausable} from "./abstracts/DomainPausable.sol";
 import {RoleManaged} from "./abstracts/RoleManaged.sol";
@@ -55,20 +41,11 @@ import {
 import {IComplianceModule} from "./interfaces/IComplianceModule.sol";
 import {IBondToken} from "./interfaces/IBondToken.sol";
 import {IRFQSettlement} from "./interfaces/IRFQSettlement.sol";
-import {
-    FeeConfig,
-    Order,
-    OrderSide,
-    PauseDomain,
-    Role
-} from "./types/BondTypes.sol";
+import {FeeConfig, Order, OrderSide, PauseDomain, Role} from "./types/BondTypes.sol";
 import {SettlementOrderEIP712} from "./libraries/SettlementOrderEIP712.sol";
 
 /// @title RFQSettlement
 /// @notice Secondary-market settlement engine for signed RFQ bond orders with accrued interest.
-/// @dev Makers sign EIP-712 orders off-chain and investors execute them on-chain. The contract
-/// validates signatures, nonce floors, allowlisted settlement tokens, compliance roles, fee policy,
-/// and accrued interest correctness.
 contract RFQSettlement is
     Initializable,
     AccessControlUpgradeable,
@@ -80,7 +57,6 @@ contract RFQSettlement is
 {
     using SafeERC20 for IERC20;
 
-    /// @notice Emitted when one RFQ order is executed successfully.
     event OrderFilled(
         bytes32 indexed orderHash,
         address indexed maker,
@@ -95,106 +71,49 @@ contract RFQSettlement is
         address feeRecipient
     );
 
-    /// @notice Emitted when a maker cancels one order payload.
-    event OrderCancelled(
-        bytes32 indexed orderHash,
-        address indexed maker,
-        address canceller
-    );
+    event OrderCancelled(bytes32 indexed orderHash, address indexed maker, address canceller);
 
-    /// @notice Emitted when a maker invalidates all older orders by raising the nonce floor.
     event NonceIncremented(address indexed maker, uint256 newMinimumValidNonce);
 
-    /// @notice Emitted when governance updates fee recipient or fee bounds.
     event FeeConfigUpdated(
-        address indexed feeRecipient,
-        address indexed operator,
-        uint16 currentFeeBps,
-        uint16 maxFeeBps
+        address indexed feeRecipient, address indexed operator, uint16 currentFeeBps, uint16 maxFeeBps
     );
 
-    /// @notice Emitted when governance enables or disables a quote token for RFQ settlement.
-    event SettlementTokenPolicyUpdated(
-        address indexed token,
-        bool enabled,
-        address operator
-    );
+    event SettlementTokenPolicyUpdated(address indexed token, bool enabled, address operator);
 
-    /// @notice Emitted when governance registers or unregisters a bond token for RFQ settlement.
-    event BondTokenRegistrationUpdated(
-        address indexed bondToken,
-        bool registered,
-        address operator
-    );
+    event BondTokenRegistrationUpdated(address indexed bondToken, bool registered, address operator);
 
-    /// @notice Emitted when governance updates the accrued interest tolerance window.
     event AiToleranceUpdated(uint256 newToleranceSeconds, address operator);
 
-    /// @notice Emitted when the admin rescues tokens accidentally sent to this contract.
-    event TokensRescued(
-        address indexed token,
-        address indexed to,
-        uint256 amount,
-        address indexed operator
-    );
+    event TokensRescued(address indexed token, address indexed to, uint256 amount, address indexed operator);
 
-    /// @notice Hard cap on the number of orders that may be settled atomically in one batch.
     uint256 internal constant MAX_BATCH_SIZE = 24;
-
-    /// @notice Default accrued interest tolerance window (5 minutes).
     uint256 internal constant DEFAULT_AI_TOLERANCE_SECONDS = 300;
-
-    /// @notice Minimum allowed accrued interest tolerance (10 seconds).
     uint256 internal constant MIN_AI_TOLERANCE_SECONDS = 10;
-
-    /// @notice Maximum allowed accrued interest tolerance (30 days).
     uint256 internal constant MAX_AI_TOLERANCE_SECONDS = 30 days;
 
-    /// @dev Active fee configuration applied to every executed order.
     FeeConfig private _feeConfig;
-
-    /// @dev Allowlist of quote tokens that may be used in RFQ settlement.
     mapping(address token => bool enabled) private _settlementTokenPolicies;
-
-    /// @dev Minimum valid nonce keyed by maker address.
     mapping(address maker => uint256 minimumValidNonce) private _nonceFloors;
-
-    /// @dev Tracks whether an order hash has already been executed.
     mapping(bytes32 orderHash => bool consumed) private _consumedOrders;
-
-    /// @dev Tracks whether an order hash has already been cancelled.
     mapping(bytes32 orderHash => bool cancelled) private _cancelledOrders;
-
-    /// @dev Registry of bond tokens allowed in RFQ orders, preventing fake-token attacks.
+    /// @dev Prevents fake-token attacks by restricting which bond tokens can be used.
     mapping(address bondToken => bool registered) private _registeredBondTokens;
-
-    /// @dev Tolerance window in seconds for accrued interest validation.
     uint256 private _aiToleranceSeconds;
-
-    /// @dev Cached EIP-712 domain separator computed at initialization.
     bytes32 private _cachedDomainSeparator;
-
-    /// @dev Chain ID recorded at initialization to detect forks.
     uint256 private _cachedChainId;
 
-    /// @dev Reserved storage gap for future proxy-safe upgrades.
     uint256[41] private __gap;
 
-    /// @dev Locks the implementation contract so only proxies may initialize it.
     constructor() {
         _disableInitializers();
     }
 
-    /// @dev Initializes admin, pauser, and upgrader roles together with the default fee policy.
     /// @param admin Default administrator address.
     /// @param maxFeeBps_ Fee cap in basis points, immutable after initialization.
     function initialize(address admin, uint16 maxFeeBps_) external initializer {
-        if (admin == address(0)) {
-            revert ZeroAddress();
-        }
-        if (maxFeeBps_ > 10_000) {
-            revert InvalidFeeConfig(0, maxFeeBps_);
-        }
+        if (admin == address(0)) revert ZeroAddress();
+        if (maxFeeBps_ > 10_000) revert InvalidFeeConfig(0, maxFeeBps_);
 
         __AccessControl_init();
 
@@ -203,49 +122,27 @@ contract RFQSettlement is
         _grantRole(PAUSER_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
 
-        _feeConfig = FeeConfig({
-            feeRecipient: admin,
-            currentFeeBps: 0,
-            maxFeeBps: maxFeeBps_
-        });
-
+        _feeConfig = FeeConfig({feeRecipient: admin, currentFeeBps: 0, maxFeeBps: maxFeeBps_});
         _aiToleranceSeconds = DEFAULT_AI_TOLERANCE_SECONDS;
-
         _cachedChainId = block.chainid;
-        _cachedDomainSeparator = SettlementOrderEIP712.domainSeparator(
-            address(this),
-            block.chainid
-        );
+        _cachedDomainSeparator = SettlementOrderEIP712.domainSeparator(address(this), block.chainid);
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Validates one signed order and executes the corresponding asset transfers.
-    function fillOrder(
-        Order calldata order,
-        bytes calldata signature
-    ) external nonReentrant {
+    function fillOrder(Order calldata order, bytes calldata signature) external nonReentrant {
         _requireDomainActive(PauseDomain.SETTLEMENT);
-
-        (bytes32 orderHash, bool isFeeExempt) = _validateOrder(
-            order,
-            signature,
-            msg.sender
-        );
+        (bytes32 orderHash, bool isFeeExempt) = _validateOrder(order, signature, msg.sender);
         _executeOrder(order, orderHash, msg.sender, isFeeExempt);
     }
 
     /// @inheritdoc IRFQSettlement
     /// @dev Validates all orders first so the batch settles atomically or reverts as a whole.
-    function batchFillOrders(
-        Order[] calldata orders,
-        bytes[] calldata signatures
-    ) external nonReentrant {
+    function batchFillOrders(Order[] calldata orders, bytes[] calldata signatures) external nonReentrant {
         _requireDomainActive(PauseDomain.SETTLEMENT);
 
         if (orders.length != signatures.length) {
             revert InvalidBatchLength(orders.length, signatures.length);
         }
-
         if (orders.length == 0 || orders.length > MAX_BATCH_SIZE) {
             revert InvalidBatchSize(orders.length, MAX_BATCH_SIZE);
         }
@@ -255,244 +152,155 @@ contract RFQSettlement is
         bool[] memory feeExemptions = new bool[](len);
 
         for (uint256 i = 0; i < len; i++) {
-            (orderHashes[i], feeExemptions[i]) = _validateOrder(
-                orders[i],
-                signatures[i],
-                msg.sender
-            );
+            (orderHashes[i], feeExemptions[i]) = _validateOrder(orders[i], signatures[i], msg.sender);
         }
-
         for (uint256 i = 0; i < len; i++) {
-            _executeOrder(
-                orders[i],
-                orderHashes[i],
-                msg.sender,
-                feeExemptions[i]
-            );
+            _executeOrder(orders[i], orderHashes[i], msg.sender, feeExemptions[i]);
         }
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Cancels one order so it can no longer be executed.
     function cancelOrder(Order calldata order) external {
         _cancelOrder(order, msg.sender);
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Cancels multiple orders for the caller.
     function batchCancelOrders(Order[] calldata orders) external {
         if (orders.length == 0 || orders.length > MAX_BATCH_SIZE) {
             revert InvalidBatchSize(orders.length, MAX_BATCH_SIZE);
         }
-
         for (uint256 i = 0; i < orders.length; i++) {
             _cancelOrder(orders[i], msg.sender);
         }
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Raises the maker nonce floor by one and invalidates all older signed orders.
     function incrementNonce() external {
         _nonceFloors[msg.sender] += 1;
         emit NonceIncremented(msg.sender, _nonceFloors[msg.sender]);
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Jumps the maker nonce floor to an arbitrary higher value, bulk-invalidating older orders.
     function setMinimumNonce(uint256 newMinNonce) external {
         uint256 current = _nonceFloors[msg.sender];
-        if (newMinNonce <= current) {
-            revert InvalidOrderNonce(msg.sender, newMinNonce, current + 1);
-        }
+        if (newMinNonce <= current) revert InvalidOrderNonce(msg.sender, newMinNonce, current + 1);
         _nonceFloors[msg.sender] = newMinNonce;
         emit NonceIncremented(msg.sender, newMinNonce);
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Updates fee recipient and current fee. maxFeeBps is immutable after initialization.
-    function setFeeConfig(
-        FeeConfig calldata config
-    ) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
-        if (config.feeRecipient == address(0)) {
-            revert ZeroAddress();
-        }
-
-        if (config.maxFeeBps != _feeConfig.maxFeeBps) {
-            revert FeeCapImmutable();
-        }
-
+    /// @dev maxFeeBps is immutable after initialization.
+    function setFeeConfig(FeeConfig calldata config) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
+        if (config.feeRecipient == address(0)) revert ZeroAddress();
+        if (config.maxFeeBps != _feeConfig.maxFeeBps) revert FeeCapImmutable();
         if (config.currentFeeBps > config.maxFeeBps) {
             revert InvalidFeeConfig(config.currentFeeBps, config.maxFeeBps);
         }
 
         _feeConfig = config;
-        emit FeeConfigUpdated(
-            config.feeRecipient,
-            msg.sender,
-            config.currentFeeBps,
-            config.maxFeeBps
-        );
+        emit FeeConfigUpdated(config.feeRecipient, msg.sender, config.currentFeeBps, config.maxFeeBps);
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Enables or disables one quote token for RFQ settlement.
-    function setSettlementTokenPolicy(
-        address token,
-        bool enabled
-    ) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
-        if (token == address(0)) {
-            revert ZeroAddress();
-        }
-
+    function setSettlementTokenPolicy(address token, bool enabled) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
+        if (token == address(0)) revert ZeroAddress();
         _settlementTokenPolicies[token] = enabled;
         emit SettlementTokenPolicyUpdated(token, enabled, msg.sender);
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Registers or unregisters a bond token for RFQ settlement.
-    function setBondTokenRegistration(
-        address bondToken,
-        bool registered
-    ) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
-        if (bondToken == address(0)) {
-            revert ZeroAddress();
-        }
-
+    function setBondTokenRegistration(address bondToken, bool registered) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
+        if (bondToken == address(0)) revert ZeroAddress();
         _registeredBondTokens[bondToken] = registered;
         emit BondTokenRegistrationUpdated(bondToken, registered, msg.sender);
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Updates the tolerance window for accrued interest validation.
-    function setAiToleranceSeconds(
-        uint256 toleranceSeconds
-    ) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
-        if (
-            toleranceSeconds < MIN_AI_TOLERANCE_SECONDS ||
-            toleranceSeconds > MAX_AI_TOLERANCE_SECONDS
-        ) {
-            revert InvalidAiTolerance(
-                toleranceSeconds,
-                MIN_AI_TOLERANCE_SECONDS,
-                MAX_AI_TOLERANCE_SECONDS
-            );
+    function setAiToleranceSeconds(uint256 toleranceSeconds) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
+        if (toleranceSeconds < MIN_AI_TOLERANCE_SECONDS || toleranceSeconds > MAX_AI_TOLERANCE_SECONDS) {
+            revert InvalidAiTolerance(toleranceSeconds, MIN_AI_TOLERANCE_SECONDS, MAX_AI_TOLERANCE_SECONDS);
         }
         _aiToleranceSeconds = toleranceSeconds;
         emit AiToleranceUpdated(toleranceSeconds, msg.sender);
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Returns whether a bond token is registered for RFQ settlement.
-    function isBondTokenRegistered(
-        address bondToken
-    ) public view returns (bool) {
+    function isBondTokenRegistered(address bondToken) public view returns (bool) {
         return _registeredBondTokens[bondToken];
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Toggles one settlement-controlled pause domain.
-    function pauseDomain(
-        PauseDomain domain,
-        bool paused
-    ) external onlyRole(PAUSER_ROLE) {
+    function pauseDomain(PauseDomain domain, bool paused) external onlyRole(PAUSER_ROLE) {
         _setDomainPaused(domain, paused);
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Exposes the EIP-712 digest that makers sign off-chain.
     function hashOrder(Order calldata order) external view returns (bytes32) {
         return _hashOrder(order);
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Returns whether the given order hash has already been consumed.
     function isOrderConsumed(bytes32 orderHash) external view returns (bool) {
         return _consumedOrders[orderHash];
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Returns whether the given order hash has already been cancelled.
     function isOrderCancelled(bytes32 orderHash) external view returns (bool) {
         return _cancelledOrders[orderHash];
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Returns the current minimum valid nonce for the maker.
     function currentNonce(address maker) external view returns (uint256) {
         return _nonceFloors[maker];
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Returns the currently active fee configuration.
     function feeConfig() external view returns (FeeConfig memory) {
         return _feeConfig;
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Returns the maximum number of orders allowed in one batch execution.
     function maxBatchSize() external pure returns (uint256) {
         return MAX_BATCH_SIZE;
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Returns whether the given quote token is enabled for settlement.
-    function isSettlementTokenEnabled(
-        address token
-    ) public view returns (bool) {
+    function isSettlementTokenEnabled(address token) public view returns (bool) {
         return _settlementTokenPolicies[token];
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Returns the current accrued interest tolerance in seconds.
     function aiToleranceSeconds() external view returns (uint256) {
         return _aiToleranceSeconds;
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Quotes the protocol fee for a trade between two parties on a given bond.
-    /// Returns 0 when both parties are market makers (fee-exempt).
-    /// The dirtyAmount should be quoteAmount + accruedInterest.
-    function quoteFee(
-        address bondToken,
-        address partyA,
-        address partyB,
-        uint256 dirtyAmount
-    ) external view returns (uint256 feeAmount) {
-        if (!isBondTokenRegistered(bondToken)) {
-            revert UnregisteredBondToken(bondToken);
-        }
+    /// @dev Returns 0 when both parties are market makers (fee-exempt).
+    function quoteFee(address bondToken, address partyA, address partyB, uint256 dirtyAmount)
+        external
+        view
+        returns (uint256 feeAmount)
+    {
+        if (!isBondTokenRegistered(bondToken)) revert UnregisteredBondToken(bondToken);
 
-        IComplianceModule complianceModule = IComplianceModule(
-            IBondToken(bondToken).complianceModule()
-        );
+        IComplianceModule complianceModule = IComplianceModule(IBondToken(bondToken).complianceModule());
         Role roleA = complianceModule.roleOf(partyA);
         Role roleB = complianceModule.roleOf(partyB);
 
-        if (roleA == Role.MARKET_MAKER && roleB == Role.MARKET_MAKER) {
-            return 0;
-        }
+        if (roleA == Role.MARKET_MAKER && roleB == Role.MARKET_MAKER) return 0;
         return _quoteFeeAmount(dirtyAmount);
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Allows the admin to recover tokens accidentally sent to this contract.
-    /// RFQSettlement never holds funds during normal operation, so no liability
-    /// protection is needed — the full balance is always rescuable.
-    function rescueTokens(
-        address token,
-        address to,
-        uint256 amount
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (token == address(0) || to == address(0)) {
-            revert ZeroAddress();
-        }
+    /// @dev RFQSettlement never holds funds, so full balance is always rescuable.
+    function rescueTokens(address token, address to, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (token == address(0) || to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
         IERC20(token).safeTransfer(to, amount);
         emit TokensRescued(token, to, amount, msg.sender);
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev EIP-5267 domain discovery for wallet and SDK interoperability.
     function eip712Domain()
         external
         view
@@ -518,219 +326,124 @@ contract RFQSettlement is
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Exposes inherited pause state for interface compliance and monitoring.
-    function isDomainPaused(
-        PauseDomain domain
-    ) public view override(DomainPausable, IRFQSettlement) returns (bool) {
+    function isDomainPaused(PauseDomain domain) public view override(DomainPausable, IRFQSettlement) returns (bool) {
         return super.isDomainPaused(domain);
     }
 
-    /// @dev Quotes protocol fee based on the dirty amount (quoteAmount + accruedInterest).
-    function _quoteFeeAmount(
-        uint256 dirtyAmount
-    ) internal view returns (uint256) {
+    function _quoteFeeAmount(uint256 dirtyAmount) internal view returns (uint256) {
         return BondMath.mulBps(dirtyAmount, _feeConfig.currentFeeBps);
     }
 
-    /// @dev Computes the EIP-712 typed-data digest for one order.
-    /// Uses the cached domain separator when the chain ID has not changed (fork safety).
+    /// @dev Uses cached domain separator; recomputes on chain fork.
     function _hashOrder(Order calldata order) internal view returns (bytes32) {
         bytes32 separator = block.chainid == _cachedChainId
             ? _cachedDomainSeparator
-            : SettlementOrderEIP712.domainSeparator(
-                address(this),
-                block.chainid
-            );
-
+            : SettlementOrderEIP712.domainSeparator(address(this), block.chainid);
         Order memory localOrder = order;
-        return
-            MessageHashUtils.toTypedDataHash(
-                separator,
-                SettlementOrderEIP712.hashOrder(localOrder)
-            );
+        return MessageHashUtils.toTypedDataHash(separator, SettlementOrderEIP712.hashOrder(localOrder));
     }
 
-    /// @dev Validates bond token registry, token policy, expiry, taker binding, nonce floor,
-    ///      signature, participant roles, and accrued interest.
     /// @return orderHash EIP-712 typed-data digest.
     /// @return isFeeExempt True when both maker and taker are market makers.
-    function _validateOrder(
-        Order calldata order,
-        bytes calldata signature,
-        address taker
-    ) internal view returns (bytes32 orderHash, bool isFeeExempt) {
-        if (order.bondAmount == 0 || order.quoteAmount == 0) {
-            revert ZeroAmount();
-        }
-
-        if (!isBondTokenRegistered(order.bondToken)) {
-            revert UnregisteredBondToken(order.bondToken);
-        }
+    function _validateOrder(Order calldata order, bytes calldata signature, address taker)
+        internal
+        view
+        returns (bytes32 orderHash, bool isFeeExempt)
+    {
+        if (order.bondAmount == 0 || order.quoteAmount == 0) revert ZeroAmount();
+        if (!isBondTokenRegistered(order.bondToken)) revert UnregisteredBondToken(order.bondToken);
 
         {
             uint256 maturity = IBondToken(order.bondToken).maturityTimestamp();
             if (block.timestamp >= maturity) {
-                revert BondAlreadyMatured(
-                    order.bondToken,
-                    maturity,
-                    block.timestamp
-                );
+                revert BondAlreadyMatured(order.bondToken, maturity, block.timestamp);
             }
         }
 
         if (!isSettlementTokenEnabled(order.quoteToken)) {
             revert UnsupportedSettlementToken(order.quoteToken);
         }
-
-        if (order.expiry <= block.timestamp) {
-            revert ExpiredDeadline(order.expiry, block.timestamp);
-        }
-
+        if (order.expiry <= block.timestamp) revert ExpiredDeadline(order.expiry, block.timestamp);
         if (order.taker != address(0) && order.taker != taker) {
             revert InvalidOrderTaker(order.taker, taker);
         }
 
         orderHash = _hashOrder(order);
-
-        if (_consumedOrders[orderHash]) {
-            revert OrderAlreadyConsumed(orderHash);
-        }
-
-        if (_cancelledOrders[orderHash]) {
-            revert OrderAlreadyCancelled(orderHash);
-        }
+        if (_consumedOrders[orderHash]) revert OrderAlreadyConsumed(orderHash);
+        if (_cancelledOrders[orderHash]) revert OrderAlreadyCancelled(orderHash);
 
         uint256 minimumValidNonce = _nonceFloors[order.maker];
         if (order.nonce < minimumValidNonce) {
-            revert InvalidOrderNonce(
-                order.maker,
-                order.nonce,
-                minimumValidNonce
-            );
+            revert InvalidOrderNonce(order.maker, order.nonce, minimumValidNonce);
         }
 
         address signer = ECDSA.recover(orderHash, signature);
-        if (signer != order.maker) {
-            revert InvalidSignature(order.maker, signer);
-        }
+        if (signer != order.maker) revert InvalidSignature(order.maker, signer);
 
-        (Role makerRole, Role takerRole) = _requireParticipantRoles(
-            order,
-            taker
-        );
-        isFeeExempt =
-            makerRole == Role.MARKET_MAKER &&
-            takerRole == Role.MARKET_MAKER;
+        (Role makerRole, Role takerRole) = _requireParticipantRoles(order, taker);
+        isFeeExempt = makerRole == Role.MARKET_MAKER && takerRole == Role.MARKET_MAKER;
 
         _validateAccruedInterest(order);
     }
 
-    /// @dev Validates that the declared accrued interest is within tolerance of the on-chain value.
-    /// When the relative tolerance rounds to zero (small faceValue bonds), a floor of 1 quote-token
-    /// unit is applied so that legitimate orders are not rejected due to block-time drift.
+    /// @dev When tolerance rounds to zero (small faceValue), a floor of 1 unit is applied.
     function _validateAccruedInterest(Order calldata order) internal view {
         IBondToken bt = IBondToken(order.bondToken);
         uint8 bondDecimals = IERC20Metadata(order.bondToken).decimals();
 
         uint256 aiPerUnit = bt.accruedInterestPerUnit(block.timestamp);
-        uint256 expectedAI = Math.mulDiv(
-            aiPerUnit,
-            order.bondAmount,
-            10 ** uint256(bondDecimals)
-        );
+        uint256 expectedAI = Math.mulDiv(aiPerUnit, order.bondAmount, 10 ** uint256(bondDecimals));
 
         uint256 tolerance;
         if (_aiToleranceSeconds > 0) {
-            uint256 aiPerUnitLater = bt.accruedInterestPerUnit(
-                block.timestamp + _aiToleranceSeconds
-            );
-            uint256 expectedAILater = Math.mulDiv(
-                aiPerUnitLater,
-                order.bondAmount,
-                10 ** uint256(bondDecimals)
-            );
-            tolerance = expectedAILater > expectedAI
-                ? expectedAILater - expectedAI
-                : 0;
+            uint256 aiPerUnitLater = bt.accruedInterestPerUnit(block.timestamp + _aiToleranceSeconds);
+            uint256 expectedAILater = Math.mulDiv(aiPerUnitLater, order.bondAmount, 10 ** uint256(bondDecimals));
+            tolerance = expectedAILater > expectedAI ? expectedAILater - expectedAI : 0;
         }
-
-        if (tolerance == 0 && expectedAI > 0) {
-            tolerance = 1;
-        }
+        if (tolerance == 0 && expectedAI > 0) tolerance = 1;
 
         if (
-            order.accruedInterest > expectedAI + tolerance ||
-            (expectedAI > tolerance &&
-                order.accruedInterest < expectedAI - tolerance)
+            order.accruedInterest > expectedAI + tolerance
+                || (expectedAI > tolerance && order.accruedInterest < expectedAI - tolerance)
         ) {
-            revert AccruedInterestMismatch(
-                order.accruedInterest,
-                expectedAI,
-                tolerance
-            );
+            revert AccruedInterestMismatch(order.accruedInterest, expectedAI, tolerance);
         }
     }
 
-    /// @dev Validates whitelist, roles, and direction. Returns roles for downstream fee logic.
-    function _requireParticipantRoles(
-        Order calldata order,
-        address taker
-    ) internal view returns (Role makerRole, Role takerRole) {
-        IComplianceModule complianceModule = IComplianceModule(
-            IBondToken(order.bondToken).complianceModule()
-        );
+    function _requireParticipantRoles(Order calldata order, address taker)
+        internal
+        view
+        returns (Role makerRole, Role takerRole)
+    {
+        IComplianceModule complianceModule = IComplianceModule(IBondToken(order.bondToken).complianceModule());
 
-        if (!complianceModule.isWhitelisted(order.maker)) {
-            revert NotWhitelisted(order.maker);
-        }
-
-        if (!complianceModule.isWhitelisted(taker)) {
-            revert NotWhitelisted(taker);
-        }
+        if (!complianceModule.isWhitelisted(order.maker)) revert NotWhitelisted(order.maker);
+        if (!complianceModule.isWhitelisted(taker)) revert NotWhitelisted(taker);
 
         makerRole = complianceModule.roleOf(order.maker);
         takerRole = complianceModule.roleOf(taker);
 
-        // maker must be a market maker, because only market makers can sign orders
         if (makerRole != Role.MARKET_MAKER) {
-            revert InvalidParticipantRole(
-                order.maker,
-                Role.MARKET_MAKER,
-                makerRole
-            );
+            revert InvalidParticipantRole(order.maker, Role.MARKET_MAKER, makerRole);
         }
-
         if (takerRole != Role.MARKET_MAKER && takerRole != Role.INVESTOR) {
             revert InvalidParticipantRole(taker, Role.INVESTOR, takerRole);
         }
     }
 
-    /// @dev Executes token transfers for one validated order and emits the canonical fill event.
-    /// dirtyAmount = quoteAmount + accruedInterest. Fee is computed on dirtyAmount.
-    /// Fee is always charged to the market-maker side:
-    ///   - MM is quoteReceiver → MM receives dirtyAmount - fee
-    ///   - MM is quotePayer   → MM pays dirtyAmount + fee (counterparty receives dirtyAmount)
-    ///   - MM ↔ MM            → fee exempt
-    /// @param isFeeExempt True when both parties are market makers (MM-to-MM).
-    function _executeOrder(
-        Order calldata order,
-        bytes32 orderHash,
-        address taker,
-        bool isFeeExempt
-    ) internal {
-        if (_consumedOrders[orderHash]) {
-            revert OrderAlreadyConsumed(orderHash);
-        }
+    /// @dev Fee is always charged to the market-maker side:
+    ///   BUY  → MM receives dirtyAmount - fee
+    ///   SELL → MM pays dirtyAmount + fee
+    ///   MM-to-MM → fee exempt
+    function _executeOrder(Order calldata order, bytes32 orderHash, address taker, bool isFeeExempt) internal {
+        if (_consumedOrders[orderHash]) revert OrderAlreadyConsumed(orderHash);
         _consumedOrders[orderHash] = true;
 
         uint256 dirtyAmount = order.quoteAmount + order.accruedInterest;
         uint256 feeAmount = isFeeExempt ? 0 : _quoteFeeAmount(dirtyAmount);
 
         if (feeAmount > 0 && _feeConfig.currentFeeBps > order.maxFeeBps) {
-            revert FeeExceedsOrderLimit(
-                order.maxFeeBps,
-                _feeConfig.currentFeeBps
-            );
+            revert FeeExceedsOrderLimit(order.maxFeeBps, _feeConfig.currentFeeBps);
         }
 
         _transferSettlement(order, taker, dirtyAmount, feeAmount);
@@ -750,91 +463,42 @@ contract RFQSettlement is
         );
     }
 
-    /// @dev Resolves token payers and receivers based on the taker's order side (BUY = taker buys bonds).
-    function _resolveSettlementParties(
-        Order calldata order,
-        address taker
-    )
+    function _resolveSettlementParties(Order calldata order, address taker)
         internal
         pure
-        returns (
-            address quotePayer,
-            address quoteReceiver,
-            address bondPayer,
-            address bondReceiver
-        )
+        returns (address quotePayer, address quoteReceiver, address bondPayer, address bondReceiver)
     {
-        if (order.side == OrderSide.BUY) {
-            return (taker, order.maker, order.maker, taker);
-        }
-
+        if (order.side == OrderSide.BUY) return (taker, order.maker, order.maker, taker);
         return (order.maker, taker, taker, order.maker);
     }
 
-    /// @dev Executes the actual token transfers for an order.
-    /// Fee is always charged to the market-maker side:
-    ///   BUY  (MM is quoteReceiver): MM receives dirtyAmount - fee, fee from quotePayer
-    ///   SELL (MM is quotePayer):     MM pays dirtyAmount + fee, counterparty receives dirtyAmount
-    function _transferSettlement(
-        Order calldata order,
-        address taker,
-        uint256 dirtyAmount,
-        uint256 feeAmount
-    ) private {
-        (
-            address quotePayer,
-            address quoteReceiver,
-            address bondPayer,
-            address bondReceiver
-        ) = _resolveSettlementParties(order, taker);
+    function _transferSettlement(Order calldata order, address taker, uint256 dirtyAmount, uint256 feeAmount) private {
+        (address quotePayer, address quoteReceiver, address bondPayer, address bondReceiver) =
+            _resolveSettlementParties(order, taker);
 
-        // BUY:  quotePayer=taker, quoteReceiver=maker(MM) → fee deducted from MM receipts
-        // SELL: quotePayer=maker(MM), quoteReceiver=taker → MM pays extra fee on top
-        bool deductFeeFromReceipt = feeAmount > 0 &&
-            order.side == OrderSide.BUY;
+        // BUY: fee deducted from MM receipts; SELL: MM pays extra fee on top
+        bool deductFeeFromReceipt = feeAmount > 0 && order.side == OrderSide.BUY;
 
-        IERC20(order.quoteToken).safeTransferFrom(
-            quotePayer,
-            quoteReceiver,
-            deductFeeFromReceipt ? dirtyAmount - feeAmount : dirtyAmount
-        );
+        IERC20(order.quoteToken)
+            .safeTransferFrom(quotePayer, quoteReceiver, deductFeeFromReceipt ? dirtyAmount - feeAmount : dirtyAmount);
 
         if (feeAmount > 0) {
-            IERC20(order.quoteToken).safeTransferFrom(
-                quotePayer,
-                _feeConfig.feeRecipient,
-                feeAmount
-            );
+            IERC20(order.quoteToken).safeTransferFrom(quotePayer, _feeConfig.feeRecipient, feeAmount);
         }
 
-        IERC20(order.bondToken).safeTransferFrom(
-            bondPayer,
-            bondReceiver,
-            order.bondAmount
-        );
+        IERC20(order.bondToken).safeTransferFrom(bondPayer, bondReceiver, order.bondAmount);
     }
 
-    /// @dev Cancels one order after verifying that the caller is the maker and the order is still live.
     function _cancelOrder(Order calldata order, address caller) internal {
-        if (caller != order.maker) {
-            revert UnauthorizedOrderMaker(caller, order.maker);
-        }
+        if (caller != order.maker) revert UnauthorizedOrderMaker(caller, order.maker);
 
         bytes32 orderHash = _hashOrder(order);
-        if (_consumedOrders[orderHash]) {
-            revert OrderAlreadyConsumed(orderHash);
-        }
-
-        if (_cancelledOrders[orderHash]) {
-            revert OrderAlreadyCancelled(orderHash);
-        }
+        if (_consumedOrders[orderHash]) revert OrderAlreadyConsumed(orderHash);
+        if (_cancelledOrders[orderHash]) revert OrderAlreadyCancelled(orderHash);
 
         _cancelledOrders[orderHash] = true;
         emit OrderCancelled(orderHash, order.maker, caller);
     }
 
-    /// @dev Restricts UUPS upgrades to the configured upgrader role.
-    function _authorizeUpgrade(
-        address
-    ) internal override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) {}
 }

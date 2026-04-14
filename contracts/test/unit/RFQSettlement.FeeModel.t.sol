@@ -12,13 +12,7 @@ contract RFQSettlementFeeModelTest is RFQSettlementFixtures {
         deployRfqFixtures();
 
         vm.prank(admin);
-        settlement.setFeeConfig(
-            FeeConfig({
-                feeRecipient: feeRecipient,
-                currentFeeBps: FEE_BPS,
-                maxFeeBps: 1_000
-            })
-        );
+        settlement.setFeeConfig(FeeConfig({feeRecipient: feeRecipient, currentFeeBps: FEE_BPS, maxFeeBps: 1_000}));
 
         vm.prank(issuanceController);
         bondToken.mint(investor, 500e18);
@@ -56,26 +50,10 @@ contract RFQSettlementFeeModelTest is RFQSettlementFixtures {
         vm.prank(investor);
         settlement.fillOrder(order, sig);
 
-        assertEq(
-            usdc.balanceOf(investor),
-            investorUsdcBefore - quoteAmount,
-            "investor pays quoteAmount"
-        );
-        assertEq(
-            usdc.balanceOf(maker),
-            makerUsdcBefore + expectedMmIncome,
-            "mm receives quoteAmount - fee"
-        );
-        assertEq(
-            usdc.balanceOf(feeRecipient),
-            feeBefore + expectedFee,
-            "platform receives fee"
-        );
-        assertEq(
-            bondToken.balanceOf(investor),
-            500e18 + 10e18,
-            "investor receives bonds"
-        );
+        assertEq(usdc.balanceOf(investor), investorUsdcBefore - quoteAmount, "investor pays quoteAmount");
+        assertEq(usdc.balanceOf(maker), makerUsdcBefore + expectedMmIncome, "mm receives quoteAmount - fee");
+        assertEq(usdc.balanceOf(feeRecipient), feeBefore + expectedFee, "platform receives fee");
+        assertEq(bondToken.balanceOf(investor), 500e18 + 10e18, "investor receives bonds");
     }
 
     // ──────────────────────── 场景二：投资者卖出债券，做市商买入 ────────────────────────
@@ -107,21 +85,9 @@ contract RFQSettlementFeeModelTest is RFQSettlementFixtures {
         vm.prank(investor);
         settlement.fillOrder(order, sig);
 
-        assertEq(
-            usdc.balanceOf(maker),
-            makerUsdcBefore - quoteAmount - expectedFee,
-            "mm pays quoteAmount + fee"
-        );
-        assertEq(
-            usdc.balanceOf(investor),
-            investorUsdcBefore + quoteAmount,
-            "investor receives full quoteAmount"
-        );
-        assertEq(
-            usdc.balanceOf(feeRecipient),
-            feeBefore + expectedFee,
-            "platform receives fee"
-        );
+        assertEq(usdc.balanceOf(maker), makerUsdcBefore - quoteAmount - expectedFee, "mm pays quoteAmount + fee");
+        assertEq(usdc.balanceOf(investor), investorUsdcBefore + quoteAmount, "investor receives full quoteAmount");
+        assertEq(usdc.balanceOf(feeRecipient), feeBefore + expectedFee, "platform receives fee");
     }
 
     // ──────────────────────── 场景三：做市商之间交易免手续费 ────────────────────────
@@ -152,21 +118,9 @@ contract RFQSettlementFeeModelTest is RFQSettlementFixtures {
         vm.prank(otherMaker);
         settlement.fillOrder(order, sig);
 
-        assertEq(
-            usdc.balanceOf(otherMaker),
-            otherMakerUsdcBefore - quoteAmount,
-            "otherMaker pays full quoteAmount"
-        );
-        assertEq(
-            usdc.balanceOf(maker),
-            makerUsdcBefore + quoteAmount,
-            "maker receives full quoteAmount (no fee)"
-        );
-        assertEq(
-            usdc.balanceOf(feeRecipient),
-            feeBefore,
-            "platform receives zero fee"
-        );
+        assertEq(usdc.balanceOf(otherMaker), otherMakerUsdcBefore - quoteAmount, "otherMaker pays full quoteAmount");
+        assertEq(usdc.balanceOf(maker), makerUsdcBefore + quoteAmount, "maker receives full quoteAmount (no fee)");
+        assertEq(usdc.balanceOf(feeRecipient), feeBefore, "platform receives zero fee");
     }
 
     function test_mmToMm_sellSide_noFeeCharged() public {
@@ -193,43 +147,24 @@ contract RFQSettlementFeeModelTest is RFQSettlementFixtures {
         vm.prank(otherMaker);
         settlement.fillOrder(order, sig);
 
-        assertEq(
-            usdc.balanceOf(feeRecipient),
-            feeBefore,
-            "platform receives zero fee for MM-MM"
-        );
+        assertEq(usdc.balanceOf(feeRecipient), feeBefore, "platform receives zero fee for MM-MM");
     }
 
     // ──────────────────────── quoteFee view 函数 ────────────────────────
 
     function test_quoteFee_returnsCorrectFeeForMmInvestor() public view {
-        uint256 fee = settlement.quoteFee(
-            address(bondToken),
-            maker,
-            investor,
-            10_000e6
-        );
+        uint256 fee = settlement.quoteFee(address(bondToken), maker, investor, 10_000e6);
         uint256 expected = (10_000e6 * FEE_BPS) / 10_000;
         assertEq(fee, expected, "quoteFee should return fee for MM-investor");
     }
 
     function test_quoteFee_returnsZeroForMmToMm() public view {
-        uint256 fee = settlement.quoteFee(
-            address(bondToken),
-            maker,
-            otherMaker,
-            10_000e6
-        );
+        uint256 fee = settlement.quoteFee(address(bondToken), maker, otherMaker, 10_000e6);
         assertEq(fee, 0, "quoteFee should return 0 for MM-MM");
     }
 
     function test_quoteFee_returnsCorrectFeeForInvestorMm() public view {
-        uint256 fee = settlement.quoteFee(
-            address(bondToken),
-            investor,
-            maker,
-            10_000e6
-        );
+        uint256 fee = settlement.quoteFee(address(bondToken), investor, maker, 10_000e6);
         uint256 expected = (10_000e6 * FEE_BPS) / 10_000;
         assertEq(fee, expected, "quoteFee should return fee for investor-MM");
     }

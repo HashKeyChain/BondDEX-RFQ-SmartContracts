@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {
-    ERC1967Proxy
-} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
@@ -21,11 +19,7 @@ contract ComplianceModuleBatchOpsTest is Test {
         module = ComplianceModule(
             address(
                 new ERC1967Proxy(
-                    address(impl),
-                    abi.encodeCall(
-                        ComplianceModule.initialize,
-                        (admin, factory, keccak256("pol"), 1)
-                    )
+                    address(impl), abi.encodeCall(ComplianceModule.initialize, (admin, factory, keccak256("pol"), 1))
                 )
             )
         );

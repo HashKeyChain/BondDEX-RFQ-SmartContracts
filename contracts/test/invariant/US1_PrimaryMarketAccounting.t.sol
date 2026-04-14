@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {
-    ERC1967Proxy
-} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 
@@ -63,12 +61,7 @@ contract US1PrimaryMarketAccountingInvariantTest is StdInvariant, Test {
 
         BondIssuance issuanceImplementation = new BondIssuance();
         issuance = BondIssuance(
-            address(
-                new ERC1967Proxy(
-                    address(issuanceImplementation),
-                    abi.encodeCall(BondIssuance.initialize, (admin))
-                )
-            )
+            address(new ERC1967Proxy(address(issuanceImplementation), abi.encodeCall(BondIssuance.initialize, (admin))))
         );
 
         ComplianceModule complianceImplementation = new ComplianceModule();
@@ -76,10 +69,7 @@ contract US1PrimaryMarketAccountingInvariantTest is StdInvariant, Test {
             address(
                 new ERC1967Proxy(
                     address(complianceImplementation),
-                    abi.encodeCall(
-                        ComplianceModule.initialize,
-                        (admin, factory, keccak256("policy"), 1)
-                    )
+                    abi.encodeCall(ComplianceModule.initialize, (admin, factory, keccak256("policy"), 1))
                 )
             )
         );
@@ -117,13 +107,7 @@ contract US1PrimaryMarketAccountingInvariantTest is StdInvariant, Test {
 
         bytes32 subApprovalId = keccak256("inv-sub-approval");
         vm.prank(admin);
-        issuance.approveSubscription(
-            subApprovalId,
-            issuer,
-            address(bondToken),
-            500e18,
-            0
-        );
+        issuance.approveSubscription(subApprovalId, issuer, address(bondToken), 500e18, 0);
 
         vm.prank(issuer);
         offerId = issuance.createSubscription(
@@ -138,18 +122,12 @@ contract US1PrimaryMarketAccountingInvariantTest is StdInvariant, Test {
             subApprovalId
         );
 
-        handler = new US1SubscriptionHandler(
-            issuance,
-            bondToken,
-            usdc,
-            offerId,
-            maker
-        );
+        handler = new US1SubscriptionHandler(issuance, bondToken, usdc, offerId, maker);
         targetContract(address(handler));
     }
 
     function invariant_totalSupplyMatchesSoldUnits() public view {
-        (, , , , uint256 soldUnits, , , ) = issuance.getSubscription(offerId);
+        (,,,, uint256 soldUnits,,,) = issuance.getSubscription(offerId);
         assertEq(bondToken.totalSupply(), soldUnits);
     }
 }

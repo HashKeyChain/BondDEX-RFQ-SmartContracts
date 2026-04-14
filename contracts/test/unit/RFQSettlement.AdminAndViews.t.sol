@@ -6,18 +6,9 @@ import {Order, FeeConfig, PauseDomain} from "../../src/types/BondTypes.sol";
 import {RFQSettlementFixtures} from "../helpers/RFQSettlementFixtures.sol";
 
 contract RFQSettlementAdminAndViewsTest is RFQSettlementFixtures {
-    event OrderCancelled(
-        bytes32 indexed orderHash,
-        address indexed maker,
-        address canceller
-    );
+    event OrderCancelled(bytes32 indexed orderHash, address indexed maker, address canceller);
     event AiToleranceUpdated(uint256 newToleranceSeconds, address operator);
-    event TokensRescued(
-        address indexed token,
-        address indexed to,
-        uint256 amount,
-        address indexed operator
-    );
+    event TokensRescued(address indexed token, address indexed to, uint256 amount, address indexed operator);
 
     function setUp() public {
         deployRfqFixtures();
@@ -91,15 +82,8 @@ contract RFQSettlementAdminAndViewsTest is RFQSettlementFixtures {
     // ── eip712Domain ───────────────────────────────────────────────
 
     function test_eip712DomainReturnsExpectedFields() public view {
-        (
-            bytes1 fields,
-            string memory name,
-            string memory version,
-            uint256 chainId,
-            address verifyingContract,
-            ,
-
-        ) = settlement.eip712Domain();
+        (bytes1 fields, string memory name, string memory version, uint256 chainId, address verifyingContract,,) =
+            settlement.eip712Domain();
 
         assertEq(fields, hex"0f");
         assertEq(keccak256(bytes(name)), keccak256("BondDEX RFQSettlement"));

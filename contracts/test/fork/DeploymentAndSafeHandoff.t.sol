@@ -36,11 +36,19 @@ contract DeploymentAndSafeHandoffForkTest is Test {
         ComplianceModule complianceImplementation = new ComplianceModule();
         BondIssuance issuanceImplementation = new BondIssuance();
         BondIssuance issuance = BondIssuance(
-            address(new ERC1967Proxy(address(issuanceImplementation), abi.encodeCall(BondIssuance.initialize, (address(this)))))
+            address(
+                new ERC1967Proxy(
+                    address(issuanceImplementation), abi.encodeCall(BondIssuance.initialize, (address(this)))
+                )
+            )
         );
         RFQSettlement settlementImplementation = new RFQSettlement();
         RFQSettlement settlement = RFQSettlement(
-            address(new ERC1967Proxy(address(settlementImplementation), abi.encodeCall(RFQSettlement.initialize, (address(this), 1_000))))
+            address(
+                new ERC1967Proxy(
+                    address(settlementImplementation), abi.encodeCall(RFQSettlement.initialize, (address(this), 1_000))
+                )
+            )
         );
         BondFactory factory = new BondFactory(address(this), address(issuance));
 
