@@ -126,6 +126,7 @@ contract BondLifecycleE2ETest is Test {
         complianceModule.setRole(issuer, Role.ISSUER);
         complianceModule.setRole(maker, Role.MARKET_MAKER);
         complianceModule.setRole(investor, Role.INVESTOR);
+        complianceModule.setTransferOperator(address(settlement), true);
         settlement.setBondTokenRegistration(bondTokenAddress, true);
         vm.stopPrank();
 

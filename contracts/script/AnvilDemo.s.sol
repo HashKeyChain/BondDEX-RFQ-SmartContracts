@@ -390,6 +390,7 @@ contract AnvilDemo is Script {
         complianceModule.setRole(investorC, Role.INVESTOR);
         complianceModule.setRole(delegate, Role.MARKET_MAKER);
 
+        complianceModule.setTransferOperator(address(settlement), true);
         settlement.setBondTokenRegistration(address(bondToken), true);
         vm.stopBroadcast();
 
@@ -397,6 +398,7 @@ contract AnvilDemo is Script {
             "  Whitelisted: issuer, makerA, makerB, investorA, investorB, delegate"
         );
         console2.log("  NOT whitelisted: makerC, investorC");
+        console2.log("  RFQSettlement registered as transfer operator");
         console2.log("  BondToken registered for RFQ settlement");
 
         _approveAll();
@@ -433,6 +435,16 @@ contract AnvilDemo is Script {
 
         _subscribeShouldFail(MAKER_C_PK, offerId, 10, "NotWhitelisted");
 
+        console2.log(
+            "  [4a] makerA tries direct transfer to makerB - UNAUTHORIZED_OPERATOR"
+        );
+        _directTransferShouldFail(
+            MAKER_A_PK,
+            makerB,
+            10,
+            "TransferRestricted(8)"
+        );
+
         _logBalances("After Subscription");
     }
 
@@ -443,6 +455,17 @@ contract AnvilDemo is Script {
     function _step7_firstTrades() internal {
         console2.log("");
         console2.log("=== Step 7: First RFQ Trades (issueDate + 12 min) ===");
+
+        console2.log("");
+        console2.log(
+            "  [7x] makerA tries direct transfer to investorA - UNAUTHORIZED_OPERATOR"
+        );
+        _directTransferShouldFail(
+            MAKER_A_PK,
+            investorA,
+            10,
+            "TransferRestricted(8)"
+        );
 
         console2.log("");
         console2.log("  [7a] investorA buys 10 from makerA @ 2000 USDC each");
@@ -580,14 +603,16 @@ contract AnvilDemo is Script {
     function _step13_investorRestriction() internal {
         console2.log("");
         console2.log("=== Step 13: Investor-to-Investor Restriction ===");
-        console2.log("  investorA tries to buy from investorB - RESTRICTED");
+        console2.log(
+            "  investorB tries to make order - INVESTOR cannot be maker"
+        );
         _rfqFillShouldFail(
             INVESTOR_B_PK,
             INVESTOR_A_PK,
             1,
             1_000e6,
             OrderSide.BUY,
-            "InvestorToInvestorRestricted"
+            "InvalidParticipantRole"
         );
     }
 
@@ -605,9 +630,7 @@ contract AnvilDemo is Script {
         vm.stopBroadcast();
 
         console2.log("  Deposited: 1,100,000 USDC");
-        console2.log(
-            "  (1,050,000 required + 50,000 excess for rescue test)"
-        );
+        console2.log("  (1,050,000 required + 50,000 excess for rescue test)");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1025,6 +1048,20 @@ contract AnvilDemo is Script {
         bytes32 digest = settlement.hashOrder(order);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
         return abi.encodePacked(r, s, v);
+    }
+
+    function _directTransferShouldFail(
+        uint256 senderPk,
+        address to,
+        uint256 amount,
+        string memory reason
+    ) internal {
+        vm.prank(vm.addr(senderPk));
+        try bondToken.transfer(to, amount) {
+            console2.log("    [ERROR] Should have reverted!");
+        } catch {
+            console2.log("    Direct transfer reverted as expected:", reason);
+        }
     }
 
     function _logBalances(string memory label) internal view {

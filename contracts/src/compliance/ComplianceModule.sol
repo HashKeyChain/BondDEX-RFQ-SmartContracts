@@ -62,6 +62,9 @@ contract ComplianceModule is
     /// @notice Transfer restriction code when settlement transfers are paused.
     uint8 public constant TRANSFERS_PAUSED_CODE = 7;
 
+    /// @notice Transfer restriction code when the transfer operator is not authorized.
+    uint8 public constant UNAUTHORIZED_OPERATOR_CODE = 8;
+
     /// @notice Maximum number of accounts that may be updated in a single batch call.
     uint256 internal constant MAX_BATCH_SIZE = 200;
 
@@ -97,6 +100,14 @@ contract ComplianceModule is
         uint256 policyVersion
     );
 
+    /// @notice Emitted when an authorized transfer operator is added or removed.
+    event TransferOperatorUpdated(
+        address indexed bondToken,
+        address indexed operator,
+        bool authorized,
+        address admin
+    );
+
     /// @notice Bound bond token governed by this module.
     address public bondToken;
 
@@ -112,8 +123,11 @@ contract ComplianceModule is
     /// @dev Compliance role assignments keyed by account.
     mapping(address account => Role role) private _roles;
 
+    /// @dev Authorized transfer operators (e.g. RFQSettlement) allowed to move bonds between users.
+    mapping(address operator => bool authorized) private _authorizedOperators;
+
     /// @dev Reserved storage gap for future upgrades.
-    uint256[45] private __gap;
+    uint256[44] private __gap;
 
     /// @dev Locks the implementation contract and requires proxy initialization.
     constructor() {
@@ -281,6 +295,28 @@ contract ComplianceModule is
     }
 
     /// @inheritdoc IComplianceModule
+    /// @dev Registers or removes an authorized transfer operator.
+    function setTransferOperator(
+        address operator,
+        bool authorized
+    ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+        if (operator == address(0)) revert ZeroAddress();
+        _authorizedOperators[operator] = authorized;
+        emit TransferOperatorUpdated(
+            bondToken,
+            operator,
+            authorized,
+            msg.sender
+        );
+    }
+
+    /// @inheritdoc IComplianceModule
+    /// @dev Returns whether the given address is an authorized transfer operator.
+    function isTransferOperator(address operator) external view returns (bool) {
+        return _authorizedOperators[operator];
+    }
+
+    /// @inheritdoc IComplianceModule
     /// @dev Returns whether the account is currently whitelisted.
     function isWhitelisted(address account) external view returns (bool) {
         return _whitelist[account];
@@ -304,10 +340,14 @@ contract ComplianceModule is
     /// @dev Evaluates the full transfer policy and returns an ERC1404-style restriction code.
     /// NOTE: The `amount` parameter is intentionally unused — the current policy is purely
     /// address/role-based. Future upgrades via UUPS can add per-transfer or cumulative limits.
+    /// The `operator` parameter is the address that initiated the transfer on the bond token
+    /// (msg.sender to transfer/transferFrom). Only authorized operators (e.g. RFQSettlement)
+    /// may trigger user-to-user transfers, ensuring all trades go through the platform.
     function checkTransfer(
         address from,
         address to,
-        uint256
+        uint256,
+        address operator
     ) external view returns (uint8) {
         if (bondToken == address(0)) {
             return UNBOUND_BOND_CODE;
@@ -315,6 +355,10 @@ contract ComplianceModule is
 
         if (isDomainPaused(PauseDomain.SETTLEMENT)) {
             return TRANSFERS_PAUSED_CODE;
+        }
+
+        if (!_authorizedOperators[operator]) {
+            return UNAUTHORIZED_OPERATOR_CODE;
         }
 
         if (!_whitelist[from]) {

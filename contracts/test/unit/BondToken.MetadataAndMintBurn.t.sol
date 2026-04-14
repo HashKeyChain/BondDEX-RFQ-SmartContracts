@@ -34,7 +34,9 @@ contract StaticRestrictionComplianceMock is IComplianceModule {
     function isWhitelisted(address) external pure returns (bool) { return true; }
     function roleOf(address) external pure returns (Role) { return Role.MARKET_MAKER; }
     function isDomainPaused(PauseDomain) external pure returns (bool) { return false; }
-    function checkTransfer(address, address, uint256) external view returns (uint8) { return _restrictionCode; }
+    function checkTransfer(address, address, uint256, address) external view returns (uint8) { return _restrictionCode; }
+    function setTransferOperator(address, bool) external {}
+    function isTransferOperator(address) external pure returns (bool) { return true; }
     function policyId() external view returns (bytes32) { return _policyId; }
     function policyVersion() external view returns (uint256) { return _policyVersion; }
 }

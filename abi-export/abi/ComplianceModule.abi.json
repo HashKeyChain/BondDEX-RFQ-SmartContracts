@@ -123,6 +123,19 @@
   },
   {
     "type": "function",
+    "name": "UNAUTHORIZED_OPERATOR_CODE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "UNBOUND_BOND_CODE",
     "inputs": [],
     "outputs": [
@@ -227,6 +240,11 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "operator",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [
@@ -335,6 +353,25 @@
         "name": "domain",
         "type": "uint8",
         "internalType": "enum PauseDomain"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isTransferOperator",
+    "inputs": [
+      {
+        "name": "operator",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [
@@ -508,6 +545,24 @@
         "name": "role",
         "type": "uint8",
         "internalType": "enum Role"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setTransferOperator",
+    "inputs": [
+      {
+        "name": "operator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "authorized",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -761,6 +816,37 @@
       },
       {
         "name": "operator",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TransferOperatorUpdated",
+    "inputs": [
+      {
+        "name": "bondToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "operator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "authorized",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "admin",
         "type": "address",
         "indexed": false,
         "internalType": "address"

@@ -228,7 +228,7 @@ contract BondFactory is
         if (record.status != ApprovalStatus.ACTIVE) {
             revert InvalidApprovalState(record.status);
         }
-        if (record.expiresAt == 0 || record.expiresAt >= block.timestamp) {
+        if (record.expiresAt == 0 || record.expiresAt > block.timestamp) {
             revert InvalidApprovalState(record.status);
         }
         record.status = ApprovalStatus.EXPIRED;
@@ -294,7 +294,7 @@ contract BondFactory is
             revert InvalidApprovalState(approval.status);
         }
 
-        if (approval.expiresAt != 0 && approval.expiresAt < block.timestamp) {
+        if (approval.expiresAt != 0 && approval.expiresAt <= block.timestamp) {
             revert ExpiredDeadline(approval.expiresAt, block.timestamp);
         }
 
@@ -317,8 +317,12 @@ contract BondFactory is
             revert UnsupportedSettlementToken(config.settlementToken);
         }
         try IERC20Metadata(config.settlementToken).decimals() returns (
-            uint8
-        ) {} catch {
+            uint8 actualDecimals
+        ) {
+            if (config.settlementTokenDecimals != actualDecimals) {
+                revert InvalidBondConfig("settlementTokenDecimals mismatch");
+            }
+        } catch {
             revert UnsupportedSettlementToken(config.settlementToken);
         }
         if (bytes(config.name).length == 0) {

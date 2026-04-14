@@ -179,6 +179,8 @@ contract BondToken is ERC20, IBondToken {
     /// @inheritdoc IBondToken
     /// @dev Returns zero for mint and burn flows so issuance-controller operations can proceed,
     /// while all user-to-user transfers are delegated to the compliance module.
+    /// When called externally (off-chain queries), msg.sender is the querier and may not
+    /// reflect the actual operator; use the 4-param overload for accurate off-chain previews.
     function detectTransferRestriction(
         address from,
         address to,
@@ -189,7 +191,33 @@ contract BondToken is ERC20, IBondToken {
         }
 
         return
-            IComplianceModule(complianceModule).checkTransfer(from, to, amount);
+            IComplianceModule(complianceModule).checkTransfer(
+                from,
+                to,
+                amount,
+                msg.sender
+            );
+    }
+
+    /// @dev Overload for off-chain queries: pass the intended operator (e.g. RFQSettlement)
+    /// to preview whether the transfer would succeed through that operator.
+    function detectTransferRestriction(
+        address from,
+        address to,
+        uint256 amount,
+        address operator
+    ) public view returns (uint8) {
+        if (from == address(0) || to == address(0)) {
+            return 0;
+        }
+
+        return
+            IComplianceModule(complianceModule).checkTransfer(
+                from,
+                to,
+                amount,
+                operator
+            );
     }
 
     /// @inheritdoc IBondToken
@@ -205,10 +233,13 @@ contract BondToken is ERC20, IBondToken {
         if (restrictionCode == 5) return "INVALID_RECEIVER_ROLE";
         if (restrictionCode == 6) return "INVALID_DIRECTION";
         if (restrictionCode == 7) return "TRANSFERS_PAUSED";
+        if (restrictionCode == 8) return "UNAUTHORIZED_OPERATOR";
         return "UNKNOWN_RESTRICTION";
     }
 
     /// @dev Evaluates the compliance policy before every token state update.
+    /// For user-to-user transfers, msg.sender is the operator (the address that called
+    /// transfer/transferFrom on this token). Mint/burn (from/to == address(0)) bypass compliance.
     function _update(
         address from,
         address to,

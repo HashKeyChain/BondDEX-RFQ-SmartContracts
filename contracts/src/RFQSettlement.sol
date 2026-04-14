@@ -626,6 +626,8 @@ contract RFQSettlement is
     }
 
     /// @dev Validates that the declared accrued interest is within tolerance of the on-chain value.
+    /// When the relative tolerance rounds to zero (small faceValue bonds), a floor of 1 quote-token
+    /// unit is applied so that legitimate orders are not rejected due to block-time drift.
     function _validateAccruedInterest(Order calldata order) internal view {
         IBondToken bt = IBondToken(order.bondToken);
         uint8 bondDecimals = IERC20Metadata(order.bondToken).decimals();
@@ -650,6 +652,10 @@ contract RFQSettlement is
             tolerance = expectedAILater > expectedAI
                 ? expectedAILater - expectedAI
                 : 0;
+        }
+
+        if (tolerance == 0 && expectedAI > 0) {
+            tolerance = 1;
         }
 
         if (

@@ -171,7 +171,7 @@ make demo-anvil
 
 该命令自动以 2025-12-31 时间戳启动 Anvil，部署合约后按真实时间线多阶段执行：认购窗口（2026-01-01）→ 起息后 12 分钟 → +2 天 → 每月推进至 +3 月 → 到期日（2027-01-09），Makefile 通过 `cast rpc` 自动推进 Anvil 时间。每笔 RFQ 交易包含基于链上时间自动计算的应计利息。演示结束后自动关闭 Anvil。
 
-演示覆盖 9 个参与者（admin / issuer / makerA / makerB / makerC / investorA / investorB / investorC / delegate），包括：超额认购报错、未授权认购报错、RFQ 买卖含应计利息和手续费、做市商间免手续费但有应计利息、取消订单、过期订单、投资者间交易限制、代理领取、多余资金救援等场景。
+演示覆盖 9 个参与者（admin / issuer / makerA / makerB / makerC / investorA / investorB / investorC / delegate），包括：超额认购报错、未授权认购报错、**私下直接转账被拒绝（授权 operator 机制）**、RFQ 买卖含应计利息和手续费、做市商间免手续费但有应计利息、取消订单、过期订单、投资者间交易限制、代理领取、多余资金救援等场景。
 
 如需纯模拟（不需要 Anvil 运行，含 `vm.warp`，单次完成全流程；需要先有 `deployments/31337.json`）：
 

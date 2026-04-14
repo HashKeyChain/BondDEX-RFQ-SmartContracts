@@ -11,6 +11,11 @@
 > - `BondCreated` 事件新增 `issueDate` 字段
 > - 新增 `BondMetadata` 事件（BondFactory 发出）
 > - 新增 `AiToleranceUpdated` 事件（RFQSettlement 发出）
+> - `IComplianceModule.checkTransfer` 签名变更：新增 `operator` 参数（4 参数）
+> - 新增 `TransferOperatorUpdated` 事件（ComplianceModule 发出）
+> - 新增 transfer restriction code 8：`UNAUTHORIZED_OPERATOR`
+> - `IBondToken.detectTransferRestriction` 新增 4 参数重载版本
+> - `BondFactory.createBond` 增加 `settlementTokenDecimals` 一致性校验
 >
 > 下游需重新生成 wagmi typings、`abigen` bindings 及 Subgraph mappings。
 
@@ -60,7 +65,19 @@ event BondMetadata(
 - `RoleUpdated`
 - `BondTokenBound`
 - `PolicyMetadataUpdated`
+- `TransferOperatorUpdated` — **新增**，当 `setTransferOperator` 注册或撤销授权转账 operator 时发出
 - `PauseDomainUpdated`
+
+#### TransferOperatorUpdated（新增）
+
+```solidity
+event TransferOperatorUpdated(
+    address indexed bondToken,
+    address indexed operator,
+    bool authorized,
+    address admin
+);
+```
 
 ### BondIssuance
 
@@ -117,6 +134,22 @@ event AiToleranceUpdated(
 ### BondToken
 
 - Standard ERC-20 `Transfer`
+
+#### Transfer Restriction Codes
+
+| Code | 常量 | 含义 |
+|------|------|------|
+| 0 | `SUCCESS` | 转账允许 |
+| 1 | `BOND_TOKEN_NOT_BOUND` | ComplianceModule 未绑定 BondToken |
+| 2 | `SENDER_NOT_WHITELISTED` | 发送方不在白名单中 |
+| 3 | `RECEIVER_NOT_WHITELISTED` | 接收方不在白名单中 |
+| 4 | `INVALID_SENDER_ROLE` | 发送方角色不符 |
+| 5 | `INVALID_RECEIVER_ROLE` | 接收方角色不符 |
+| 6 | `INVALID_DIRECTION` | 禁止的转账方向（投资者→投资者） |
+| 7 | `TRANSFERS_PAUSED` | 转账已暂停 |
+| 8 | `UNAUTHORIZED_OPERATOR` | **新增** — 转账发起方不是授权的 operator（用户不能私下直接转账） |
+
+> **链下预检**：前端使用 `detectTransferRestriction(from, to, amount, operator)` 四参数重载版本（传入 RFQSettlement 地址作为 operator）来准确判断交易是否可行。三参数版本会使用 `msg.sender` 作为 operator，链下静态调用时会返回 code 8。
 
 ## Consumer Notes
 

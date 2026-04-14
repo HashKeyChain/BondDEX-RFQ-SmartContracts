@@ -1534,6 +1534,22 @@
   },
   {
     "type": "error",
+    "name": "SubscriptionWindowAlreadyClosed",
+    "inputs": [
+      {
+        "name": "closesAt",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "SubscriptionWindowClosed",
     "inputs": [
       {

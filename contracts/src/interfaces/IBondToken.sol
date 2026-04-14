@@ -76,6 +76,7 @@ interface IBondToken {
     ) external view returns (uint256);
 
     /// @dev Evaluates one transfer restriction using ERC1404-style numeric codes.
+    /// Uses msg.sender as the operator — off-chain callers should use the 4-param overload.
     /// @param from Sender address.
     /// @param to Receiver address.
     /// @param amount Transfer amount in smallest bond units.
@@ -84,6 +85,20 @@ interface IBondToken {
         address from,
         address to,
         uint256 amount
+    ) external view returns (uint8);
+
+    /// @dev Off-chain variant: pass the intended operator (e.g. RFQSettlement) to preview
+    /// whether the transfer would succeed through that operator.
+    /// @param from Sender address.
+    /// @param to Receiver address.
+    /// @param amount Transfer amount in smallest bond units.
+    /// @param operator Address that would initiate the transfer.
+    /// @return restrictionCode Numeric restriction code where zero means success.
+    function detectTransferRestriction(
+        address from,
+        address to,
+        uint256 amount,
+        address operator
     ) external view returns (uint8);
 
     /// @dev Returns the stable human-readable message for one restriction code.

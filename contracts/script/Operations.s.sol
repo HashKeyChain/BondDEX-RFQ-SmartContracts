@@ -77,6 +77,17 @@ contract Operations is BaseConfig {
         return vm.envUint("DEPLOYER_PRIVATE_KEY");
     }
 
+    /// @dev 获取 maker 签名时允许的最大手续费 bps，默认 100 (1%)。
+    ///      通过 MAX_FEE_BPS 环境变量覆盖。
+    function _orderMaxFeeBps() internal view returns (uint16) {
+        try vm.envUint("MAX_FEE_BPS") returns (uint256 val) {
+            require(val <= 10_000, "MAX_FEE_BPS exceeds 10000");
+            return uint16(val);
+        } catch {
+            return 100;
+        }
+    }
+
     // ================================================================
     //  债券创建
     // ================================================================
@@ -269,6 +280,23 @@ contract Operations is BaseConfig {
         console2.log("Batch role set:", accounts.length, "accounts");
     }
 
+    /// @notice 注册/撤销授权转账 operator（COMPLIANCE_ADMIN_ROLE 调用）
+    function setTransferOperator(
+        address complianceModuleAddr,
+        address operatorAddr,
+        bool authorized
+    ) external {
+        ComplianceModule cm = ComplianceModule(complianceModuleAddr);
+        vm.startBroadcast(_senderPk());
+        cm.setTransferOperator(operatorAddr, authorized);
+        vm.stopBroadcast();
+        console2.log(
+            "Transfer operator",
+            operatorAddr,
+            authorized ? "authorized" : "revoked"
+        );
+    }
+
     // ================================================================
     //  一级认购
     // ================================================================
@@ -416,7 +444,7 @@ contract Operations is BaseConfig {
             expiry: expiry,
             nonce: nonce,
             salt: salt,
-            maxFeeBps: 10_000,
+            maxFeeBps: _orderMaxFeeBps(),
             accruedInterest: accruedInterest
         });
 
@@ -461,7 +489,7 @@ contract Operations is BaseConfig {
             expiry: expiry,
             nonce: nonce,
             salt: salt,
-            maxFeeBps: 10_000,
+            maxFeeBps: _orderMaxFeeBps(),
             accruedInterest: accruedInterest
         });
 

@@ -194,3 +194,9 @@ error InvalidAiTolerance(uint256 provided, uint256 min, uint256 max);
 
 /// @notice Thrown when a subscription window is created without a closing timestamp.
 error SubscriptionWindowMissingCloseTime();
+
+/// @notice Thrown when a subscription window closing time is not in the future.
+error SubscriptionWindowAlreadyClosed(
+    uint256 closesAt,
+    uint256 currentTimestamp
+);

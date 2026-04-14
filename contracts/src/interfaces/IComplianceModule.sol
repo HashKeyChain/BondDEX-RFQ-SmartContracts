@@ -64,12 +64,25 @@ interface IComplianceModule {
     /// @param from Sender address.
     /// @param to Receiver address.
     /// @param amount Transfer amount in smallest bond units.
+    /// @param operator Address initiating the transfer (msg.sender on the bond token).
     /// @return restrictionCode Numeric restriction code where zero means success.
     function checkTransfer(
         address from,
         address to,
-        uint256 amount
+        uint256 amount,
+        address operator
     ) external view returns (uint8);
+
+    /// @dev Registers or removes an authorized transfer operator (e.g. RFQSettlement).
+    /// Only authorized operators may trigger user-to-user bond transfers.
+    /// @param operator Operator address.
+    /// @param authorized Whether the operator is authorized.
+    function setTransferOperator(address operator, bool authorized) external;
+
+    /// @dev Returns whether the given address is an authorized transfer operator.
+    /// @param operator Address to inspect.
+    /// @return authorized True when the operator is authorized.
+    function isTransferOperator(address operator) external view returns (bool);
 
     /// @dev Returns the current provider-facing policy identifier.
     /// @return id Policy identifier.

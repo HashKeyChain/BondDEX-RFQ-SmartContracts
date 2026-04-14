@@ -99,6 +99,7 @@ abstract contract RFQSettlementFixtures is Test {
         complianceModule.setRole(maker, Role.MARKET_MAKER);
         complianceModule.setRole(investor, Role.INVESTOR);
         complianceModule.setRole(otherMaker, Role.MARKET_MAKER);
+        complianceModule.setTransferOperator(address(settlement), true);
         settlement.setBondTokenRegistration(address(bondToken), true);
         settlement.setSettlementTokenPolicy(address(usdc), true);
         settlement.setFeeConfig(

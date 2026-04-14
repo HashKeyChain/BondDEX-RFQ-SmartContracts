@@ -121,15 +121,18 @@ contract ComplianceModulePolicyAdminTest is Test {
     function test_checkTransferEnforcesWhitelistAndDirection() public {
         address maker = makeAddr("maker");
         address investor = makeAddr("investor");
+        address operator = makeAddr("operator");
 
         vm.startPrank(admin);
         module.setWhitelist(maker, true);
         module.setWhitelist(investor, true);
         module.setRole(maker, Role.MARKET_MAKER);
         module.setRole(investor, Role.INVESTOR);
+        module.setTransferOperator(operator, true);
         vm.stopPrank();
 
-        assertEq(module.checkTransfer(maker, investor, 1e18), 0);
-        assertNotEq(module.checkTransfer(investor, investor, 1e18), 0);
+        assertEq(module.checkTransfer(maker, investor, 1e18, operator), 0);
+        assertNotEq(module.checkTransfer(investor, investor, 1e18, operator), 0);
+        assertEq(module.checkTransfer(maker, investor, 1e18, maker), 8);
     }
 }

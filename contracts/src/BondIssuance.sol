@@ -40,6 +40,7 @@ import {
     SubscriptionNotActive,
     SubscriptionWindowClosed,
     SubscriptionWindowExceedsIssueDate,
+    SubscriptionWindowAlreadyClosed,
     SubscriptionWindowMissingCloseTime,
     UnsupportedSettlementToken,
     UnauthorizedClaimCaller,
@@ -346,7 +347,7 @@ contract BondIssuance is
         if (record.status != ApprovalStatus.ACTIVE) {
             revert SubscriptionApprovalNotActive(approvalId, record.status);
         }
-        if (record.expiresAt == 0 || record.expiresAt >= block.timestamp) {
+        if (record.expiresAt == 0 || record.expiresAt > block.timestamp) {
             revert SubscriptionApprovalNotActive(approvalId, record.status);
         }
         record.status = ApprovalStatus.EXPIRED;
@@ -368,7 +369,7 @@ contract BondIssuance is
         if (approval.status != ApprovalStatus.ACTIVE) {
             revert SubscriptionApprovalNotActive(approvalId, approval.status);
         }
-        if (approval.expiresAt != 0 && approval.expiresAt < block.timestamp) {
+        if (approval.expiresAt != 0 && approval.expiresAt <= block.timestamp) {
             revert SubscriptionApprovalNotActive(
                 approvalId,
                 ApprovalStatus.EXPIRED
@@ -574,22 +575,30 @@ contract BondIssuance is
         _requireIssuerIdentity(bondToken, msg.sender);
         _requireRedemptionTokenEnabled(bondToken.settlementToken());
 
-        RedemptionState storage state = _redemptionStates[bondTokenAddress];
-        state.fundedAmount += amount;
-        state.lastFundingAt = block.timestamp;
-        _totalRedemptionLiability[bondToken.settlementToken()] += amount;
+        address settlementToken = bondToken.settlementToken();
+        uint256 balanceBefore = IERC20(settlementToken).balanceOf(
+            address(this)
+        );
 
-        IERC20(bondToken.settlementToken()).safeTransferFrom(
+        IERC20(settlementToken).safeTransferFrom(
             msg.sender,
             address(this),
             amount
         );
 
+        uint256 received = IERC20(settlementToken).balanceOf(address(this)) -
+            balanceBefore;
+
+        RedemptionState storage state = _redemptionStates[bondTokenAddress];
+        state.fundedAmount += received;
+        state.lastFundingAt = block.timestamp;
+        _totalRedemptionLiability[settlementToken] += received;
+
         emit RedemptionDeposited(
             bondTokenAddress,
             msg.sender,
-            bondToken.settlementToken(),
-            amount,
+            settlementToken,
+            received,
             state.fundedAmount
         );
     }
@@ -975,16 +984,19 @@ contract BondIssuance is
         }
     }
 
-    /// @dev Reverts when closesAt is zero or closesAt is not strictly after opensAt.
+    /// @dev Reverts when closesAt is zero, not after opensAt, or not in the future.
     function _requireValidWindow(
         uint256 opensAt,
         uint256 closesAt
-    ) internal pure {
+    ) internal view {
         if (closesAt == 0) {
             revert SubscriptionWindowMissingCloseTime();
         }
         if (closesAt <= opensAt) {
             revert InvalidSubscriptionWindow(opensAt, closesAt);
+        }
+        if (closesAt <= block.timestamp) {
+            revert SubscriptionWindowAlreadyClosed(closesAt, block.timestamp);
         }
     }
 
