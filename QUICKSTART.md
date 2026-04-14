@@ -1,71 +1,73 @@
-# Quickstart
+# Quick Start
 
-BondDEX RFQ 是面向 HashKey Chain 的合规债券协议，覆盖发行审批、一级认购、二级 RFQ 成交与到期赎回。详见 `README.md`。
+[中文版](QUICKSTART.zh-CN.md)
 
-这份 quickstart 的目标是让你在最短路径内完成 4 件事：
+BondDEX RFQ is a compliant bond protocol for HashKey Chain, covering issuance approval, primary subscription, secondary RFQ settlement, and maturity redemption. See `README.md` for details.
 
-- 确认仓库能正常编译
-- 跑通 `US1 / US2 / US3` 三条核心业务主线
-- 在本地 Anvil 上验证一站式部署脚本
-- 导出 ABI 产物给前端、后端或索引器消费
+This quickstart guide aims to get you through 4 things in the shortest path:
 
-## 前置依赖
+- Confirm the repository compiles successfully
+- Run through `US1 / US2 / US3` — the 3 core business workflows
+- Verify the one-stop deployment script on local Anvil
+- Export ABI artifacts for frontend, backend, or indexer consumption
 
-- 已安装 Foundry：`forge`、`cast`、`anvil`
-- 已安装 `jq`（Makefile 用它从 `config/*.json` 提取 RPC URL）
-- 已安装 `make`
+## Prerequisites
 
-如果仓库里已经有 `contracts/lib/`，可以跳过依赖安装。若缺少依赖，请在 `contracts/` 目录执行：
+- Foundry installed: `forge`, `cast`, `anvil`
+- `jq` installed (Makefile uses it to extract RPC URLs from `config/*.json`)
+- `make` installed
+
+If `contracts/lib/` already exists in the repository, you can skip dependency installation. If dependencies are missing, run in the `contracts/` directory:
 
 ```bash
 cd contracts
 forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts OpenZeppelin/openzeppelin-contracts-upgradeable
 ```
 
-## 配置文件说明
+## Configuration Files
 
-角色地址与策略配置集中在 `config/` 目录；部署者私钥通过环境变量 `DEPLOYER_PRIVATE_KEY` 传入，**不存储在配置文件中**。每个角色、每条结算代币策略均可独立配置。
+Role addresses and policy configurations are centralized in the `config/` directory; the deployer private key is passed via the `DEPLOYER_PRIVATE_KEY` environment variable — **never stored in config files**. Each role and settlement token policy can be independently configured.
 
 ```
 config/
-├── anvil.json      ← 本地 Anvil（使用 Anvil 预置账户，token 零地址自动部署 MockERC20）
-├── testnet.json    ← 测试网（部署前必须填入全部真实值）
-└── mainnet.json    ← 主网（部署前必须填入全部真实值）
+├── anvil.json      ← Local Anvil (uses Anvil preset accounts, zero-address token auto-deploys MockERC20)
+├── testnet.json    ← Testnet (must fill in all real values before deployment)
+└── mainnet.json    ← Mainnet (must fill in all real values before deployment)
 ```
 
-### 完整配置格式
+### Full Configuration Format
 
 ```json
 {
   "rpcUrl": "https://testnet.hsk.xyz",
 
-  "platformAdmin": "0x新建ComplianceModule的初始管理员（通常为Safe多签）",
+  "platformAdmin": "0xInitialAdminForNewComplianceModule(typicallySafeMultisig)",
 
   "roles": {
     "bondFactory": {
-      "admin":            "0x工厂DEFAULT_ADMIN_ROLE持有者",
-      "issuanceApprover": "0x发行审批ISSUANCE_APPROVER_ROLE持有者",
-      "complianceAdmin":  "0x合规管理COMPLIANCE_ADMIN_ROLE持有者",
-      "pauser":           "0x暂停操作PAUSER_ROLE持有者"
+      "admin":            "0xFactoryDEFAULT_ADMIN_ROLE_holder",
+      "issuanceApprover": "0xISSUANCE_APPROVER_ROLE_holder",
+      "complianceAdmin":  "0xCOMPLIANCE_ADMIN_ROLE_holder",
+      "pauser":           "0xPAUSER_ROLE_holder"
     },
     "bondIssuance": {
-      "admin":            "0x一级市场DEFAULT_ADMIN_ROLE持有者",
-      "issuanceApprover": "0x认购审批ISSUANCE_APPROVER_ROLE持有者",
-      "settlementAdmin":  "0x结算管理SETTLEMENT_ADMIN_ROLE持有者",
-      "pauser":           "0x暂停操作PAUSER_ROLE持有者",
-      "upgrader":         "0xUUPS升级UPGRADER_ROLE持有者"
+      "admin":            "0xPrimaryMarketDEFAULT_ADMIN_ROLE_holder",
+      "issuanceApprover": "0xISSUANCE_APPROVER_ROLE_holder",
+      "settlementAdmin":  "0xSETTLEMENT_ADMIN_ROLE_holder",
+      "pauser":           "0xPAUSER_ROLE_holder",
+      "upgrader":         "0xUUPS_UPGRADER_ROLE_holder"
     },
     "rfqSettlement": {
-      "admin":            "0x二级市场DEFAULT_ADMIN_ROLE持有者",
-      "settlementAdmin":  "0x结算管理SETTLEMENT_ADMIN_ROLE持有者",
-      "pauser":           "0x暂停操作PAUSER_ROLE持有者",
-      "upgrader":         "0xUUPS升级UPGRADER_ROLE持有者"
+      "admin":            "0xSecondaryMarketDEFAULT_ADMIN_ROLE_holder",
+      "settlementAdmin":  "0xSETTLEMENT_ADMIN_ROLE_holder",
+      "pauser":           "0xPAUSER_ROLE_holder",
+      "upgrader":         "0xUUPS_UPGRADER_ROLE_holder"
     }
   },
 
   "settlementTokens": [
     {
-      "token": "0x结算代币地址（如USDC）",
+      "token": "0xSettlementTokenAddress(e.g.USDC)",
       "bondIssuancePolicy": {
         "issuanceEnabled": true,
         "settlementEnabled": false,
@@ -76,7 +78,7 @@ config/
   ],
 
   "feeConfig": {
-    "feeRecipient": "0x手续费接收地址",
+    "feeRecipient": "0xFeeRecipientAddress",
     "currentFeeBps": 30,
     "maxFeeBps": 1000
   },
@@ -85,162 +87,162 @@ config/
 }
 ```
 
-### 配置项参考
+### Configuration Reference
 
-| 字段 | 说明 |
+| Field | Description |
 | --- | --- |
-| `DEPLOYER_PRIVATE_KEY`（环境变量） | 部署者私钥，通过环境变量传入；testnet/mainnet 完成后可自动撤销全部角色 |
-| `platformAdmin` | 新建 ComplianceModule 代理的初始管理员，获得该模块的 DEFAULT_ADMIN / COMPLIANCE_ADMIN / PAUSER / UPGRADER |
+| `DEPLOYER_PRIVATE_KEY` (env var) | Deployer private key, passed via environment variable; all roles can be auto-revoked after testnet/mainnet deployment |
+| `platformAdmin` | Initial admin for new ComplianceModule proxies; receives DEFAULT_ADMIN / COMPLIANCE_ADMIN / PAUSER / UPGRADER on that module |
 | **roles.bondFactory** | |
-| `.admin` | BondFactory 的 DEFAULT_ADMIN_ROLE — 可管理所有角色授予/撤销 |
-| `.issuanceApprover` | ISSUANCE_APPROVER_ROLE — 审批/撤销发行申请 |
-| `.complianceAdmin` | COMPLIANCE_ADMIN_ROLE — 注册/禁用合规实现模板 |
-| `.pauser` | PAUSER_ROLE — 暂停/恢复 Factory 域 |
+| `.admin` | BondFactory DEFAULT_ADMIN_ROLE — can manage all role grants/revocations |
+| `.issuanceApprover` | ISSUANCE_APPROVER_ROLE — approve/revoke issuance applications |
+| `.complianceAdmin` | COMPLIANCE_ADMIN_ROLE — register/disable compliance implementation templates |
+| `.pauser` | PAUSER_ROLE — pause/unpause Factory domains |
 | **roles.bondIssuance** | |
-| `.admin` | BondIssuance 的 DEFAULT_ADMIN_ROLE — 管理所有角色 |
-| `.issuanceApprover` | ISSUANCE_APPROVER_ROLE — 审批/撤销认购申请 |
-| `.settlementAdmin` | SETTLEMENT_ADMIN_ROLE — 配置结算代币策略 |
-| `.pauser` | PAUSER_ROLE — 暂停/恢复认购、赎回等域 |
-| `.upgrader` | UPGRADER_ROLE — 执行 UUPS 代理升级 |
+| `.admin` | BondIssuance DEFAULT_ADMIN_ROLE — manage all roles |
+| `.issuanceApprover` | ISSUANCE_APPROVER_ROLE — approve/revoke subscription applications |
+| `.settlementAdmin` | SETTLEMENT_ADMIN_ROLE — configure settlement token policies |
+| `.pauser` | PAUSER_ROLE — pause/unpause subscription, redemption, etc. |
+| `.upgrader` | UPGRADER_ROLE — execute UUPS proxy upgrades |
 | **roles.rfqSettlement** | |
-| `.admin` | RFQSettlement 的 DEFAULT_ADMIN_ROLE — 管理所有角色 |
-| `.settlementAdmin` | SETTLEMENT_ADMIN_ROLE — 配置结算代币策略 + 手续费 |
-| `.pauser` | PAUSER_ROLE — 暂停/恢复结算域 |
-| `.upgrader` | UPGRADER_ROLE — 执行 UUPS 代理升级 |
-| **settlementTokens[]** | 结算代币数组，支持多币种 |
-| `.token` | ERC20 代币地址（填 `0x0` 时自动部署 MockERC20，仅限本地测试） |
-| `.bondIssuancePolicy` | BondIssuance 三维策略：认购(issuance) / 结算(settlement) / 赎回(redemption) |
-| `.rfqSettlementEnabled` | RFQSettlement 该代币是否允许二级结算 |
+| `.admin` | RFQSettlement DEFAULT_ADMIN_ROLE — manage all roles |
+| `.settlementAdmin` | SETTLEMENT_ADMIN_ROLE — configure settlement token policies + fees |
+| `.pauser` | PAUSER_ROLE — pause/unpause settlement domains |
+| `.upgrader` | UPGRADER_ROLE — execute UUPS proxy upgrades |
+| **settlementTokens[]** | Settlement token array, supporting multiple currencies |
+| `.token` | ERC20 token address (`0x0` auto-deploys MockERC20, local testing only) |
+| `.bondIssuancePolicy` | BondIssuance tri-dimensional policy: issuance / settlement / redemption |
+| `.rfqSettlementEnabled` | Whether this token is enabled for RFQSettlement secondary trading |
 | **feeConfig** | |
-| `.feeRecipient` | RFQ 二级市场手续费接收地址 |
-| `.currentFeeBps` | 当前手续费率（基点，30 = 0.30%） |
-| `.maxFeeBps` | 手续费率上限（基点，1000 = 10%） |
-| `revokeDeployer` | 是否在配置完成后撤销 deployer 的全部角色（选择性撤销：已移交给他人的角色才撤销，deployer 仍持有的角色保留并输出警告） |
+| `.feeRecipient` | RFQ secondary market fee recipient address |
+| `.currentFeeBps` | Current fee rate (basis points, 30 = 0.30%) |
+| `.maxFeeBps` | Fee rate ceiling (basis points, 1000 = 10%) |
+| `revokeDeployer` | Whether to revoke all deployer roles after configuration (selective revocation: only roles already handed off to others are revoked; roles still held solely by deployer are retained with a warning) |
 
-> **安全说明**：部署者私钥已从 config 文件中移除，仅通过 `DEPLOYER_PRIVATE_KEY` 环境变量传入，避免意外提交到 Git。
+> **Security Note**: The deployer private key has been removed from config files and is only passed via the `DEPLOYER_PRIVATE_KEY` environment variable to prevent accidental Git commits.
 >
-> **统一部署流程**：Anvil / Testnet / Mainnet 走完全相同的部署流水线，本地 Anvil 默认使用 Anvil 账户 #1 作为角色地址并启用 `revokeDeployer`，以真实测试权限移交流程。
+> **Unified Deployment Pipeline**: Anvil / Testnet / Mainnet follow the exact same deployment pipeline. Local Anvil defaults to Anvil account #1 for role addresses and enables `revokeDeployer` to realistically test the permission handoff flow.
 
-## 1. 编译合约
+## 1. Compile Contracts
 
 ```bash
 make build
 ```
 
-## 2. 跑最小验证路径
+## 2. Run Minimum Verification Path
 
 ```bash
-make test-us1   # 发行审批 + 一级认购
-make test-us2   # RFQ 二级成交、批量成交、手续费、应计利息验证
-make test-us3   # 赎回注资 + 持有人兑付
-make test-e2e   # 完整生命周期 E2E
-make test        # 全量回归
+make test-us1   # Issuance approval + primary subscription
+make test-us2   # RFQ secondary trading, batch fills, fees, accrued interest verification
+make test-us3   # Redemption fund injection + holder claims
+make test-e2e   # Full lifecycle E2E
+make test        # Full regression suite
 ```
 
-## 3. 在本地 Anvil 上验证一站式部署
+## 3. Verify One-Stop Deployment on Local Anvil
 
 ```bash
-# 终端 1：启动本地链
+# Terminal 1: Start local chain
 anvil
 
-# 终端 2：一站式部署（Anvil 默认私钥）
+# Terminal 2: One-stop deployment (Anvil default private key)
 DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 make deploy-anvil
 ```
 
-**一条命令自动完成**（Anvil / Testnet / Mainnet 执行相同流水线）：
+**A single command automatically completes** (Anvil / Testnet / Mainnet run the same pipeline):
 
-1. 部署 MockERC20（token 为零地址时，仅本地测试触发）
-2. 校验配置（所有角色、代币、手续费地址必须非零）
-3. 部署 ComplianceModule 实现 → BondIssuance 代理 → RFQSettlement 代理 → BondFactory
-4. 注册 ComplianceModule 实现模板
-5. 配置全部结算代币策略
-6. 配置 RFQ 手续费
-7. 设置 platformAdmin
-8. 逐角色授权（每个合约的每个角色独立授予配置的地址）
-9. 选择性撤销 deployer 角色（`revokeDeployer=true` 时，已移交给他人的角色自动 renounce）
+1. Deploy MockERC20 (triggered only when token is zero address, local testing only)
+2. Validate configuration (all roles, tokens, fee addresses must be non-zero)
+3. Deploy ComplianceModule implementation → BondIssuance proxy → RFQSettlement proxy → BondFactory
+4. Register ComplianceModule implementation template
+5. Configure all settlement token policies
+6. Configure RFQ fees
+7. Set platformAdmin
+8. Per-role authorization (each contract's each role independently granted to configured addresses)
+9. Selective deployer revocation (`revokeDeployer=true`: roles already handed off to others are auto-renounced)
 
-部署完成后，完整清单写入 `deployments/{chainId}.json`。
+Upon completion, the full manifest is written to `deployments/{chainId}.json`.
 
-### 3.1 端到端演示
+### 3.1 End-to-End Demo
 
-一键执行完整生命周期演示（自动启动 Anvil → 部署 → 演示 → 关闭 Anvil）：
+Run a full lifecycle demo with one command (auto-starts Anvil → deploys → demos → shuts down Anvil):
 
 ```bash
 make demo-anvil
 ```
 
-该命令自动以 2025-12-31 时间戳启动 Anvil，部署合约后按真实时间线多阶段执行：认购窗口（2026-01-01）→ 起息后 12 分钟 → +2 天 → 每月推进至 +3 月 → 到期日（2027-01-09），Makefile 通过 `cast rpc` 自动推进 Anvil 时间。每笔 RFQ 交易包含基于链上时间自动计算的应计利息。演示结束后自动关闭 Anvil。
+This command automatically starts Anvil with a timestamp of 2025-12-31, deploys contracts, then executes in multiple phases along a real timeline: subscription window (2026-01-01) → 12 minutes after issue date → +2 days → monthly progression to +3 months → maturity date (2027-01-09). The Makefile advances Anvil time via `cast rpc`. Each RFQ trade includes accrued interest automatically calculated from onchain time. Anvil shuts down automatically after the demo.
 
-演示覆盖 9 个参与者（admin / issuer / makerA / makerB / makerC / investorA / investorB / investorC / delegate），包括：超额认购报错、未授权认购报错、**私下直接转账被拒绝（授权 operator 机制）**、RFQ 买卖含应计利息和手续费、做市商间免手续费但有应计利息、取消订单、过期订单、投资者间交易限制、代理领取、多余资金救援等场景。
+The demo covers 9 participants (admin / issuer / makerA / makerB / makerC / investorA / investorB / investorC / delegate), including: over-subscription error, unauthorized subscription error, **direct transfer rejection (authorized operator mechanism)**, RFQ buy/sell with accrued interest and fees, market maker-to-market maker fee exemption with accrued interest, order cancellation, expired orders, investor-to-investor restriction, delegated claims, surplus fund rescue, and more.
 
-如需纯模拟（不需要 Anvil 运行，含 `vm.warp`，单次完成全流程；需要先有 `deployments/31337.json`）：
+For simulation mode (no Anvil required, uses `vm.warp`, single-pass full lifecycle; requires existing `deployments/31337.json`):
 
 ```bash
 make demo-anvil-sim
 ```
 
-### 3.2 模块化操作
+### 3.2 Modular Operations
 
-部署后的日常操作（审批、合规、认购、RFQ、赎回、查询等）通过 `Operations.s.sol` 提供模块化命令。通过 `ENV` 变量选择网络：
+Post-deployment daily operations (approval, compliance, subscription, RFQ, redemption, queries, etc.) are provided via `Operations.s.sol` as modular commands. Select network via `ENV` variable:
 
 ```bash
-# Anvil（默认）
+# Anvil (default)
 make ops-query-fee-config
 
-# 测试网
+# Testnet
 ENV=testnet make ops-query-fee-config
-ENV=testnet DEPLOYER_PRIVATE_KEY=0x... make ops-set-whitelist ARGS="0xCM地址 0x账户 true"
+ENV=testnet DEPLOYER_PRIVATE_KEY=0x... make ops-set-whitelist ARGS="0xCMAddress 0xAccount true"
 
-# 主网
-ENV=mainnet DEPLOYER_PRIVATE_KEY=0x... make ops-set-whitelist ARGS="0xCM地址 0x账户 true"
+# Mainnet
+ENV=mainnet DEPLOYER_PRIVATE_KEY=0x... make ops-set-whitelist ARGS="0xCMAddress 0xAccount true"
 ```
 
-查询类操作（`ops-query-*`）不需要私钥。详见 `docs/部署后操作手册.md`。
+Query operations (`ops-query-*`) do not require a private key. See `docs/部署后操作手册.md` for details.
 
-应计利息容差配置（`setAiToleranceSeconds` / `aiToleranceSeconds`）可通过 `Operations.s.sol` 直接调用，详见 `docs/部署后操作手册.md`。
+Accrued interest tolerance configuration (`setAiToleranceSeconds` / `aiToleranceSeconds`) can be invoked directly through `Operations.s.sol`. See `docs/部署后操作手册.md` for details.
 
-## 4. 导出 ABI
+## 4. Export ABI
 
 ```bash
 make export-abi
 ```
 
-产物：`abi-export/abi/*.abi.json` + `abi-export/metadata/metadata.json`
+Output: `abi-export/abi/*.abi.json` + `abi-export/metadata/metadata.json`
 
-## 5. 推进到测试网
+## 5. Deploy to Testnet
 
-### 5.1 编辑 `config/testnet.json`
+### 5.1 Edit `config/testnet.json`
 
-填入所有真实地址（每个角色可以指向不同的 Safe 多签）：
+Fill in all real addresses (each role can point to a different Safe multisig):
 
 ```json
 {
   "rpcUrl": "https://testnet.hsk.xyz",
-  "platformAdmin": "0xSafe地址A",
+  "platformAdmin": "0xSafeAddressA",
   "roles": {
     "bondFactory": {
-      "admin":            "0xSafe地址A",
-      "issuanceApprover": "0xSafe地址A",
-      "complianceAdmin":  "0xSafe地址A",
-      "pauser":           "0xSafe地址B（运维团队）"
+      "admin":            "0xSafeAddressA",
+      "issuanceApprover": "0xSafeAddressA",
+      "complianceAdmin":  "0xSafeAddressA",
+      "pauser":           "0xSafeAddressB(OpsTeam)"
     },
     "bondIssuance": {
-      "admin":            "0xSafe地址A",
-      "issuanceApprover": "0xSafe地址A",
-      "settlementAdmin":  "0xSafe地址A",
-      "pauser":           "0xSafe地址B",
-      "upgrader":         "0xSafe地址C（技术团队）"
+      "admin":            "0xSafeAddressA",
+      "issuanceApprover": "0xSafeAddressA",
+      "settlementAdmin":  "0xSafeAddressA",
+      "pauser":           "0xSafeAddressB",
+      "upgrader":         "0xSafeAddressC(TechTeam)"
     },
     "rfqSettlement": {
-      "admin":            "0xSafe地址A",
-      "settlementAdmin":  "0xSafe地址A",
-      "pauser":           "0xSafe地址B",
-      "upgrader":         "0xSafe地址C"
+      "admin":            "0xSafeAddressA",
+      "settlementAdmin":  "0xSafeAddressA",
+      "pauser":           "0xSafeAddressB",
+      "upgrader":         "0xSafeAddressC"
     }
   },
   "settlementTokens": [
     {
-      "token": "0x测试网USDC",
+      "token": "0xTestnetUSDC",
       "bondIssuancePolicy": {
         "issuanceEnabled": true,
         "settlementEnabled": false,
@@ -250,7 +252,7 @@ make export-abi
     }
   ],
   "feeConfig": {
-    "feeRecipient": "0x国库Safe",
+    "feeRecipient": "0xTreasurySafe",
     "currentFeeBps": 30,
     "maxFeeBps": 1000
   },
@@ -258,99 +260,99 @@ make export-abi
 }
 ```
 
-### 5.2 一站式部署
+### 5.2 One-Stop Deployment
 
 ```bash
-DEPLOYER_PRIVATE_KEY=0x你的私钥 make deploy-testnet
+DEPLOYER_PRIVATE_KEY=0xYourPrivateKey make deploy-testnet
 ```
 
-成功后自动更新 `deployments/133.json`（含完整合约地址、配置参数、角色矩阵、移交状态）。
+On success, `deployments/133.json` is automatically updated (containing complete contract addresses, configuration parameters, role matrix, and handoff status).
 
-## 6. 主网部署
+## 6. Mainnet Deployment
 
-编辑 `config/mainnet.json` → `DEPLOYER_PRIVATE_KEY=0x... make deploy-mainnet` → 输出 `deployments/177.json`。
+Edit `config/mainnet.json` → `DEPLOYER_PRIVATE_KEY=0x... make deploy-mainnet` → outputs `deployments/177.json`.
 
-## 部署输出文件说明
+## Deployment Output File
 
-`deployments/{chainId}.json` 包含：
+`deployments/{chainId}.json` contains:
 
-| 字段 | 说明 |
+| Field | Description |
 | --- | --- |
-| `deployer` / `platformAdmin` | 关键账户地址 |
-| `contracts` | 所有合约地址（代理 + 实现） |
-| `configuration.settlementTokens[]` | 每条代币的完整策略 |
-| `configuration.feeConfig` | 手续费率和接收地址 |
-| `configuration.aiToleranceSeconds` | 应计利息验证容差（秒），从链上读取 |
-| `roles.bondFactory` | BondFactory 每个角色的持有者 |
-| `roles.bondIssuance` | BondIssuance 每个角色的持有者 |
-| `roles.rfqSettlement` | RFQSettlement 每个角色的持有者 |
-| `handoff` | deployer 角色撤销状态 |
+| `deployer` / `platformAdmin` | Key account addresses |
+| `contracts` | All contract addresses (proxy + implementation) |
+| `configuration.settlementTokens[]` | Full policy for each token |
+| `configuration.feeConfig` | Fee rate and recipient address |
+| `configuration.aiToleranceSeconds` | Accrued interest verification tolerance (seconds), read from onchain |
+| `roles.bondFactory` | BondFactory per-role holders |
+| `roles.bondIssuance` | BondIssuance per-role holders |
+| `roles.rfqSettlement` | RFQSettlement per-role holders |
+| `handoff` | Deployer role revocation status |
 
-## 命令速查
+## Command Reference
 
-| 命令 | 说明 |
+| Command | Description |
 | --- | --- |
-| `make build` | 编译合约 |
-| `make test` | 全量测试 |
-| `make test-us1` / `test-us2` / `test-us3` | 单条主线测试 |
-| `make test-e2e` | E2E 生命周期测试 |
-| `DEPLOYER_PRIVATE_KEY=0x... make deploy-anvil` | 本地 Anvil 一站式部署 |
-| `DEPLOYER_PRIVATE_KEY=0x... make deploy-testnet` | 测试网一站式部署 + 权限移交 |
-| `DEPLOYER_PRIVATE_KEY=0x... make deploy-mainnet` | 主网一站式部署 + 权限移交 |
-| `make ops-release-excess-redemption ARGS="<bondToken>"` | 释放超额赎回负债（到期后） |
-| `make demo-anvil` | Anvil 端到端演示（多阶段：按真实时间线推进认购→RFQ→赎回） |
-| `make demo-anvil-sim` | 纯模拟演示（不 broadcast，含 vm.warp，单次完成） |
-| `make export-abi` | 导出 ABI |
-| `ENV=testnet make ops-query-*` | 测试网查询（不需要私钥） |
-| `ENV=testnet DEPLOYER_PRIVATE_KEY=0x... make ops-*` | 测试网写入操作 |
+| `make build` | Compile contracts |
+| `make test` | Full test suite |
+| `make test-us1` / `test-us2` / `test-us3` | Individual workflow tests |
+| `make test-e2e` | E2E lifecycle test |
+| `DEPLOYER_PRIVATE_KEY=0x... make deploy-anvil` | Local Anvil one-stop deployment |
+| `DEPLOYER_PRIVATE_KEY=0x... make deploy-testnet` | Testnet one-stop deployment + permission handoff |
+| `DEPLOYER_PRIVATE_KEY=0x... make deploy-mainnet` | Mainnet one-stop deployment + permission handoff |
+| `make ops-release-excess-redemption ARGS="<bondToken>"` | Release excess redemption liability (post-maturity) |
+| `make demo-anvil` | Anvil E2E demo (multi-phase: real-timeline subscription → RFQ → redemption) |
+| `make demo-anvil-sim` | Simulation demo (no broadcast, uses vm.warp, single-pass) |
+| `make export-abi` | Export ABI |
+| `ENV=testnet make ops-query-*` | Testnet queries (no private key required) |
+| `ENV=testnet DEPLOYER_PRIVATE_KEY=0x... make ops-*` | Testnet write operations |
 
-## BondConfig 字段速查
+## BondConfig Field Reference
 
-`createBond` 使用的 `BondConfig` 结构体完整示例：
+Full example of the `BondConfig` struct used by `createBond`:
 
 ```solidity
 BondConfig({
-    issuer:                   0x发行人地址,
+    issuer:                   0xIssuerAddress,
     name:                     "HashKey Bond 2026-Q1",
     symbol:                   "HKB-Q1",
     decimals:                 0,
     faceValue:                1_000e6,           // 1,000 USDC
-    couponRateBps:            500,               // 年化 5%（注意：现在是年化利率）
-    maturityTimestamp:        1767225600,         // 2026-01-01 到期
-    issueDate:                1704067200,         // 2024-01-01 发行
+    couponRateBps:            500,               // 5% annualized (note: annualized rate)
+    maturityTimestamp:        1767225600,         // 2026-01-01 maturity
+    issueDate:                1704067200,         // 2024-01-01 issue date
     dayCountConvention:       DayCount.ACT_365,
     couponFrequency:          CouponFrequency.BULLET,
     bondCategory:             BondCategory.CORPORATE,
-    isin:                     bytes12(0),         // 或填入 12 字节 ISIN
-    settlementToken:          0xUSDC地址,
+    isin:                     bytes12(0),         // or fill in 12-byte ISIN
+    settlementToken:          0xUSDCAddress,
     settlementTokenDecimals:  6,
-    complianceImplementation: 0x已注册合规模板地址,
+    complianceImplementation: 0xRegisteredComplianceTemplate,
     policyId:                 keccak256("policy-v1"),
     policyVersion:            1
 })
 ```
 
-**DayCountConvention 枚举值：**
+**DayCountConvention Enum Values:**
 
-| 枚举 | 值 | 说明 |
+| Enum | Value | Description |
 | --- | --- | --- |
-| `ACT_365` | 0 | 实际天数 / 365 |
-| `ACT_360` | 1 | 实际天数 / 360 |
+| `ACT_365` | 0 | Actual days / 365 |
+| `ACT_360` | 1 | Actual days / 360 |
 
-**CouponFrequency 枚举值：**
+**CouponFrequency Enum Values:**
 
-| 枚举 | 值 | 说明 |
+| Enum | Value | Description |
 | --- | --- | --- |
-| `BULLET` | 0 | 到期一次性付息（最常见） |
-| `ANNUAL` | 1 | 每年付息 |
-| `SEMI_ANNUAL` | 2 | 每半年付息 |
-| `QUARTERLY` | 3 | 每季度付息 |
+| `BULLET` | 0 | Bullet payment at maturity (most common) |
+| `ANNUAL` | 1 | Annual coupon |
+| `SEMI_ANNUAL` | 2 | Semi-annual coupon |
+| `QUARTERLY` | 3 | Quarterly coupon |
 
-**BondCategory 枚举值：**
+**BondCategory Enum Values:**
 
-| 枚举 | 值 | 说明 |
+| Enum | Value | Description |
 | --- | --- | --- |
-| `CORPORATE` | 0 | 公司债 |
-| `GOVERNMENT` | 1 | 政府债 |
-| `CONVERTIBLE` | 2 | 可转债 |
-| `ABS` | 3 | 资产支持证券 |
+| `CORPORATE` | 0 | Corporate bond |
+| `GOVERNMENT` | 1 | Government bond |
+| `CONVERTIBLE` | 2 | Convertible bond |
+| `ABS` | 3 | Asset-backed security |

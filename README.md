@@ -1,62 +1,64 @@
 # BondDEX RFQ Smart Contracts
 
-`BondDEX RFQ Smart Contracts` 是一个面向 HashKey Chain 的 `contracts-first` 债券协议仓库。它覆盖了合规债券的创建与发行审批、一级市场认购、二级市场 RFQ 询价成交，以及到期后的赎回资金注入与持有人兑付领取。
+[中文版](README.zh-CN.md)
 
-这个仓库的目标不只是放 Solidity 合约本身，还包括完整的交付链路：
+`BondDEX RFQ Smart Contracts` is a contracts-first bond protocol repository targeting HashKey Chain. It covers compliant bond creation and issuance approval, primary market subscription, secondary market RFQ settlement, and post-maturity redemption fund injection with holder claims.
 
-- 在 `contracts/` 中完成合约、脚本与测试开发
-- 在 `deployments/` 中沉淀链级部署清单
-- 在 `abi-export/` 中导出 ABI、地址与事件接口说明，供前端、Go 后端和索引器消费
+This repository aims to deliver not just the Solidity contracts themselves, but the complete delivery pipeline:
 
-## 业务范围
+- Develop contracts, scripts, and tests in `contracts/`
+- Maintain chain-level deployment manifests in `deployments/`
+- Export ABIs, addresses, and event interface documentation in `abi-export/` for consumption by frontend, Go backend, and indexers
 
-当前仓库的核心能力可以按 3 条主流程理解：
+## Business Scope
 
-- `US1 - Launch and Subscribe`：平台审批发行，发行人创建债券（含 issueDate、dayCountConvention、couponFrequency、bondCategory、ISIN 等完整属性），配置合规模块，管理员审批认购窗口，做市商或合格参与方完成一级认购
-- `US2 - RFQ Settlement`：做市商或投资者签名 EIP-712 订单（含 accruedInterest 字段），对手方按单成交，合约在链上验证应计利息合理性，支持批量成交、订单取消、nonce 管理和手续费收取（基于 dirty amount）。交易方向限制为做市商↔投资者和做市商↔做市商，禁止投资者↔投资者。手续费始终由做市商侧承担，做市商之间交易免手续费
-- `US3 - Redemption and Claims`：债券到期后由发行人注入赎回资金（按年化利率 + 日期折算，平台链下流程强制要求全额存入），持有人直接领取或通过代理人代领（持有人须仍在白名单中）；超额赎回负债在全部赎回后自动释放，或由管理员主动释放（`releaseExcessRedemption`），释放后可通过 `rescueTokens` 取回多余资金
+The core capabilities of this repository can be understood through 3 main workflows:
 
-这 3 条主流程分别在 `contracts/test/integration/US1_LaunchAndSubscribe.t.sol`、`contracts/test/integration/US2_RfqSettlement.t.sol` 和 `contracts/test/integration/US3_RedemptionAndClaims.t.sol` 中有对应的集成测试覆盖，并由 `contracts/test/integration/BondLifecycleE2E.t.sol` 串成完整生命周期。
+- **US1 – Launch and Subscribe**: Platform approves issuance; issuer creates a bond (with full attributes including issueDate, dayCountConvention, couponFrequency, bondCategory, ISIN, etc.); compliance modules are configured; admin approves subscription window; market makers or qualified participants complete primary subscription
+- **US2 – RFQ Settlement**: Market makers or investors sign EIP-712 orders (with accruedInterest field); counterparties fill orders; the contract verifies accrued interest reasonableness onchain; supports batch fills, order cancellation, nonce management, and fee collection (based on dirty amount). Trading direction is restricted to market maker ↔ investor and market maker ↔ market maker; investor ↔ investor is prohibited. Fees are always borne by the market maker side; market maker-to-market maker trades are fee-exempt
+- **US3 – Redemption and Claims**: After maturity, the issuer injects redemption funds (calculated by annualized rate × date proration; the platform's off-chain process mandates full deposit). Holders claim directly or via delegate (holder must remain whitelisted). Excess redemption liability is automatically released once all holders claim, or manually released by admin (`releaseExcessRedemption`); after release, surplus funds can be rescued via `rescueTokens`
 
-## 核心模块
+These 3 workflows are covered by integration tests in `contracts/test/integration/US1_LaunchAndSubscribe.t.sol`, `contracts/test/integration/US2_RfqSettlement.t.sol`, and `contracts/test/integration/US3_RedemptionAndClaims.t.sol`, and are chained into a full lifecycle by `contracts/test/integration/BondLifecycleE2E.t.sol`.
 
-| 模块 | 作用 |
+## Core Modules
+
+| Module | Purpose |
 | --- | --- |
-| `BondFactory` | 负责发行审批、合规实现注册，以及创建 `BondToken` 和每只债对应的 `ComplianceModule` 实例；`createBond` 现接收含完整债券属性（issueDate、dayCountConvention、couponFrequency、bondCategory、isin）的 `BondConfig` 结构体 |
-| `BondToken` | 债券 ERC-20 资产本体，记录发行人、面值、年化票息率、发行日、计息惯例、到期时间和结算币；构造器通过 `ConstructorParams` 结构体传参；转账限制委托给合规模块判断 |
-| `ComplianceModule` | 负责白名单、角色矩阵、授权转账 operator、策略元数据与暂停域控制；限制债券转账方向（禁止投资者↔投资者）和参与方身份；强制所有用户间转账必须通过授权 operator（如 RFQSettlement）执行 |
-| `BondIssuance` | 负责一级市场认购审批、认购窗口管理、赎回资金注入（赎回利息按年化利率 × 日期折算）、直接领取与代理领取（含持有人白名单校验）、超额赎回负债释放（`releaseExcessRedemption`）、资金救援（`rescueTokens`）与结算代币策略查询（`getSettlementTokenPolicy`） |
-| `RFQSettlement` | 负责二级市场 RFQ 订单的 EIP-712 签名校验、应计利息链上验证（含容差配置 `setAiToleranceSeconds`）、撮合成交、批量成交、取消、nonce floor、手续费策略（基于 dirty amount）与 `quoteFee` 查询 |
-| `BondMath` | 基点计算与精度缩放工具库，供手续费计算和金额换算使用 |
+| `BondFactory` | Handles issuance approval, compliance implementation registration, and creation of `BondToken` and per-bond `ComplianceModule` instances; `createBond` accepts a `BondConfig` struct with full bond attributes (issueDate, dayCountConvention, couponFrequency, bondCategory, isin) |
+| `BondToken` | Bond ERC-20 asset entity recording issuer, face value, annualized coupon rate, issue date, day count convention, maturity, and settlement token; constructor uses `ConstructorParams` struct; transfer restrictions are delegated to the compliance module |
+| `ComplianceModule` | Manages whitelist, role matrix, authorized transfer operators, policy metadata, and domain-level pause control; restricts bond transfer directions (investor ↔ investor prohibited) and participant identity; enforces all user-to-user transfers through authorized operators (e.g., RFQSettlement) |
+| `BondIssuance` | Handles primary market subscription approval, subscription window management, redemption fund injection (interest calculated by annualized rate × date proration), direct and delegated claims (with holder whitelist verification), excess redemption liability release (`releaseExcessRedemption`), fund rescue (`rescueTokens`), and settlement token policy queries (`getSettlementTokenPolicy`) |
+| `RFQSettlement` | Handles secondary market RFQ order EIP-712 signature verification, onchain accrued interest verification (with configurable tolerance `setAiToleranceSeconds`), order filling, batch fills, cancellation, nonce floor, fee policy (based on dirty amount), and `quoteFee` queries |
+| `BondMath` | Basis point calculation and precision scaling utility library for fee computation and amount conversion |
 
-## 手续费模型
+## Fee Model
 
-RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不受手续费影响，且**基于 dirty amount（quoteAmount + accruedInterest）计算**：
+RFQ secondary market trading fees are always borne by the market maker side; investors are unaffected. Fees are **calculated based on the dirty amount (quoteAmount + accruedInterest)**:
 
-| 场景 | 资金流（以 30 bps 为例，含应计利息 500 USDC） |
+| Scenario | Fund flow (example at 30 bps, with accrued interest of 500 USDC) |
 | --- | --- |
-| 做市商卖出债券 / 投资者买入 | 投资者付 10,500 USDC → 做市商收 10,468.5 → 平台收 31.5 |
-| 做市商买入债券 / 投资者卖出 | 做市商付 10,531.5 USDC → 投资者收 10,500 → 平台收 31.5 |
-| 做市商之间交易 | 做市商 B 付 10,500 USDC → 做市商 A 收 10,500 → 平台不收 |
+| Market maker sells bond / investor buys | Investor pays 10,500 USDC → market maker receives 10,468.5 → platform receives 31.5 |
+| Market maker buys bond / investor sells | Market maker pays 10,531.5 USDC → investor receives 10,500 → platform receives 31.5 |
+| Market maker-to-market maker trade | Market maker B pays 10,500 USDC → market maker A receives 10,500 → platform receives 0 |
 
-`quoteFee(bondToken, partyA, partyB, dirtyAmount)` 提供链上手续费预估查询，做市商可在链下构造订单前调用（传入 dirty amount）。每笔订单通过 `maxFeeBps` 字段锁定 maker 签名时的最高费率预期，防止签名后费率被修改导致超预期扣费。
+`quoteFee(bondToken, partyA, partyB, dirtyAmount)` provides onchain fee estimation; market makers can call it before constructing orders off-chain (passing dirty amount). Each order includes a `maxFeeBps` field that locks the maker's maximum acceptable fee rate at signing time, preventing unexpected overcharges from post-signature fee changes.
 
-## 协议特性
+## Protocol Features
 
-- 目标链为 HashKey Chain，内置测试网 `133` 与主网 `177` 的部署配置
-- 关键控制平面采用 `AccessControl` + 角色治理，支持部署后向 Safe 交接权限
-- `BondIssuance`、`RFQSettlement` 与每债券实例级的 `ComplianceModule` 使用 UUPS 代理部署模式
-- `BondToken` 将合规限制外部化到 `ComplianceModule`，便于按债券实例独立配置白名单、角色和授权 operator；构造器通过 `ConstructorParams` 结构体传参，支持完整债券属性
-- `ComplianceModule` 的授权 operator 机制强制所有用户间债券转账必须通过平台合约（RFQSettlement）执行，防止私下转账绕过手续费和应计利息验证
-- 二级结算使用 EIP-712 typed data，订单结构含 `accruedInterest` 字段，对订单哈希、签名与 nonce 作严格校验
-- `BondToken` 支持完整债券属性：`issueDate`、`dayCountConvention`（ACT_365 / ACT_360）、`couponFrequency`（BULLET / ANNUAL / SEMI_ANNUAL / QUARTERLY）、`bondCategory`（CORPORATE / GOVERNMENT / CONVERTIBLE / ABS）、`isin`（bytes12）
-- 赎回利息按年化利率 + 日期折算（ACT_365 / ACT_360 两种计息惯例）；`couponRateBps` 语义为年化利率
-- RFQ 应计利息链上验证，容差通过 `setAiToleranceSeconds` 可调，防止恶意篡改同时容忍合理时间延迟
-- 手续费路由根据参与方角色自动判断，做市商之间免手续费；手续费基于 dirty amount（含应计利息）计算
-- `BondFactory.createBond` 拆分事件：`BondCreated`（含 issueDate）+ `BondMetadata`（计息惯例、付息频率、债券类别、ISIN）
-- ABI 与事件接口采用 additive-first 的发布约定，方便前端、`abigen` 与 Subgraph 同步升级
+- Targets HashKey Chain with built-in deployment configurations for testnet `133` and mainnet `177`
+- Critical control plane uses `AccessControl` + role governance with support for post-deployment handoff to Safe
+- `BondIssuance`, `RFQSettlement`, and per-bond `ComplianceModule` use UUPS proxy deployment pattern
+- `BondToken` externalizes compliance restrictions to `ComplianceModule` for per-bond whitelist, role, and authorized operator configuration; constructor uses `ConstructorParams` struct with full bond attributes
+- `ComplianceModule`'s authorized operator mechanism enforces all user-to-user bond transfers through platform contracts (RFQSettlement), preventing direct transfers that bypass fees and accrued interest verification
+- Secondary settlement uses EIP-712 typed data; order struct includes `accruedInterest` field with strict order hash, signature, and nonce verification
+- `BondToken` supports full bond attributes: `issueDate`, `dayCountConvention` (ACT_365 / ACT_360), `couponFrequency` (BULLET / ANNUAL / SEMI_ANNUAL / QUARTERLY), `bondCategory` (CORPORATE / GOVERNMENT / CONVERTIBLE / ABS), `isin` (bytes12)
+- Redemption interest uses annualized rate + date proration (ACT_365 / ACT_360 day count conventions); `couponRateBps` semantics are annualized rate
+- RFQ accrued interest onchain verification with configurable tolerance via `setAiToleranceSeconds`, preventing manipulation while tolerating reasonable time delays
+- Fee routing automatically determined by participant roles; market maker-to-market maker trades are fee-exempt; fees computed on dirty amount (including accrued interest)
+- `BondFactory.createBond` emits split events: `BondCreated` (with issueDate) + `BondMetadata` (day count convention, coupon frequency, bond category, ISIN)
+- ABI and event interfaces follow an additive-first release convention for easy synchronization with frontend, `abigen`, and Subgraph upgrades
 
-## 仓库结构
+## Repository Structure
 
 ```text
 .
@@ -64,15 +66,15 @@ RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不�
 ├── QUICKSTART.md
 ├── Makefile
 ├── config/
-│   ├── anvil.json      ← 本地 Anvil（Anvil 预置账户 + MockERC20，默认启用 revokeDeployer）
-│   ├── testnet.json    ← 测试网（需填入每个角色地址、代币、手续费等）
-│   └── mainnet.json    ← 主网（需填入每个角色地址、代币、手续费等）
+│   ├── anvil.json      ← Local Anvil (Anvil preset accounts + MockERC20, revokeDeployer enabled by default)
+│   ├── testnet.json    ← Testnet (fill in role addresses, tokens, fees, etc.)
+│   └── mainnet.json    ← Mainnet (fill in role addresses, tokens, fees, etc.)
 ├── abi-export/
-│   ├── abi/                 # 导出的 ABI JSON
-│   ├── addresses/           # 链级地址清单
-│   └── metadata/            # 版本、事件接口、发布元数据
+│   ├── abi/                 # Exported ABI JSON
+│   ├── addresses/           # Chain-level address manifests
+│   └── metadata/            # Version, event interfaces, release metadata
 ├── contracts/
-│   ├── src/                 # 核心合约
+│   ├── src/                 # Core contracts
 │   │   ├── BondFactory.sol
 │   │   ├── BondToken.sol
 │   │   ├── BondIssuance.sol
@@ -82,52 +84,52 @@ RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不�
 │   │   ├── interfaces/      # IBondFactory, IBondToken, IBondIssuance, IComplianceModule, IRFQSettlement
 │   │   ├── libraries/       # BondErrors, BondMath, SettlementOrderEIP712
 │   │   └── types/BondTypes.sol
-│   ├── script/              # FullDeploy 部署、AnvilDemo 端到端演示、Operations 模块化操作、ABI 导出
+│   ├── script/              # FullDeploy deployment, AnvilDemo E2E demo, Operations modular ops, ABI export
 │   ├── test/                # unit / fuzz / invariant / integration / fork
 │   ├── foundry.toml
 │   └── remappings.txt
-└── deployments/             # 各链部署记录与交接状态
+└── deployments/             # Per-chain deployment records and handoff status
 ```
 
-## 开发与交付流程
+## Development and Delivery Workflow
 
-推荐按下面的顺序理解和使用仓库：
+Recommended order for understanding and using this repository:
 
-1. 在 `contracts/` 中编译、运行单元测试和集成测试
-2. 编辑 `config/{env}.json`，配置每个合约的角色地址、结算代币策略、手续费与移交策略
-3. 使用 `make deploy-anvil` 在本地链验证一站式部署
-4. 使用 `make deploy-testnet` 或 `make deploy-mainnet` 一站式完成部署 → 配置 → 角色授予 → 权限移交
-5. 使用 `make export-abi` 将 ABI 与发布元数据导出到 `abi-export/`
-6. 使用 `make demo-anvil` 在本地 Anvil 上按真实时间线运行完整生命周期演示（9 个参与者、按日推进应计利息、覆盖认购/RFQ 含 AI 和手续费/赎回/合规拒绝等场景）
-7. 使用 `ENV=testnet make ops-*` 或 `ENV=mainnet make ops-*` 在测试网/主网执行模块化操作
+1. Compile, run unit tests and integration tests in `contracts/`
+2. Edit `config/{env}.json` to configure role addresses, settlement token policies, fees, and handoff strategies for each contract
+3. Use `make deploy-anvil` to verify the one-stop deployment on a local chain
+4. Use `make deploy-testnet` or `make deploy-mainnet` for one-stop deployment → configuration → role grants → permission handoff
+5. Use `make export-abi` to export ABIs and release metadata to `abi-export/`
+6. Use `make demo-anvil` to run a full lifecycle demo on local Anvil with real-time progression (9 participants, day-by-day accrued interest advancement, covering subscription / RFQ with AI and fees / redemption / compliance rejection scenarios)
+7. Use `ENV=testnet make ops-*` or `ENV=mainnet make ops-*` to execute modular operations on testnet/mainnet
 
-一站式部署脚本 `FullDeploy.s.sol` 在单次广播中完成全部操作（部署、注册合规模板、配置结算代币策略与手续费、逐角色授权、选择性撤销 deployer 权限），Anvil / Testnet / Mainnet 走完全相同的部署流水线，部署结果写入 `deployments/{chainId}.json`。
+The one-stop deployment script `FullDeploy.s.sol` completes all operations in a single broadcast (deploy, register compliance template, configure settlement token policies and fees, per-role authorization, selective deployer revocation). Anvil / Testnet / Mainnet follow the exact same deployment pipeline; results are written to `deployments/{chainId}.json`.
 
-`Operations.s.sol` 提供模块化操作脚本，每个函数对应一个链上操作（审批、合规、认购、RFQ、赎回、查询等），通过 `ENV` 环境变量切换 Anvil / 测试网 / 主网。
+`Operations.s.sol` provides modular operation scripts, with each function corresponding to a single onchain operation (approval, compliance, subscription, RFQ, redemption, queries, etc.), switchable between Anvil / testnet / mainnet via the `ENV` environment variable.
 
-## 测试分层
+## Test Layers
 
-仓库已经按 Foundry 常见分层组织测试：
+Tests are organized following standard Foundry layering:
 
-- `unit/`：聚焦单个模块行为，例如发行审批、订单填充、合规模块管理、手续费模型
-- `fuzz/`：聚焦数学与边界输入，例如认购与结算计价逻辑
-- `invariant/`：聚焦协议不变量，例如一级市场记账与 RFQ 结算状态一致性
-- `integration/`：按用户故事验证 `US1`、`US2`、`US3` 与完整生命周期
-- `fork/`：在 HashKey testnet fork 上验证域分隔、部署与 Safe handoff 等链相关行为
+- `unit/`: Focused on individual module behavior, e.g., issuance approval, order filling, compliance module management, fee model
+- `fuzz/`: Focused on math and boundary inputs, e.g., subscription and settlement pricing logic
+- `invariant/`: Focused on protocol invariants, e.g., primary market accounting and RFQ settlement state consistency
+- `integration/`: User story validation for `US1`, `US2`, `US3`, and full lifecycle
+- `fork/`: Validates domain separation, deployment, and Safe handoff behavior on HashKey testnet fork
 
-## ABI 与事件接口
+## ABI and Event Interfaces
 
-`abi-export/metadata/README.md` 和 `abi-export/metadata/event-interface.md` 约定了 ABI 发布与事件变更策略：
+`abi-export/metadata/README.md` and `abi-export/metadata/event-interface.md` define the ABI release and event change policies:
 
-- `contracts/out/` 是构建产物的规范真源
-- `abi-export/abi/*.abi.json` 是下游消费的导出 ABI
-- `abi-export/metadata/event-interface.md` 描述了 `BondFactory`、`ComplianceModule`、`BondIssuance`、`RFQSettlement`、`BondToken` 的事件面
-- 新增事件或新增非 indexed 字段应视为 `MINOR` 变更
-- 删除事件、修改 indexed topic 或调整字段顺序应视为 `MAJOR` 变更
+- `contracts/out/` is the canonical source of truth for build artifacts
+- `abi-export/abi/*.abi.json` is the exported ABI for downstream consumption
+- `abi-export/metadata/event-interface.md` describes the event surface for `BondFactory`, `ComplianceModule`, `BondIssuance`, `RFQSettlement`, `BondToken`
+- Adding new events or non-indexed fields is considered a `MINOR` change
+- Removing events, modifying indexed topics, or reordering fields is considered a `MAJOR` change
 
-## 文档依据
+## Documentation Sources
 
-本 README 主要根据以下真值源整理而成：
+This README is compiled from the following sources of truth:
 
 - `abi-export/metadata/README.md`
 - `abi-export/metadata/event-interface.md`
@@ -137,6 +139,6 @@ RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不�
 - `contracts/test/integration/US3_RedemptionAndClaims.t.sol`
 - `contracts/test/integration/BondLifecycleE2E.t.sol`
 
-## 快速开始
+## Quick Start
 
-本地启动、核心命令、最小验证路径与测试网/主网的环境变量说明见根目录 `QUICKSTART.md`。
+For local setup, core commands, minimum verification path, and testnet/mainnet environment variable instructions, see `QUICKSTART.md` in the project root.
