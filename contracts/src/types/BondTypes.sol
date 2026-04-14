@@ -45,8 +45,7 @@ enum SubscriptionStatus {
 /// @notice Day count convention for accrued interest calculation.
 enum DayCount {
     ACT_365, // Actual/365
-    ACT_360, // Actual/360
-    THIRTY_360 // 30/360 US
+    ACT_360 // Actual/360
 }
 
 /// @notice Coupon payment frequency.

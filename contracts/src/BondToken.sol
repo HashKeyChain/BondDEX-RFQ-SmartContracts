@@ -11,7 +11,6 @@ import {
     TransferRestricted,
     ZeroAddress
 } from "./libraries/BondErrors.sol";
-import {DateLib} from "./libraries/DateLib.sol";
 import {IComplianceModule} from "./interfaces/IComplianceModule.sol";
 import {IBondToken} from "./interfaces/IBondToken.sol";
 import {BondCategory, CouponFrequency, DayCount} from "./types/BondTypes.sol";
@@ -145,27 +144,16 @@ contract BondToken is ERC20, IBondToken {
             ? timestamp
             : maturityTimestamp;
 
-        if (dayCountConvention == DayCount.ACT_365) {
-            uint256 elapsedSeconds = effectiveTs - issueDate;
-            return
-                Math.mulDiv(
-                    faceValue,
-                    couponRateBps * elapsedSeconds,
-                    10_000 * 365 days
-                );
-        }
-        if (dayCountConvention == DayCount.ACT_360) {
-            uint256 elapsedSeconds = effectiveTs - issueDate;
-            return
-                Math.mulDiv(
-                    faceValue,
-                    couponRateBps * elapsedSeconds,
-                    10_000 * 360 days
-                );
-        }
-        // DayCount.THIRTY_360
-        uint256 days360 = DateLib.diffDays30_360(issueDate, effectiveTs);
-        return Math.mulDiv(faceValue, couponRateBps * days360, 10_000 * 360);
+        uint256 elapsedSeconds = effectiveTs - issueDate;
+        uint256 yearSeconds = dayCountConvention == DayCount.ACT_365
+            ? 365 days
+            : 360 days;
+        return
+            Math.mulDiv(
+                faceValue,
+                couponRateBps * elapsedSeconds,
+                10_000 * yearSeconds
+            );
     }
 
     /// @inheritdoc IBondToken

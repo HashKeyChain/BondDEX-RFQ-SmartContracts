@@ -44,7 +44,8 @@ import {
     UnsupportedSettlementToken,
     UnauthorizedClaimCaller,
     ZeroAddress,
-    ZeroAmount
+    ZeroAmount,
+    ZeroId
 } from "./libraries/BondErrors.sol";
 import {IComplianceModule} from "./interfaces/IComplianceModule.sol";
 import {IBondIssuance} from "./interfaces/IBondIssuance.sol";
@@ -288,6 +289,7 @@ contract BondIssuance is
         uint256 maxUnits,
         uint256 expiresAt
     ) external onlyRole(ISSUANCE_APPROVER_ROLE) {
+        if (approvalId == bytes32(0)) revert ZeroId();
         if (issuer == address(0) || bondToken == address(0)) {
             revert ZeroAddress();
         }

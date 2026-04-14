@@ -118,7 +118,7 @@ contract Operations is BaseConfig {
     /// @param settlementToken_ 结算代币地址
     /// @param extendedData abi.encode(uint256 issueDate, uint8 dayCount, uint8 couponFreq, uint8 bondCategory, bytes12 isin)
     ///   - issueDate: 起息日（Unix 时间戳）
-    ///   - dayCount: 计息惯例（0=ACT_365, 1=ACT_360, 2=THIRTY_360）
+    ///   - dayCount: 计息惯例（0=ACT_365, 1=ACT_360）
     ///   - couponFreq: 付息频率（0=BULLET, 1=ANNUAL, 2=SEMI_ANNUAL, 3=QUARTERLY）
     ///   - bondCategory: 债券类别（0=CORPORATE, 1=GOVERNMENT, 2=CONVERTIBLE, 3=ABS）
     ///   - isin: ISIN 代码（12 字节，留空填 bytes12(0)）

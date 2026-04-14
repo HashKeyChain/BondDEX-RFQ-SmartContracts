@@ -27,7 +27,7 @@
 | `ComplianceModule` | 负责白名单、角色矩阵、策略元数据与暂停域控制，限制债券转账方向（禁止投资者↔投资者）和参与方身份 |
 | `BondIssuance` | 负责一级市场认购审批、认购窗口管理、赎回资金注入（赎回利息按年化利率 × 日期折算）、直接领取与代理领取、超额赎回负债释放（`releaseExcessRedemption`）与资金救援（`rescueTokens`） |
 | `RFQSettlement` | 负责二级市场 RFQ 订单的 EIP-712 签名校验、应计利息链上验证（含容差配置 `setAiToleranceSeconds`）、撮合成交、批量成交、取消、nonce floor、手续费策略（基于 dirty amount）与 `quoteFee` 查询 |
-| `DateLib` | 日期计算工具库，实现 ACT_365、ACT_360、30/360 三种计息惯例的天数计算，供 `BondIssuance` 赎回和 `RFQSettlement` 应计利息验证共享使用 |
+| `BondMath` | 基点计算与精度缩放工具库，供手续费计算和金额换算使用 |
 
 ## 手续费模型
 
@@ -48,8 +48,8 @@ RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不�
 - `BondIssuance`、`RFQSettlement` 与每债券实例级的 `ComplianceModule` 使用 UUPS 代理部署模式
 - `BondToken` 将合规限制外部化到 `ComplianceModule`，便于按债券实例独立配置白名单与角色；构造器通过 `ConstructorParams` 结构体传参，支持完整债券属性
 - 二级结算使用 EIP-712 typed data，订单结构含 `accruedInterest` 字段，对订单哈希、签名与 nonce 作严格校验
-- `BondToken` 支持完整债券属性：`issueDate`、`dayCountConvention`（ACT_365 / ACT_360 / THIRTY_360）、`couponFrequency`（BULLET / ANNUAL / SEMI_ANNUAL / QUARTERLY）、`bondCategory`（CORPORATE / GOVERNMENT / CONVERTIBLE / ABS）、`isin`（bytes12）
-- 赎回利息按年化利率 + 日期折算（`DateLib.sol` 实现三种计息惯例）；`couponRateBps` 语义为年化利率
+- `BondToken` 支持完整债券属性：`issueDate`、`dayCountConvention`（ACT_365 / ACT_360）、`couponFrequency`（BULLET / ANNUAL / SEMI_ANNUAL / QUARTERLY）、`bondCategory`（CORPORATE / GOVERNMENT / CONVERTIBLE / ABS）、`isin`（bytes12）
+- 赎回利息按年化利率 + 日期折算（ACT_365 / ACT_360 两种计息惯例）；`couponRateBps` 语义为年化利率
 - RFQ 应计利息链上验证，容差通过 `setAiToleranceSeconds` 可调，防止恶意篡改同时容忍合理时间延迟
 - 手续费路由根据参与方角色自动判断，做市商之间免手续费；手续费基于 dirty amount（含应计利息）计算
 - `BondFactory.createBond` 拆分事件：`BondCreated`（含 issueDate）+ `BondMetadata`（计息惯例、付息频率、债券类别、ISIN）
@@ -79,7 +79,7 @@ RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不�
 │   │   ├── compliance/ComplianceModule.sol
 │   │   ├── abstracts/       # DomainPausable, RoleManaged
 │   │   ├── interfaces/      # IBondFactory, IBondToken, IBondIssuance, IComplianceModule, IRFQSettlement
-│   │   ├── libraries/       # BondErrors, BondMath, DateLib, SettlementOrderEIP712
+│   │   ├── libraries/       # BondErrors, BondMath, SettlementOrderEIP712
 │   │   └── types/BondTypes.sol
 │   ├── script/              # FullDeploy 部署、AnvilDemo 端到端演示、Operations 模块化操作、ABI 导出
 │   ├── test/                # unit / fuzz / invariant / integration / fork

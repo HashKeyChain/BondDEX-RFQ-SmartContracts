@@ -22,7 +22,8 @@ import {
     UnauthorizedIssuer,
     UnsupportedInterface,
     UnsupportedSettlementToken,
-    ZeroAddress
+    ZeroAddress,
+    ZeroId
 } from "./libraries/BondErrors.sol";
 import {ApprovalStatus, BondConfig, PauseDomain} from "./types/BondTypes.sol";
 import {IBondFactory} from "./interfaces/IBondFactory.sol";
@@ -169,6 +170,7 @@ contract BondFactory is
         uint256 expiresAt,
         bytes32 metadataHash
     ) external onlyRole(ISSUANCE_APPROVER_ROLE) {
+        if (approvalId == bytes32(0)) revert ZeroId();
         if (issuer == address(0) || complianceImplementation == address(0)) {
             revert ZeroAddress();
         }

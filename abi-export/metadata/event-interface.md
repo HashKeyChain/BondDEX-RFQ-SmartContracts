@@ -47,7 +47,7 @@ event BondCreated(
 ```solidity
 event BondMetadata(
     address indexed bondToken,
-    uint8 dayCountConvention,    // 0=ACT_365, 1=ACT_360, 2=THIRTY_360
+    uint8 dayCountConvention,    // 0=ACT_365, 1=ACT_360
     uint8 couponFrequency,       // 0=BULLET, 1=ANNUAL, 2=SEMI_ANNUAL, 3=QUARTERLY
     uint8 bondCategory,          // 0=CORPORATE, 1=GOVERNMENT, 2=CONVERTIBLE, 3=ABS
     bytes12 isin                 // 国际证券识别码（留空为 bytes12(0)）

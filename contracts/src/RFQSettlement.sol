@@ -2,6 +2,9 @@
 pragma solidity ^0.8.28;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {
+    MessageHashUtils
+} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
     IERC20Metadata
@@ -168,8 +171,14 @@ contract RFQSettlement is
     /// @dev Tolerance window in seconds for accrued interest validation.
     uint256 private _aiToleranceSeconds;
 
+    /// @dev Cached EIP-712 domain separator computed at initialization.
+    bytes32 private _cachedDomainSeparator;
+
+    /// @dev Chain ID recorded at initialization to detect forks.
+    uint256 private _cachedChainId;
+
     /// @dev Reserved storage gap for future proxy-safe upgrades.
-    uint256[44] private __gap;
+    uint256[41] private __gap;
 
     /// @dev Locks the implementation contract so only proxies may initialize it.
     constructor() {
@@ -201,6 +210,12 @@ contract RFQSettlement is
         });
 
         _aiToleranceSeconds = DEFAULT_AI_TOLERANCE_SECONDS;
+
+        _cachedChainId = block.chainid;
+        _cachedDomainSeparator = SettlementOrderEIP712.domainSeparator(
+            address(this),
+            block.chainid
+        );
     }
 
     /// @inheritdoc IRFQSettlement
@@ -211,12 +226,12 @@ contract RFQSettlement is
     ) external nonReentrant {
         _requireDomainActive(PauseDomain.SETTLEMENT);
 
-        (bytes32 orderHash, Role makerRole, Role takerRole) = _validateOrder(
+        (bytes32 orderHash, bool isFeeExempt) = _validateOrder(
             order,
             signature,
             msg.sender
         );
-        _executeOrder(order, orderHash, msg.sender, makerRole, takerRole);
+        _executeOrder(order, orderHash, msg.sender, isFeeExempt);
     }
 
     /// @inheritdoc IRFQSettlement
@@ -237,11 +252,10 @@ contract RFQSettlement is
 
         uint256 len = orders.length;
         bytes32[] memory orderHashes = new bytes32[](len);
-        Role[] memory makerRoles = new Role[](len);
-        Role[] memory takerRoles = new Role[](len);
+        bool[] memory feeExemptions = new bool[](len);
 
         for (uint256 i = 0; i < len; i++) {
-            (orderHashes[i], makerRoles[i], takerRoles[i]) = _validateOrder(
+            (orderHashes[i], feeExemptions[i]) = _validateOrder(
                 orders[i],
                 signatures[i],
                 msg.sender
@@ -253,8 +267,7 @@ contract RFQSettlement is
                 orders[i],
                 orderHashes[i],
                 msg.sender,
-                makerRoles[i],
-                takerRoles[i]
+                feeExemptions[i]
             );
         }
     }
@@ -520,27 +533,32 @@ contract RFQSettlement is
     }
 
     /// @dev Computes the EIP-712 typed-data digest for one order.
+    /// Uses the cached domain separator when the chain ID has not changed (fork safety).
     function _hashOrder(Order calldata order) internal view returns (bytes32) {
-        Order memory localOrder = order;
-        return
-            SettlementOrderEIP712.hashTypedData(
-                localOrder,
+        bytes32 separator = block.chainid == _cachedChainId
+            ? _cachedDomainSeparator
+            : SettlementOrderEIP712.domainSeparator(
                 address(this),
                 block.chainid
+            );
+
+        Order memory localOrder = order;
+        return
+            MessageHashUtils.toTypedDataHash(
+                separator,
+                SettlementOrderEIP712.hashOrder(localOrder)
             );
     }
 
     /// @dev Validates bond token registry, token policy, expiry, taker binding, nonce floor,
     ///      signature, participant roles, and accrued interest.
+    /// @return orderHash EIP-712 typed-data digest.
+    /// @return isFeeExempt True when both maker and taker are market makers.
     function _validateOrder(
         Order calldata order,
         bytes calldata signature,
         address taker
-    )
-        internal
-        view
-        returns (bytes32 orderHash, Role makerRole, Role takerRole)
-    {
+    ) internal view returns (bytes32 orderHash, bool isFeeExempt) {
         if (order.bondAmount == 0 || order.quoteAmount == 0) {
             revert ZeroAmount();
         }
@@ -596,7 +614,13 @@ contract RFQSettlement is
             revert InvalidSignature(order.maker, signer);
         }
 
-        (makerRole, takerRole) = _requireParticipantRoles(order, taker);
+        (Role makerRole, Role takerRole) = _requireParticipantRoles(
+            order,
+            taker
+        );
+        isFeeExempt =
+            makerRole == Role.MARKET_MAKER &&
+            takerRole == Role.MARKET_MAKER;
 
         _validateAccruedInterest(order);
     }
@@ -681,12 +705,12 @@ contract RFQSettlement is
     ///   - MM is quoteReceiver → MM receives dirtyAmount - fee
     ///   - MM is quotePayer   → MM pays dirtyAmount + fee (counterparty receives dirtyAmount)
     ///   - MM ↔ MM            → fee exempt
+    /// @param isFeeExempt True when both parties are market makers (MM-to-MM).
     function _executeOrder(
         Order calldata order,
         bytes32 orderHash,
         address taker,
-        Role makerRole,
-        Role takerRole
+        bool isFeeExempt
     ) internal {
         if (_consumedOrders[orderHash]) {
             revert OrderAlreadyConsumed(orderHash);
@@ -694,11 +718,7 @@ contract RFQSettlement is
         _consumedOrders[orderHash] = true;
 
         uint256 dirtyAmount = order.quoteAmount + order.accruedInterest;
-
-        uint256 feeAmount = (makerRole == Role.MARKET_MAKER &&
-            takerRole == Role.MARKET_MAKER)
-            ? 0
-            : _quoteFeeAmount(dirtyAmount);
+        uint256 feeAmount = isFeeExempt ? 0 : _quoteFeeAmount(dirtyAmount);
 
         if (feeAmount > 0 && _feeConfig.currentFeeBps > order.maxFeeBps) {
             revert FeeExceedsOrderLimit(
@@ -707,51 +727,7 @@ contract RFQSettlement is
             );
         }
 
-        {
-            (
-                address quotePayer,
-                address quoteReceiver,
-                address bondPayer,
-                address bondReceiver
-            ) = _resolveSettlementParties(order, taker);
-
-            // Fee deducted from quoteReceiver when quoteReceiver is MM;
-            // otherwise quotePayer (MM) pays dirtyAmount + fee separately.
-            if (
-                feeAmount == 0 ||
-                (
-                    order.side == OrderSide.BUY
-                        ? makerRole == Role.MARKET_MAKER
-                        : takerRole == Role.MARKET_MAKER
-                )
-            ) {
-                IERC20(order.quoteToken).safeTransferFrom(
-                    quotePayer,
-                    quoteReceiver,
-                    dirtyAmount - feeAmount
-                );
-            } else {
-                IERC20(order.quoteToken).safeTransferFrom(
-                    quotePayer,
-                    quoteReceiver,
-                    dirtyAmount
-                );
-            }
-
-            if (feeAmount != 0) {
-                IERC20(order.quoteToken).safeTransferFrom(
-                    quotePayer,
-                    _feeConfig.feeRecipient,
-                    feeAmount
-                );
-            }
-
-            IERC20(order.bondToken).safeTransferFrom(
-                bondPayer,
-                bondReceiver,
-                order.bondAmount
-            );
-        }
+        _transferSettlement(order, taker, dirtyAmount, feeAmount);
 
         emit OrderFilled(
             orderHash,
@@ -787,6 +763,49 @@ contract RFQSettlement is
         }
 
         return (order.maker, taker, taker, order.maker);
+    }
+
+    /// @dev Executes the actual token transfers for an order.
+    /// Fee is always charged to the market-maker side:
+    ///   BUY  (MM is quoteReceiver): MM receives dirtyAmount - fee, fee from quotePayer
+    ///   SELL (MM is quotePayer):     MM pays dirtyAmount + fee, counterparty receives dirtyAmount
+    function _transferSettlement(
+        Order calldata order,
+        address taker,
+        uint256 dirtyAmount,
+        uint256 feeAmount
+    ) private {
+        (
+            address quotePayer,
+            address quoteReceiver,
+            address bondPayer,
+            address bondReceiver
+        ) = _resolveSettlementParties(order, taker);
+
+        // BUY:  quotePayer=taker, quoteReceiver=maker(MM) → fee deducted from MM receipts
+        // SELL: quotePayer=maker(MM), quoteReceiver=taker → MM pays extra fee on top
+        bool deductFeeFromReceipt = feeAmount > 0 &&
+            order.side == OrderSide.BUY;
+
+        IERC20(order.quoteToken).safeTransferFrom(
+            quotePayer,
+            quoteReceiver,
+            deductFeeFromReceipt ? dirtyAmount - feeAmount : dirtyAmount
+        );
+
+        if (feeAmount > 0) {
+            IERC20(order.quoteToken).safeTransferFrom(
+                quotePayer,
+                _feeConfig.feeRecipient,
+                feeAmount
+            );
+        }
+
+        IERC20(order.bondToken).safeTransferFrom(
+            bondPayer,
+            bondReceiver,
+            order.bondAmount
+        );
     }
 
     /// @dev Cancels one order after verifying that the caller is the maker and the order is still live.

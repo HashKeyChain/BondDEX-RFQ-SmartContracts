@@ -9,6 +9,9 @@ import {ApprovalStatus, PauseDomain, Role} from "../types/BondTypes.sol";
 /// @notice Thrown when a required address argument is the zero address.
 error ZeroAddress();
 
+/// @notice Thrown when a required bytes32 identifier is zero.
+error ZeroId();
+
 /// @notice Thrown when two calldata arrays expected to align by index do not match in length.
 error InvalidArrayLength();
 
