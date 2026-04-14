@@ -651,6 +651,31 @@
   },
   {
     "type": "event",
+    "name": "IssuanceApprovalExpired",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "issuer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "operator",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "IssuanceApproved",
     "inputs": [
       {

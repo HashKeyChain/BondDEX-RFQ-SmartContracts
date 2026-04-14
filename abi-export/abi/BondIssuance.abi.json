@@ -978,6 +978,31 @@
   },
   {
     "type": "event",
+    "name": "SubscriptionApprovalExpired",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "issuer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "operator",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "SubscriptionApprovalRevoked",
     "inputs": [
       {
@@ -1538,6 +1563,11 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "SubscriptionWindowMissingCloseTime",
+    "inputs": []
   },
   {
     "type": "error",

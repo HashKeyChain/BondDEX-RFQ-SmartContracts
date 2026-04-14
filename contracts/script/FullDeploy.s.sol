@@ -94,7 +94,7 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
         r.rfqSettlement = address(
             new ERC1967Proxy(
                 r.rfqSettlementImpl,
-                abi.encodeCall(RFQSettlement.initialize, (cfg.deployer))
+                abi.encodeCall(RFQSettlement.initialize, (cfg.deployer, cfg.maxFeeBps))
             )
         );
 

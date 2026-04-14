@@ -17,7 +17,9 @@ abstract contract DomainPausable {
     /// @dev Pause state keyed by lifecycle domain.
     mapping(PauseDomain domain => bool paused) private _pausedDomains;
 
-    /// @dev Reserved storage gap for future upgrades.
+    /// @dev Reserved storage gap for proxy-safe upgrades in UUPS contracts that inherit
+    /// DomainPausable. Non-upgradeable contracts (e.g., BondFactory) inherit this gap
+    /// harmlessly — it only costs deployment gas and has no runtime impact.
     uint256[49] private __gap;
 
     /// @notice Returns whether the domain is currently paused.

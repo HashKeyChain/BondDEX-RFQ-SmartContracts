@@ -14,7 +14,7 @@
 
 - `US1 - Launch and Subscribe`：平台审批发行，发行人创建债券（含 issueDate、dayCountConvention、couponFrequency、bondCategory、ISIN 等完整属性），配置合规模块，管理员审批认购窗口，做市商或合格参与方完成一级认购
 - `US2 - RFQ Settlement`：做市商或投资者签名 EIP-712 订单（含 accruedInterest 字段），对手方按单成交，合约在链上验证应计利息合理性，支持批量成交、订单取消、nonce 管理和手续费收取（基于 dirty amount）。交易方向限制为做市商↔投资者和做市商↔做市商，禁止投资者↔投资者。手续费始终由做市商侧承担，做市商之间交易免手续费
-- `US3 - Redemption and Claims`：债券到期后由发行人注入赎回资金（按年化利率 + 日期折算），持有人直接领取或通过代理人代领；超额赎回负债在全部赎回后自动释放，或由管理员主动释放（`releaseExcessRedemption`），释放后可通过 `rescueTokens` 取回多余资金
+- `US3 - Redemption and Claims`：债券到期后由发行人注入赎回资金（按年化利率 + 日期折算，平台链下流程强制要求全额存入），持有人直接领取或通过代理人代领；超额赎回负债在全部赎回后自动释放，或由管理员主动释放（`releaseExcessRedemption`），释放后可通过 `rescueTokens` 取回多余资金
 
 这 3 条主流程分别在 `contracts/test/integration/US1_LaunchAndSubscribe.t.sol`、`contracts/test/integration/US2_RfqSettlement.t.sol` 和 `contracts/test/integration/US3_RedemptionAndClaims.t.sol` 中有对应的集成测试覆盖，并由 `contracts/test/integration/BondLifecycleE2E.t.sol` 串成完整生命周期。
 

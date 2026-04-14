@@ -182,3 +182,12 @@ error InvalidIssueDate(uint256 issueDate, uint256 maturityTimestamp);
 
 /// @notice Thrown when a subscription window extends past the bond's issue date.
 error SubscriptionWindowExceedsIssueDate(uint256 closesAt, uint256 issueDate);
+
+/// @notice Thrown when setFeeConfig attempts to modify the immutable maxFeeBps cap.
+error FeeCapImmutable();
+
+/// @notice Thrown when the accrued interest tolerance is outside the allowed [min, max] range.
+error InvalidAiTolerance(uint256 provided, uint256 min, uint256 max);
+
+/// @notice Thrown when a subscription window is created without a closing timestamp.
+error SubscriptionWindowMissingCloseTime();

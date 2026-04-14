@@ -185,6 +185,7 @@ contract ComplianceModule is
         }
 
         for (uint256 i = 0; i < accounts.length; i++) {
+            if (accounts[i] == address(0)) revert ZeroAddress();
             _whitelist[accounts[i]] = allowed[i];
             emit WhitelistUpdated(
                 bondToken,
@@ -197,13 +198,14 @@ contract ComplianceModule is
     }
 
     /// @inheritdoc IComplianceModule
-    /// @dev Assigns one compliance role to one account.
+    /// @dev Assigns one compliance role to one account. Role.NONE is not allowed;
+    /// valid roles are ISSUER, MARKET_MAKER, and INVESTOR.
     function setRole(
         address account,
         Role role
     ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         if (account == address(0)) revert ZeroAddress();
-        if (uint8(role) > uint8(Role.INVESTOR)) {
+        if (role == Role.NONE || uint8(role) > uint8(Role.INVESTOR)) {
             revert InvalidParticipantRole(account, Role.INVESTOR, role);
         }
         _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
@@ -224,7 +226,9 @@ contract ComplianceModule is
 
         for (uint256 i = 0; i < accounts.length; i++) {
             if (accounts[i] == address(0)) revert ZeroAddress();
-            if (uint8(roles[i]) > uint8(Role.INVESTOR)) {
+            if (
+                roles[i] == Role.NONE || uint8(roles[i]) > uint8(Role.INVESTOR)
+            ) {
                 revert InvalidParticipantRole(
                     accounts[i],
                     Role.INVESTOR,

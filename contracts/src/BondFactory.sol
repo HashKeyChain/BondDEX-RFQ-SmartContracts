@@ -84,6 +84,13 @@ contract BondFactory is
         bool enabled
     );
 
+    /// @notice Emitted when an active issuance approval is marked as expired.
+    event IssuanceApprovalExpired(
+        bytes32 indexed approvalId,
+        address indexed issuer,
+        address operator
+    );
+
     /// @notice Emitted when governance updates the platform administrator.
     event PlatformAdminUpdated(
         address indexed previousAdmin,
@@ -220,7 +227,7 @@ contract BondFactory is
             revert InvalidApprovalState(record.status);
         }
         record.status = ApprovalStatus.EXPIRED;
-        emit IssuanceRevoked(approvalId, record.issuer, msg.sender);
+        emit IssuanceApprovalExpired(approvalId, record.issuer, msg.sender);
     }
 
     /// @inheritdoc IBondFactory

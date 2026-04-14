@@ -20,7 +20,7 @@ contract RFQSettlementEIP712Test is RFQSettlementFixtures {
 
         RFQSettlement otherImplementation = new RFQSettlement();
         RFQSettlement otherSettlement = RFQSettlement(
-            address(new ERC1967Proxy(address(otherImplementation), abi.encodeCall(RFQSettlement.initialize, (admin))))
+            address(new ERC1967Proxy(address(otherImplementation), abi.encodeCall(RFQSettlement.initialize, (admin, 1_000))))
         );
 
         assertNotEq(settlement.hashOrder(order), otherSettlement.hashOrder(order));

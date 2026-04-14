@@ -35,7 +35,7 @@ contract RFQSettlementDomainForkTest is Test {
             address(
                 new ERC1967Proxy(
                     address(implementation),
-                    abi.encodeCall(RFQSettlement.initialize, (address(this)))
+                    abi.encodeCall(RFQSettlement.initialize, (address(this), 1_000))
                 )
             )
         );

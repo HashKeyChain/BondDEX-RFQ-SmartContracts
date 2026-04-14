@@ -146,8 +146,8 @@ contract BondToken is ERC20, IBondToken {
             uint256 elapsedSeconds = effectiveTs - issueDate;
             return
                 Math.mulDiv(
-                    faceValue * couponRateBps,
-                    elapsedSeconds,
+                    faceValue,
+                    couponRateBps * elapsedSeconds,
                     10_000 * 365 days
                 );
         }
@@ -155,14 +155,14 @@ contract BondToken is ERC20, IBondToken {
             uint256 elapsedSeconds = effectiveTs - issueDate;
             return
                 Math.mulDiv(
-                    faceValue * couponRateBps,
-                    elapsedSeconds,
+                    faceValue,
+                    couponRateBps * elapsedSeconds,
                     10_000 * 360 days
                 );
         }
         // DayCount.THIRTY_360
         uint256 days360 = DateLib.diffDays30_360(issueDate, effectiveTs);
-        return Math.mulDiv(faceValue * couponRateBps, days360, 10_000 * 360);
+        return Math.mulDiv(faceValue, couponRateBps * days360, 10_000 * 360);
     }
 
     /// @inheritdoc IBondToken

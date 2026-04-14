@@ -127,4 +127,24 @@ interface IRFQSettlement {
         address partyB,
         uint256 dirtyAmount
     ) external view returns (uint256 feeAmount);
+
+    /// @dev Allows the admin to recover tokens accidentally sent to this contract.
+    /// @param token Token address to rescue.
+    /// @param to Recipient address.
+    /// @param amount Amount to transfer.
+    function rescueTokens(address token, address to, uint256 amount) external;
+
+    /// @dev EIP-5267 domain discovery for wallet and SDK interoperability.
+    function eip712Domain()
+        external
+        view
+        returns (
+            bytes1 fields,
+            string memory name,
+            string memory version,
+            uint256 chainId,
+            address verifyingContract,
+            bytes32 salt,
+            uint256[] memory extensions
+        );
 }

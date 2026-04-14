@@ -20,7 +20,7 @@ contract RFQSettlementMathTest is Test {
     function setUp() public {
         RFQSettlementMathHarness implementation = new RFQSettlementMathHarness();
         harness = RFQSettlementMathHarness(
-            address(new ERC1967Proxy(address(implementation), abi.encodeCall(RFQSettlement.initialize, (address(this)))))
+            address(new ERC1967Proxy(address(implementation), abi.encodeCall(RFQSettlement.initialize, (address(this), 1_000))))
         );
         harness.setFeeConfig(FeeConfig({feeRecipient: address(this), currentFeeBps: 100, maxFeeBps: 1_000}));
     }

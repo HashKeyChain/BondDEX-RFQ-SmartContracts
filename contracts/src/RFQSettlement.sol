@@ -29,7 +29,9 @@ import {BondMath} from "./libraries/BondMath.sol";
 import {
     AccruedInterestMismatch,
     ExpiredDeadline,
+    FeeCapImmutable,
     FeeExceedsOrderLimit,
+    InvalidAiTolerance,
     InvalidBatchLength,
     InvalidBatchSize,
     InvalidFeeConfig,
@@ -37,7 +39,6 @@ import {
     InvalidOrderTaker,
     InvalidParticipantRole,
     InvalidSignature,
-    InvestorToInvestorRestricted,
     OrderAlreadyCancelled,
     OrderAlreadyConsumed,
     UnauthorizedOrderMaker,
@@ -125,11 +126,25 @@ contract RFQSettlement is
     /// @notice Emitted when governance updates the accrued interest tolerance window.
     event AiToleranceUpdated(uint256 newToleranceSeconds, address operator);
 
+    /// @notice Emitted when the admin rescues tokens accidentally sent to this contract.
+    event TokensRescued(
+        address indexed token,
+        address indexed to,
+        uint256 amount,
+        address indexed operator
+    );
+
     /// @notice Hard cap on the number of orders that may be settled atomically in one batch.
     uint256 internal constant MAX_BATCH_SIZE = 24;
 
     /// @notice Default accrued interest tolerance window (5 minutes).
     uint256 internal constant DEFAULT_AI_TOLERANCE_SECONDS = 300;
+
+    /// @notice Minimum allowed accrued interest tolerance (10 seconds).
+    uint256 internal constant MIN_AI_TOLERANCE_SECONDS = 10;
+
+    /// @notice Maximum allowed accrued interest tolerance (30 days).
+    uint256 internal constant MAX_AI_TOLERANCE_SECONDS = 30 days;
 
     /// @dev Active fee configuration applied to every executed order.
     FeeConfig private _feeConfig;
@@ -161,9 +176,14 @@ contract RFQSettlement is
     }
 
     /// @dev Initializes admin, pauser, and upgrader roles together with the default fee policy.
-    function initialize(address admin) external initializer {
+    /// @param admin Default administrator address.
+    /// @param maxFeeBps_ Fee cap in basis points, immutable after initialization.
+    function initialize(address admin, uint16 maxFeeBps_) external initializer {
         if (admin == address(0)) {
             revert ZeroAddress();
+        }
+        if (maxFeeBps_ > 10_000) {
+            revert InvalidFeeConfig(0, maxFeeBps_);
         }
 
         __AccessControl_init();
@@ -176,7 +196,7 @@ contract RFQSettlement is
         _feeConfig = FeeConfig({
             feeRecipient: admin,
             currentFeeBps: 0,
-            maxFeeBps: 1_000
+            maxFeeBps: maxFeeBps_
         });
 
         _aiToleranceSeconds = DEFAULT_AI_TOLERANCE_SECONDS;
@@ -275,7 +295,7 @@ contract RFQSettlement is
     }
 
     /// @inheritdoc IRFQSettlement
-    /// @dev Updates fee recipient and fee bounds enforced during settlement.
+    /// @dev Updates fee recipient and current fee. maxFeeBps is immutable after initialization.
     function setFeeConfig(
         FeeConfig calldata config
     ) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
@@ -283,9 +303,11 @@ contract RFQSettlement is
             revert ZeroAddress();
         }
 
-        if (
-            config.maxFeeBps > 10_000 || config.currentFeeBps > config.maxFeeBps
-        ) {
+        if (config.maxFeeBps != _feeConfig.maxFeeBps) {
+            revert FeeCapImmutable();
+        }
+
+        if (config.currentFeeBps > config.maxFeeBps) {
             revert InvalidFeeConfig(config.currentFeeBps, config.maxFeeBps);
         }
 
@@ -331,6 +353,16 @@ contract RFQSettlement is
     function setAiToleranceSeconds(
         uint256 toleranceSeconds
     ) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
+        if (
+            toleranceSeconds < MIN_AI_TOLERANCE_SECONDS ||
+            toleranceSeconds > MAX_AI_TOLERANCE_SECONDS
+        ) {
+            revert InvalidAiTolerance(
+                toleranceSeconds,
+                MIN_AI_TOLERANCE_SECONDS,
+                MAX_AI_TOLERANCE_SECONDS
+            );
+        }
         _aiToleranceSeconds = toleranceSeconds;
         emit AiToleranceUpdated(toleranceSeconds, msg.sender);
     }
@@ -426,6 +458,49 @@ contract RFQSettlement is
             return 0;
         }
         return _quoteFeeAmount(dirtyAmount);
+    }
+
+    /// @inheritdoc IRFQSettlement
+    /// @dev Allows the admin to recover tokens accidentally sent to this contract.
+    /// RFQSettlement never holds funds during normal operation, so no liability
+    /// protection is needed — the full balance is always rescuable.
+    function rescueTokens(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (token == address(0) || to == address(0)) {
+            revert ZeroAddress();
+        }
+        if (amount == 0) revert ZeroAmount();
+        IERC20(token).safeTransfer(to, amount);
+        emit TokensRescued(token, to, amount, msg.sender);
+    }
+
+    /// @inheritdoc IRFQSettlement
+    /// @dev EIP-5267 domain discovery for wallet and SDK interoperability.
+    function eip712Domain()
+        external
+        view
+        returns (
+            bytes1 fields,
+            string memory name,
+            string memory version,
+            uint256 chainId,
+            address verifyingContract,
+            bytes32 salt,
+            uint256[] memory extensions
+        )
+    {
+        return (
+            hex"0f",
+            SettlementOrderEIP712.NAME,
+            SettlementOrderEIP712.VERSION,
+            block.chainid,
+            address(this),
+            bytes32(0),
+            new uint256[](0)
+        );
     }
 
     /// @inheritdoc IRFQSettlement
@@ -574,7 +649,8 @@ contract RFQSettlement is
         makerRole = complianceModule.roleOf(order.maker);
         takerRole = complianceModule.roleOf(taker);
 
-        if (makerRole != Role.MARKET_MAKER && makerRole != Role.INVESTOR) {
+        // maker must be a market maker, because only market makers can sign orders
+        if (makerRole != Role.MARKET_MAKER) {
             revert InvalidParticipantRole(
                 order.maker,
                 Role.MARKET_MAKER,
@@ -584,10 +660,6 @@ contract RFQSettlement is
 
         if (takerRole != Role.MARKET_MAKER && takerRole != Role.INVESTOR) {
             revert InvalidParticipantRole(taker, Role.INVESTOR, takerRole);
-        }
-
-        if (makerRole == Role.INVESTOR && takerRole == Role.INVESTOR) {
-            revert InvestorToInvestorRestricted(order.maker, taker);
         }
     }
 

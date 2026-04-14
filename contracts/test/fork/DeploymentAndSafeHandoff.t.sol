@@ -40,7 +40,7 @@ contract DeploymentAndSafeHandoffForkTest is Test {
         );
         RFQSettlement settlementImplementation = new RFQSettlement();
         RFQSettlement settlement = RFQSettlement(
-            address(new ERC1967Proxy(address(settlementImplementation), abi.encodeCall(RFQSettlement.initialize, (address(this)))))
+            address(new ERC1967Proxy(address(settlementImplementation), abi.encodeCall(RFQSettlement.initialize, (address(this), 1_000))))
         );
         BondFactory factory = new BondFactory(address(this), address(issuance));
 

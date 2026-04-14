@@ -40,6 +40,7 @@ import {
     SubscriptionNotActive,
     SubscriptionWindowClosed,
     SubscriptionWindowExceedsIssueDate,
+    SubscriptionWindowMissingCloseTime,
     UnsupportedSettlementToken,
     UnauthorizedClaimCaller,
     ZeroAddress,
@@ -163,6 +164,13 @@ contract BondIssuance is
         bytes32 indexed approvalId,
         address indexed issuer,
         address approver
+    );
+
+    /// @notice Emitted when an active subscription approval is marked as expired.
+    event SubscriptionApprovalExpired(
+        bytes32 indexed approvalId,
+        address indexed issuer,
+        address operator
     );
 
     /// @notice Emitted when a market maker successfully subscribes for bond units.
@@ -340,7 +348,7 @@ contract BondIssuance is
             revert SubscriptionApprovalNotActive(approvalId, record.status);
         }
         record.status = ApprovalStatus.EXPIRED;
-        emit SubscriptionApprovalRevoked(approvalId, record.issuer, msg.sender);
+        emit SubscriptionApprovalExpired(approvalId, record.issuer, msg.sender);
     }
 
     /// @inheritdoc IBondIssuance
@@ -387,7 +395,7 @@ contract BondIssuance is
         _requireValidWindow(terms.opensAt, terms.closesAt);
 
         uint256 bondIssueDate = bondToken.issueDate();
-        if (terms.closesAt != 0 && terms.closesAt > bondIssueDate) {
+        if (terms.closesAt > bondIssueDate) {
             revert SubscriptionWindowExceedsIssueDate(
                 terms.closesAt,
                 bondIssueDate
@@ -462,8 +470,7 @@ contract BondIssuance is
         }
 
         if (
-            block.timestamp < offer.opensAt ||
-            (offer.closesAt != 0 && block.timestamp > offer.closesAt)
+            block.timestamp < offer.opensAt || block.timestamp > offer.closesAt
         ) {
             revert SubscriptionWindowClosed(offerId, block.timestamp);
         }
@@ -551,6 +558,9 @@ contract BondIssuance is
 
     /// @inheritdoc IBondIssuance
     /// @dev Pulls redemption funds from the issuer and records cumulative funding.
+    /// Unlike subscription flows, redemption funding only requires the caller to be the
+    /// bond's designated issuer — no whitelist check — so that compliance admin actions
+    /// cannot block redemption fund deposits and strand holder payouts.
     function depositRedemption(
         address bondTokenAddress,
         uint256 amount
@@ -559,7 +569,7 @@ contract BondIssuance is
         _requireDomainActive(PauseDomain.REDEMPTION_FUNDING);
 
         IBondToken bondToken = IBondToken(bondTokenAddress);
-        _requireIssuer(bondToken, msg.sender);
+        _requireIssuerIdentity(bondToken, msg.sender);
         _requireRedemptionTokenEnabled(bondToken.settlementToken());
 
         RedemptionState storage state = _redemptionStates[bondTokenAddress];
@@ -951,12 +961,27 @@ contract BondIssuance is
         }
     }
 
-    /// @dev Reverts when closesAt is non-zero but not strictly after opensAt.
+    /// @dev Reverts unless the caller is the bond's designated issuer.
+    /// Unlike _requireIssuer, this helper does NOT check whitelist or compliance role,
+    /// so that redemption funding cannot be blocked by compliance admin actions.
+    function _requireIssuerIdentity(
+        IBondToken bondToken,
+        address account
+    ) internal view {
+        if (bondToken.issuer() != account) {
+            revert InvalidParticipantRole(account, Role.ISSUER, Role.NONE);
+        }
+    }
+
+    /// @dev Reverts when closesAt is zero or closesAt is not strictly after opensAt.
     function _requireValidWindow(
         uint256 opensAt,
         uint256 closesAt
     ) internal pure {
-        if (closesAt != 0 && closesAt <= opensAt) {
+        if (closesAt == 0) {
+            revert SubscriptionWindowMissingCloseTime();
+        }
+        if (closesAt <= opensAt) {
             revert InvalidSubscriptionWindow(opensAt, closesAt);
         }
     }

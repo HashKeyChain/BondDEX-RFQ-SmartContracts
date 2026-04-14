@@ -64,7 +64,7 @@ abstract contract RFQSettlementFixtures is Test {
             address(
                 new ERC1967Proxy(
                     address(settlementImplementation),
-                    abi.encodeCall(RFQSettlement.initialize, (admin))
+                    abi.encodeCall(RFQSettlement.initialize, (admin, 1_000))
                 )
             )
         );
