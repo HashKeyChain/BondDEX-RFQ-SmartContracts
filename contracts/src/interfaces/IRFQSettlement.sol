@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {FeeConfig, Order, PauseDomain} from "../types/BondTypes.sol";
+import { FeeConfig, Order, PauseDomain } from "../types/BondTypes.sol";
 
 /// @title IRFQSettlement
 /// @notice Interface for signed RFQ order execution, cancellation, nonce management, and fee policy.

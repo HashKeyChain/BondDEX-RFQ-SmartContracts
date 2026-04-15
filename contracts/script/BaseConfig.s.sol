@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Script} from "forge-std/Script.sol";
+import { Script } from "forge-std/Script.sol";
 
 /// @title BaseConfig
 /// @notice 全局路径常量与链标识，所有部署 / 配置脚本共享。

@@ -26,7 +26,7 @@ depth = 100
 fail_on_revert = false
 
 [fmt]
-line_length = 100
+line_length = 120
 tab_width = 4
 bracket_spacing = true
 quote_style = "double"

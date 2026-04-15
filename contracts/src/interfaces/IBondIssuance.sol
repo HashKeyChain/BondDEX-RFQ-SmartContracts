@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ApprovalStatus, PauseDomain, SubscriptionTerms} from "../types/BondTypes.sol";
+import { ApprovalStatus, PauseDomain, SubscriptionTerms } from "../types/BondTypes.sol";
 
 /// @title IBondIssuance
 /// @notice Interface for primary-market subscription management and post-maturity redemption flows.

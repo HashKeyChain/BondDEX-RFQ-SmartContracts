@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
-import {Order} from "../types/BondTypes.sol";
+import { Order } from "../types/BondTypes.sol";
 
 /// @title SettlementOrderEIP712
 /// @notice EIP-712 hashing helpers for BondDEX RFQ orders.

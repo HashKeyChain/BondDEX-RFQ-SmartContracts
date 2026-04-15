@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {Test} from "forge-std/Test.sol";
+import { StdInvariant } from "forge-std/StdInvariant.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {Order} from "../../src/types/BondTypes.sol";
-import {RFQSettlementFixtures} from "../helpers/RFQSettlementFixtures.sol";
+import { Order } from "../../src/types/BondTypes.sol";
+import { RFQSettlementFixtures } from "../helpers/RFQSettlementFixtures.sol";
 
 contract RFQSettlementHandler is RFQSettlementFixtures {
     Order internal trackedOrder;
@@ -35,7 +35,7 @@ contract RFQSettlementHandler is RFQSettlementFixtures {
     function fillTrackedOrder() external {
         fillAttempts++;
         vm.prank(investor);
-        try settlement.fillOrder(trackedOrder, trackedSignature) {} catch {}
+        try settlement.fillOrder(trackedOrder, trackedSignature) { } catch { }
     }
 
     function trackedOrderHash() external view returns (bytes32) {

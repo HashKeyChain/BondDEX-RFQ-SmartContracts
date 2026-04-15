@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Script} from "forge-std/Script.sol";
-import {console2} from "forge-std/console2.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Script } from "forge-std/Script.sol";
+import { console2 } from "forge-std/console2.sol";
 
-import {BondFactory} from "../src/BondFactory.sol";
-import {BondIssuance} from "../src/BondIssuance.sol";
-import {BondToken} from "../src/BondToken.sol";
-import {ComplianceModule} from "../src/compliance/ComplianceModule.sol";
-import {RFQSettlement} from "../src/RFQSettlement.sol";
-import {MockERC20Decimals} from "../test/mocks/MockERC20Decimals.sol";
+import { BondFactory } from "../src/BondFactory.sol";
+import { BondIssuance } from "../src/BondIssuance.sol";
+import { BondToken } from "../src/BondToken.sol";
+import { ComplianceModule } from "../src/compliance/ComplianceModule.sol";
+import { RFQSettlement } from "../src/RFQSettlement.sol";
+import { MockERC20Decimals } from "../test/mocks/MockERC20Decimals.sol";
 import {
     BondCategory,
     BondConfig,

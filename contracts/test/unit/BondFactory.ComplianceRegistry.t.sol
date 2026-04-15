@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {BondFactory} from "../../src/BondFactory.sol";
-import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
-import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
+import { BondFactory } from "../../src/BondFactory.sol";
+import { ComplianceModule } from "../../src/compliance/ComplianceModule.sol";
+import { IComplianceModule } from "../../src/interfaces/IComplianceModule.sol";
 
 contract BondFactoryComplianceRegistryTest is Test {
     event ComplianceImplementationRegistered(

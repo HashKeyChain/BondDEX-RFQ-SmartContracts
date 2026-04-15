@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {FeeConfig, Order, OrderSide, Role} from "../../src/types/BondTypes.sol";
-import {RFQSettlementFixtures} from "../helpers/RFQSettlementFixtures.sol";
+import { FeeConfig, Order, OrderSide, Role } from "../../src/types/BondTypes.sol";
+import { RFQSettlementFixtures } from "../helpers/RFQSettlementFixtures.sol";
 
 /// @dev 覆盖三种手续费场景：做市商卖/投资者买、投资者卖/做市商买、做市商间免费。
 contract RFQSettlementFeeModelTest is RFQSettlementFixtures {
@@ -12,7 +12,7 @@ contract RFQSettlementFeeModelTest is RFQSettlementFixtures {
         deployRfqFixtures();
 
         vm.prank(admin);
-        settlement.setFeeConfig(FeeConfig({feeRecipient: feeRecipient, currentFeeBps: FEE_BPS, maxFeeBps: 1_000}));
+        settlement.setFeeConfig(FeeConfig({ feeRecipient: feeRecipient, currentFeeBps: FEE_BPS, maxFeeBps: 1_000 }));
 
         vm.prank(issuanceController);
         bondToken.mint(investor, 500e18);

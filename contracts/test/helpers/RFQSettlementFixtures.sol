@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {Test} from "forge-std/Test.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {BondToken} from "../../src/BondToken.sol";
-import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
-import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
+import { BondToken } from "../../src/BondToken.sol";
+import { ComplianceModule } from "../../src/compliance/ComplianceModule.sol";
+import { MockERC20Decimals } from "../mocks/MockERC20Decimals.sol";
 import {
     Role,
     Order,
@@ -17,7 +17,7 @@ import {
     CouponFrequency,
     DayCount
 } from "../../src/types/BondTypes.sol";
-import {RFQSettlement} from "../../src/RFQSettlement.sol";
+import { RFQSettlement } from "../../src/RFQSettlement.sol";
 
 abstract contract RFQSettlementFixtures is Test {
     using ECDSA for bytes32;
@@ -96,7 +96,7 @@ abstract contract RFQSettlementFixtures is Test {
         complianceModule.setTransferOperator(address(settlement), true);
         settlement.setBondTokenRegistration(address(bondToken), true);
         settlement.setSettlementTokenPolicy(address(usdc), true);
-        settlement.setFeeConfig(FeeConfig({feeRecipient: feeRecipient, currentFeeBps: 0, maxFeeBps: 1_000}));
+        settlement.setFeeConfig(FeeConfig({ feeRecipient: feeRecipient, currentFeeBps: 0, maxFeeBps: 1_000 }));
         vm.stopPrank();
 
         vm.prank(issuanceController);

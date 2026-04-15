@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {PauseDomain} from "../../src/types/BondTypes.sol";
-import {BondIssuanceRedemptionFixtures} from "../helpers/BondIssuanceRedemptionFixtures.sol";
+import { PauseDomain } from "../../src/types/BondTypes.sol";
+import { BondIssuanceRedemptionFixtures } from "../helpers/BondIssuanceRedemptionFixtures.sol";
 
 contract BondIssuanceRedemptionFundingTest is BondIssuanceRedemptionFixtures {
     event RedemptionDeposited(

@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {console2} from "forge-std/console2.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { console2 } from "forge-std/console2.sol";
 
-import {BondFactory} from "../src/BondFactory.sol";
-import {BondIssuance} from "../src/BondIssuance.sol";
-import {RFQSettlement} from "../src/RFQSettlement.sol";
-import {ComplianceModule} from "../src/compliance/ComplianceModule.sol";
-import {IComplianceModule} from "../src/interfaces/IComplianceModule.sol";
-import {FeeConfig} from "../src/types/BondTypes.sol";
-import {DeployConfig, TokenPolicy, DeployResult} from "./DeployTypes.s.sol";
-import {DeployConfigParser} from "./DeployConfigParser.s.sol";
-import {DeployJsonWriter} from "./DeployJsonWriter.s.sol";
+import { BondFactory } from "../src/BondFactory.sol";
+import { BondIssuance } from "../src/BondIssuance.sol";
+import { RFQSettlement } from "../src/RFQSettlement.sol";
+import { ComplianceModule } from "../src/compliance/ComplianceModule.sol";
+import { IComplianceModule } from "../src/interfaces/IComplianceModule.sol";
+import { FeeConfig } from "../src/types/BondTypes.sol";
+import { DeployConfig, TokenPolicy, DeployResult } from "./DeployTypes.s.sol";
+import { DeployConfigParser } from "./DeployConfigParser.s.sol";
+import { DeployJsonWriter } from "./DeployJsonWriter.s.sol";
 
 /// @title FullDeploy
 /// @notice 一站式部署：部署合约 → 注册合规模板 → 配置结算代币 → 配置手续费 → 逐角色授权 → 撤销 deployer → 输出完整清单。
@@ -103,7 +103,7 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
 
         // ③ 配置 RFQ 手续费
         settlement.setFeeConfig(
-            FeeConfig({feeRecipient: cfg.feeRecipient, currentFeeBps: cfg.currentFeeBps, maxFeeBps: cfg.maxFeeBps})
+            FeeConfig({ feeRecipient: cfg.feeRecipient, currentFeeBps: cfg.currentFeeBps, maxFeeBps: cfg.maxFeeBps })
         );
 
         // ④ 设置 platformAdmin

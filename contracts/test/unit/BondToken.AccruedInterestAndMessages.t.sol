@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {BondToken} from "../../src/BondToken.sol";
-import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
-import {BondCategory, CouponFrequency, DayCount, PauseDomain, Role} from "../../src/types/BondTypes.sol";
+import { BondToken } from "../../src/BondToken.sol";
+import { IComplianceModule } from "../../src/interfaces/IComplianceModule.sol";
+import { BondCategory, CouponFrequency, DayCount, PauseDomain, Role } from "../../src/types/BondTypes.sol";
 
 contract MinimalComplianceMock is IComplianceModule {
-    function setWhitelist(address, bool) external {}
-    function batchSetWhitelist(address[] calldata, bool[] calldata) external {}
-    function setRole(address, Role) external {}
-    function batchSetRole(address[] calldata, Role[] calldata) external {}
-    function setPolicyMetadata(bytes32, uint256) external {}
-    function pauseDomain(PauseDomain, bool) external {}
+    function setWhitelist(address, bool) external { }
+    function batchSetWhitelist(address[] calldata, bool[] calldata) external { }
+    function setRole(address, Role) external { }
+    function batchSetRole(address[] calldata, Role[] calldata) external { }
+    function setPolicyMetadata(bytes32, uint256) external { }
+    function pauseDomain(PauseDomain, bool) external { }
 
     function isWhitelisted(address) external pure returns (bool) {
         return true;
@@ -30,7 +30,7 @@ contract MinimalComplianceMock is IComplianceModule {
     function checkTransfer(address, address, uint256, address) external pure returns (uint8) {
         return 0;
     }
-    function setTransferOperator(address, bool) external {}
+    function setTransferOperator(address, bool) external { }
 
     function isTransferOperator(address) external pure returns (bool) {
         return true;

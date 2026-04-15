@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Script} from "forge-std/Script.sol";
-import {DeployConfig, TokenPolicy} from "./DeployTypes.s.sol";
-import {MockERC20Decimals} from "../test/mocks/MockERC20Decimals.sol";
+import { Script } from "forge-std/Script.sol";
+import { DeployConfig, TokenPolicy } from "./DeployTypes.s.sol";
+import { MockERC20Decimals } from "../test/mocks/MockERC20Decimals.sol";
 
 /// @title DeployConfigParser
 /// @notice 从 config JSON 解析部署配置、校验参数合法性。

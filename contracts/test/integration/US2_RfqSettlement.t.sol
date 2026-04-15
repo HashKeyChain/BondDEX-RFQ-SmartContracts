@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {FeeConfig, Order} from "../../src/types/BondTypes.sol";
-import {RFQSettlementFixtures} from "../helpers/RFQSettlementFixtures.sol";
+import { FeeConfig, Order } from "../../src/types/BondTypes.sol";
+import { RFQSettlementFixtures } from "../helpers/RFQSettlementFixtures.sol";
 
 contract US2RfqSettlementIntegrationTest is RFQSettlementFixtures {
     function setUp() public {
@@ -11,7 +11,7 @@ contract US2RfqSettlementIntegrationTest is RFQSettlementFixtures {
 
     function test_multiMakerBatchSettlementAndFeeFlow() public {
         vm.prank(admin);
-        settlement.setFeeConfig(FeeConfig({feeRecipient: feeRecipient, currentFeeBps: 50, maxFeeBps: 1_000}));
+        settlement.setFeeConfig(FeeConfig({ feeRecipient: feeRecipient, currentFeeBps: 50, maxFeeBps: 1_000 }));
 
         Order[] memory orders = new Order[](2);
         bytes[] memory signatures = new bytes[](2);

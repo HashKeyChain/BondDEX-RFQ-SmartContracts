@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ApprovalStatus, PauseDomain, Role} from "../types/BondTypes.sol";
+import { ApprovalStatus, PauseDomain, Role } from "../types/BondTypes.sol";
 
 /// @title BondErrors
 /// @notice Shared custom errors used across the BondDEX protocol contracts.

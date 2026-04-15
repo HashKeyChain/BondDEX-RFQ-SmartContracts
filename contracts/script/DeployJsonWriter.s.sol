@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {console2} from "forge-std/console2.sol";
-import {BaseConfig} from "./BaseConfig.s.sol";
-import {DeployConfig, TokenPolicy, DeployResult} from "./DeployTypes.s.sol";
-import {RFQSettlement} from "../src/RFQSettlement.sol";
+import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
+import { console2 } from "forge-std/console2.sol";
+import { BaseConfig } from "./BaseConfig.s.sol";
+import { DeployConfig, TokenPolicy, DeployResult } from "./DeployTypes.s.sol";
+import { RFQSettlement } from "../src/RFQSettlement.sol";
 
 /// @title DeployJsonWriter
 /// @notice 部署结果 JSON 序列化与日志输出。
@@ -72,10 +72,9 @@ abstract contract DeployJsonWriter is BaseConfig {
     }
 
     function _jsonMeta(DeployConfig memory cfg) internal pure returns (string memory) {
-        return
-            string.concat(
-                '  "deployer": ', _qa(cfg.deployer), ",\n", '  "platformAdmin": ', _qa(cfg.platformAdmin), ",\n"
-            );
+        return string.concat(
+            '  "deployer": ', _qa(cfg.deployer), ",\n", '  "platformAdmin": ', _qa(cfg.platformAdmin), ",\n"
+        );
     }
 
     function _jsonContracts(DeployResult memory r) internal pure returns (string memory) {

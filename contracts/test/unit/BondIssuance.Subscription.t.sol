@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {Test} from "forge-std/Test.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {BondIssuance} from "../../src/BondIssuance.sol";
-import {BondToken} from "../../src/BondToken.sol";
-import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
-import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
-import {BondCategory, CouponFrequency, DayCount, Role, SubscriptionTerms} from "../../src/types/BondTypes.sol";
+import { BondIssuance } from "../../src/BondIssuance.sol";
+import { BondToken } from "../../src/BondToken.sol";
+import { ComplianceModule } from "../../src/compliance/ComplianceModule.sol";
+import { MockERC20Decimals } from "../mocks/MockERC20Decimals.sol";
+import { BondCategory, CouponFrequency, DayCount, Role, SubscriptionTerms } from "../../src/types/BondTypes.sol";
 
 contract BondIssuanceSubscriptionTest is Test {
     event SettlementTokenPolicyUpdated(

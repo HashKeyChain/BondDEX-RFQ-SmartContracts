@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {Test} from "forge-std/Test.sol";
+import { StdInvariant } from "forge-std/StdInvariant.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {BondIssuanceRedemptionFixtures} from "../helpers/BondIssuanceRedemptionFixtures.sol";
+import { BondIssuanceRedemptionFixtures } from "../helpers/BondIssuanceRedemptionFixtures.sol";
 
 contract BondIssuanceRedemptionHandler is BondIssuanceRedemptionFixtures {
     constructor() {
@@ -18,7 +18,7 @@ contract BondIssuanceRedemptionHandler is BondIssuanceRedemptionFixtures {
 
     function delegateClaim() external {
         vm.prank(delegate);
-        try issuance.claimFor(address(bondToken), holder) {} catch {}
+        try issuance.claimFor(address(bondToken), holder) { } catch { }
     }
 
     function usdcToken() external view returns (address) {

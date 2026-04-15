@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {DomainPausable} from "../../src/abstracts/DomainPausable.sol";
-import {PauseDomain} from "../../src/types/BondTypes.sol";
-import {DomainAlreadySet, DomainPaused} from "../../src/libraries/BondErrors.sol";
+import { DomainPausable } from "../../src/abstracts/DomainPausable.sol";
+import { PauseDomain } from "../../src/types/BondTypes.sol";
+import { DomainAlreadySet, DomainPaused } from "../../src/libraries/BondErrors.sol";
 
 contract DomainPausableHarness is DomainPausable {
     function setPaused(PauseDomain domain, bool paused) external {

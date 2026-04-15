@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {BondMath} from "../../src/libraries/BondMath.sol";
+import { BondMath } from "../../src/libraries/BondMath.sol";
 
 contract BondMathHarness {
     function scaleAmount(uint256 amount, uint8 fromDecimals, uint8 toDecimals) external pure returns (uint256) {

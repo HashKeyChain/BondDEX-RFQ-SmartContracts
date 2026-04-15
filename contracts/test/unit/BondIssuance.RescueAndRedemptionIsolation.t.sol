@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {BondIssuanceRedemptionFixtures} from "../helpers/BondIssuanceRedemptionFixtures.sol";
-import {BondToken} from "../../src/BondToken.sol";
-import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {BondCategory, CouponFrequency, DayCount, Role} from "../../src/types/BondTypes.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { BondIssuanceRedemptionFixtures } from "../helpers/BondIssuanceRedemptionFixtures.sol";
+import { BondToken } from "../../src/BondToken.sol";
+import { ComplianceModule } from "../../src/compliance/ComplianceModule.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { BondCategory, CouponFrequency, DayCount, Role } from "../../src/types/BondTypes.sol";
 
 contract BondIssuanceRescueAndRedemptionIsolationTest is BondIssuanceRedemptionFixtures {
     event TokensRescued(address indexed token, address indexed to, uint256 amount, address indexed operator);

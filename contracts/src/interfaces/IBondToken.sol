@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {BondCategory, CouponFrequency, DayCount} from "../types/BondTypes.sol";
+import { BondCategory, CouponFrequency, DayCount } from "../types/BondTypes.sol";
 
 /// @title IBondToken
 /// @notice Interface for immutable bond tokens with controller-gated mint/burn and compliance checks.

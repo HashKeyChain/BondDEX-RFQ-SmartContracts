@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {Test} from "forge-std/Test.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {BondFactory} from "../../src/BondFactory.sol";
-import {BondIssuance} from "../../src/BondIssuance.sol";
-import {BondToken} from "../../src/BondToken.sol";
-import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
-import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
+import { BondFactory } from "../../src/BondFactory.sol";
+import { BondIssuance } from "../../src/BondIssuance.sol";
+import { BondToken } from "../../src/BondToken.sol";
+import { ComplianceModule } from "../../src/compliance/ComplianceModule.sol";
+import { MockERC20Decimals } from "../mocks/MockERC20Decimals.sol";
 import {
     BondCategory,
     BondConfig,
@@ -17,7 +17,7 @@ import {
     SubscriptionTerms,
     Role
 } from "../../src/types/BondTypes.sol";
-import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
+import { IComplianceModule } from "../../src/interfaces/IComplianceModule.sol";
 
 contract US1LaunchAndSubscribeIntegrationTest is Test {
     address internal admin = makeAddr("admin");

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {BondToken} from "../../src/BondToken.sol";
-import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
-import {BondCategory, CouponFrequency, DayCount, PauseDomain, Role} from "../../src/types/BondTypes.sol";
+import { BondToken } from "../../src/BondToken.sol";
+import { IComplianceModule } from "../../src/interfaces/IComplianceModule.sol";
+import { BondCategory, CouponFrequency, DayCount, PauseDomain, Role } from "../../src/types/BondTypes.sol";
 
 contract StaticRestrictionComplianceMock is IComplianceModule {
     uint8 internal _restrictionCode;
@@ -16,16 +16,16 @@ contract StaticRestrictionComplianceMock is IComplianceModule {
         _restrictionCode = restrictionCode;
     }
 
-    function setWhitelist(address, bool) external {}
-    function batchSetWhitelist(address[] calldata, bool[] calldata) external {}
-    function setRole(address, Role) external {}
-    function batchSetRole(address[] calldata, Role[] calldata) external {}
+    function setWhitelist(address, bool) external { }
+    function batchSetWhitelist(address[] calldata, bool[] calldata) external { }
+    function setRole(address, Role) external { }
+    function batchSetRole(address[] calldata, Role[] calldata) external { }
 
     function setPolicyMetadata(bytes32 policyId_, uint256 policyVersion_) external {
         _policyId = policyId_;
         _policyVersion = policyVersion_;
     }
-    function pauseDomain(PauseDomain, bool) external {}
+    function pauseDomain(PauseDomain, bool) external { }
 
     function isWhitelisted(address) external pure returns (bool) {
         return true;
@@ -42,7 +42,7 @@ contract StaticRestrictionComplianceMock is IComplianceModule {
     function checkTransfer(address, address, uint256, address) external view returns (uint8) {
         return _restrictionCode;
     }
-    function setTransferOperator(address, bool) external {}
+    function setTransferOperator(address, bool) external { }
 
     function isTransferOperator(address) external pure returns (bool) {
         return true;

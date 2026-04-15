@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {Test} from "forge-std/Test.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {BondFactory} from "../../src/BondFactory.sol";
-import {BondIssuance} from "../../src/BondIssuance.sol";
-import {BondToken} from "../../src/BondToken.sol";
-import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
-import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
-import {RFQSettlement} from "../../src/RFQSettlement.sol";
+import { BondFactory } from "../../src/BondFactory.sol";
+import { BondIssuance } from "../../src/BondIssuance.sol";
+import { BondToken } from "../../src/BondToken.sol";
+import { ComplianceModule } from "../../src/compliance/ComplianceModule.sol";
+import { MockERC20Decimals } from "../mocks/MockERC20Decimals.sol";
+import { RFQSettlement } from "../../src/RFQSettlement.sol";
 import {
     BondConfig,
     BondCategory,
@@ -21,7 +21,7 @@ import {
     OrderSide,
     FeeConfig
 } from "../../src/types/BondTypes.sol";
-import {IComplianceModule} from "../../src/interfaces/IComplianceModule.sol";
+import { IComplianceModule } from "../../src/interfaces/IComplianceModule.sol";
 
 contract BondLifecycleE2ETest is Test {
     uint256 internal constant MAKER_PK = 0xA11CE;
@@ -67,7 +67,7 @@ contract BondLifecycleE2ETest is Test {
         );
         issuance.setSettlementTokenPolicy(address(usdc), true, false, true);
         settlement.setSettlementTokenPolicy(address(usdc), true);
-        settlement.setFeeConfig(FeeConfig({feeRecipient: feeRecipient, currentFeeBps: 50, maxFeeBps: 1_000}));
+        settlement.setFeeConfig(FeeConfig({ feeRecipient: feeRecipient, currentFeeBps: 50, maxFeeBps: 1_000 }));
         vm.stopPrank();
 
         BondConfig memory config = BondConfig({

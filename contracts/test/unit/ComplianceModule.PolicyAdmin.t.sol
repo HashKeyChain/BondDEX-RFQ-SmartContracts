@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {Test} from "forge-std/Test.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
-import {PauseDomain, Role} from "../../src/types/BondTypes.sol";
+import { ComplianceModule } from "../../src/compliance/ComplianceModule.sol";
+import { PauseDomain, Role } from "../../src/types/BondTypes.sol";
 
 contract ComplianceModulePolicyAdminTest is Test {
     event WhitelistUpdated(

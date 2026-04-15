@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {DomainAlreadySet, DomainPaused} from "../libraries/BondErrors.sol";
-import {PauseDomain} from "../types/BondTypes.sol";
+import { DomainAlreadySet, DomainPaused } from "../libraries/BondErrors.sol";
+import { PauseDomain } from "../types/BondTypes.sol";
 
 /// @title DomainPausable
 /// @notice Lightweight pause switch that lets each lifecycle domain be stopped independently.

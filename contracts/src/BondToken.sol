@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {
     InvalidBondConfig,
@@ -11,9 +11,9 @@ import {
     TransferRestricted,
     ZeroAddress
 } from "./libraries/BondErrors.sol";
-import {IComplianceModule} from "./interfaces/IComplianceModule.sol";
-import {IBondToken} from "./interfaces/IBondToken.sol";
-import {BondCategory, CouponFrequency, DayCount} from "./types/BondTypes.sol";
+import { IComplianceModule } from "./interfaces/IComplianceModule.sol";
+import { IBondToken } from "./interfaces/IBondToken.sol";
+import { BondCategory, CouponFrequency, DayCount } from "./types/BondTypes.sol";
 
 /// @title BondToken
 /// @notice ERC-20 bond instrument with immutable issuance terms and compliance-gated transfers.
@@ -55,19 +55,13 @@ contract BondToken is ERC20, IBondToken {
         if (
             params_.issuer == address(0) || params_.settlementToken == address(0)
                 || params_.complianceModule == address(0) || params_.issuanceController == address(0)
-        ) {
-            revert ZeroAddress();
-        }
+        ) revert ZeroAddress();
         if (params_.faceValue == 0) revert InvalidBondConfig("faceValue must be > 0");
-        if (params_.couponRateBps > 10_000) {
-            revert InvalidBondConfig("couponRateBps must be <= 10000");
-        }
+        if (params_.couponRateBps > 10_000) revert InvalidBondConfig("couponRateBps must be <= 10000");
         if (params_.maturityTimestamp <= block.timestamp) {
             revert InvalidBondConfig("maturityTimestamp must be in the future");
         }
-        if (params_.issueDate < block.timestamp) {
-            revert InvalidBondConfig("issueDate must not be in the past");
-        }
+        if (params_.issueDate < block.timestamp) revert InvalidBondConfig("issueDate must not be in the past");
         if (params_.issueDate >= params_.maturityTimestamp) {
             revert InvalidIssueDate(params_.issueDate, params_.maturityTimestamp);
         }

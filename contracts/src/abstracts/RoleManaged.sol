@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ZeroAddress} from "../libraries/BondErrors.sol";
+import { ZeroAddress } from "../libraries/BondErrors.sol";
 
 /// @title RoleManaged
 /// @notice Shared role identifiers and address validation helpers for BondDEX control-plane contracts.

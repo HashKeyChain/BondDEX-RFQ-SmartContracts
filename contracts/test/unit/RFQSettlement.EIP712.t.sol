@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-import {Order} from "../../src/types/BondTypes.sol";
-import {RFQSettlement} from "../../src/RFQSettlement.sol";
-import {RFQSettlementFixtures} from "../helpers/RFQSettlementFixtures.sol";
+import { Order } from "../../src/types/BondTypes.sol";
+import { RFQSettlement } from "../../src/RFQSettlement.sol";
+import { RFQSettlementFixtures } from "../helpers/RFQSettlementFixtures.sol";
 
 contract RFQSettlementEIP712Test is RFQSettlementFixtures {
     using ECDSA for bytes32;

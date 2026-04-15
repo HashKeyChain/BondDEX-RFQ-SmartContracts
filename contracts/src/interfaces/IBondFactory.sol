@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ApprovalStatus, BondConfig, PauseDomain} from "../types/BondTypes.sol";
+import { ApprovalStatus, BondConfig, PauseDomain } from "../types/BondTypes.sol";
 
 /// @title IBondFactory
 /// @notice Interface for the factory that approves issuances and deploys new bond series.

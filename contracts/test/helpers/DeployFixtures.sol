@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
-import {MockSafe} from "../mocks/MockSafe.sol";
+import { MockERC20Decimals } from "../mocks/MockERC20Decimals.sol";
+import { MockSafe } from "../mocks/MockSafe.sol";
 
 abstract contract DeployFixtures is Test {
     address internal admin = makeAddr("admin");

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {SettlementOrderEIP712} from "../../src/libraries/SettlementOrderEIP712.sol";
-import {Order, OrderSide} from "../../src/types/BondTypes.sol";
+import { SettlementOrderEIP712 } from "../../src/libraries/SettlementOrderEIP712.sol";
+import { Order, OrderSide } from "../../src/types/BondTypes.sol";
 
 contract SettlementOrderEIP712Harness {
     function hashOrder(Order memory order) external pure returns (bytes32) {

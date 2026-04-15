@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {FeeConfig, Order, PauseDomain} from "../../src/types/BondTypes.sol";
-import {RFQSettlementFixtures} from "../helpers/RFQSettlementFixtures.sol";
+import { FeeConfig, Order, PauseDomain } from "../../src/types/BondTypes.sol";
+import { RFQSettlementFixtures } from "../helpers/RFQSettlementFixtures.sol";
 
 contract RFQSettlementFillOrderTest is RFQSettlementFixtures {
     event OrderFilled(
@@ -86,7 +86,7 @@ contract RFQSettlementFillOrderTest is RFQSettlementFixtures {
         Order memory order = makeBuyOrder(10e18, 10_500e6, 0, 1);
         bytes memory signature = signOrder(order, MAKER_PK);
         vm.prank(admin);
-        settlement.setFeeConfig(FeeConfig({feeRecipient: feeRecipient, currentFeeBps: 100, maxFeeBps: 1_000}));
+        settlement.setFeeConfig(FeeConfig({ feeRecipient: feeRecipient, currentFeeBps: 100, maxFeeBps: 1_000 }));
 
         vm.prank(investor);
         settlement.fillOrder(order, signature);

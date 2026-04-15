@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {Test} from "forge-std/Test.sol";
-import {StdInvariant} from "forge-std/StdInvariant.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Test } from "forge-std/Test.sol";
+import { StdInvariant } from "forge-std/StdInvariant.sol";
 
-import {BondIssuance} from "../../src/BondIssuance.sol";
-import {BondToken} from "../../src/BondToken.sol";
-import {ComplianceModule} from "../../src/compliance/ComplianceModule.sol";
-import {MockERC20Decimals} from "../mocks/MockERC20Decimals.sol";
-import {BondCategory, CouponFrequency, DayCount, Role, SubscriptionTerms} from "../../src/types/BondTypes.sol";
+import { BondIssuance } from "../../src/BondIssuance.sol";
+import { BondToken } from "../../src/BondToken.sol";
+import { ComplianceModule } from "../../src/compliance/ComplianceModule.sol";
+import { MockERC20Decimals } from "../mocks/MockERC20Decimals.sol";
+import { BondCategory, CouponFrequency, DayCount, Role, SubscriptionTerms } from "../../src/types/BondTypes.sol";
 
 contract US1SubscriptionHandler is Test {
     BondIssuance internal immutable issuance;
@@ -38,7 +38,7 @@ contract US1SubscriptionHandler is Test {
         usdc.mint(maker, 1_000_000e6);
         vm.startPrank(maker);
         usdc.approve(address(issuance), type(uint256).max);
-        try issuance.subscribe(offerId, units) {} catch {}
+        try issuance.subscribe(offerId, units) { } catch { }
         vm.stopPrank();
     }
 }

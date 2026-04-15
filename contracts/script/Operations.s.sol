@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {console2} from "forge-std/console2.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { console2 } from "forge-std/console2.sol";
 
-import {BondFactory} from "../src/BondFactory.sol";
-import {BondIssuance} from "../src/BondIssuance.sol";
-import {ComplianceModule} from "../src/compliance/ComplianceModule.sol";
-import {RFQSettlement} from "../src/RFQSettlement.sol";
-import {MockERC20Decimals} from "../test/mocks/MockERC20Decimals.sol";
+import { BondFactory } from "../src/BondFactory.sol";
+import { BondIssuance } from "../src/BondIssuance.sol";
+import { ComplianceModule } from "../src/compliance/ComplianceModule.sol";
+import { RFQSettlement } from "../src/RFQSettlement.sol";
+import { MockERC20Decimals } from "../test/mocks/MockERC20Decimals.sol";
 import {
     ApprovalStatus,
     BondCategory,
@@ -23,7 +23,7 @@ import {
     SubscriptionTerms
 } from "../src/types/BondTypes.sol";
 
-import {BaseConfig} from "./BaseConfig.s.sol";
+import { BaseConfig } from "./BaseConfig.s.sol";
 
 /// @title Operations
 /// @notice 模块化操作脚本——每个函数对应一个链上操作，可独立调用。
@@ -579,7 +579,7 @@ contract Operations is BaseConfig {
         RFQSettlement stl = RFQSettlement(settlementAddr);
 
         vm.startBroadcast(_senderPk());
-        stl.setFeeConfig(FeeConfig({feeRecipient: feeRecipient, currentFeeBps: currentFeeBps, maxFeeBps: maxFeeBps}));
+        stl.setFeeConfig(FeeConfig({ feeRecipient: feeRecipient, currentFeeBps: currentFeeBps, maxFeeBps: maxFeeBps }));
         vm.stopBroadcast();
 
         console2.log("Fee config updated:", currentFeeBps, "bps");

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {InvalidBasisPoints} from "./BondErrors.sol";
+import { InvalidBasisPoints } from "./BondErrors.sol";
 
 /// @title BondMath
 /// @notice Utility math helpers shared by BondDEX pricing and payout logic.

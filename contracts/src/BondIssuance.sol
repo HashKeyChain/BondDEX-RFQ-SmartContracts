@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ReentrancyGuardTransient } from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
+import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {DomainPausable} from "./abstracts/DomainPausable.sol";
-import {RoleManaged} from "./abstracts/RoleManaged.sol";
+import { DomainPausable } from "./abstracts/DomainPausable.sol";
+import { RoleManaged } from "./abstracts/RoleManaged.sol";
 import {
     BondAlreadyMatured,
     BondNotMatured,
@@ -36,10 +36,10 @@ import {
     ZeroAmount,
     ZeroId
 } from "./libraries/BondErrors.sol";
-import {IComplianceModule} from "./interfaces/IComplianceModule.sol";
-import {IBondIssuance} from "./interfaces/IBondIssuance.sol";
-import {IBondToken} from "./interfaces/IBondToken.sol";
-import {ApprovalStatus, PauseDomain, Role, SubscriptionStatus, SubscriptionTerms} from "./types/BondTypes.sol";
+import { IComplianceModule } from "./interfaces/IComplianceModule.sol";
+import { IBondIssuance } from "./interfaces/IBondIssuance.sol";
+import { IBondToken } from "./interfaces/IBondToken.sol";
+import { ApprovalStatus, PauseDomain, Role, SubscriptionStatus, SubscriptionTerms } from "./types/BondTypes.sol";
 
 /// @title BondIssuance
 /// @notice Primary-market and redemption controller for issued bond tokens.
@@ -89,7 +89,6 @@ contract BondIssuance is
     event SettlementTokenPolicyUpdated(
         address indexed token, bool issuanceEnabled, bool settlementEnabled, bool redemptionEnabled, address operator
     );
-
     event SubscriptionCreated(
         bytes32 indexed offerId,
         address indexed bondToken,
@@ -100,7 +99,6 @@ contract BondIssuance is
         uint256 opensAt,
         uint256 closesAt
     );
-
     event SubscriptionApproved(
         bytes32 indexed approvalId,
         address indexed issuer,
@@ -109,11 +107,8 @@ contract BondIssuance is
         uint256 maxUnits,
         uint256 expiresAt
     );
-
     event SubscriptionApprovalRevoked(bytes32 indexed approvalId, address indexed issuer, address approver);
-
     event SubscriptionApprovalExpired(bytes32 indexed approvalId, address indexed issuer, address operator);
-
     event Subscribed(
         bytes32 indexed offerId,
         address indexed bondToken,
@@ -122,7 +117,6 @@ contract BondIssuance is
         uint256 units,
         uint256 cost
     );
-
     event RedemptionDeposited(
         address indexed bondToken,
         address indexed issuer,
@@ -130,28 +124,21 @@ contract BondIssuance is
         uint256 amount,
         uint256 cumulativeFundedAmount
     );
-
     event RedemptionClaimed(
         address indexed bondToken, address indexed holder, address indexed claimer, uint256 bondAmount, uint256 payout
     );
-
     event SubscriptionClosed(bytes32 indexed offerId, address indexed bondToken, address indexed issuer);
-
     event TokensRescued(address indexed token, address indexed to, uint256 amount, address indexed operator);
-
     event ExcessRedemptionReleased(address indexed bondToken, address indexed settlementToken, uint256 excessAmount);
-
     event ClaimDelegateSet(address indexed holder, address indexed delegate, address operator);
 
     uint256 private _nextOfferId;
-
     mapping(address token => SettlementTokenPolicy policy) private _settlementTokenPolicies;
     mapping(bytes32 offerId => SubscriptionOffer offer) private _subscriptionOffers;
     mapping(bytes32 approvalId => SubscriptionApprovalRecord record) private _subscriptionApprovals;
     mapping(address holder => address delegate) private _claimDelegates;
     mapping(address bondToken => RedemptionState state) private _redemptionStates;
     mapping(address token => uint256 liability) private _totalRedemptionLiability;
-
     uint256[43] private __gap;
 
     constructor() {
@@ -160,9 +147,7 @@ contract BondIssuance is
 
     function initialize(address admin) external initializer {
         if (admin == address(0)) revert ZeroAddress();
-
         __AccessControl_init();
-
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ISSUANCE_APPROVER_ROLE, admin);
         _grantRole(SETTLEMENT_ADMIN_ROLE, admin);
@@ -181,14 +166,10 @@ contract BondIssuance is
         if (approvalId == bytes32(0)) revert ZeroId();
         if (issuer == address(0) || bondToken == address(0)) revert ZeroAddress();
         if (maxUnits == 0) revert ZeroAmount();
-        if (expiresAt != 0 && expiresAt <= block.timestamp) {
-            revert ExpiredDeadline(expiresAt, block.timestamp);
-        }
+        if (expiresAt != 0 && expiresAt <= block.timestamp) revert ExpiredDeadline(expiresAt, block.timestamp);
 
         ApprovalStatus currentStatus = _subscriptionApprovals[approvalId].status;
-        if (currentStatus != ApprovalStatus.NONE) {
-            revert SubscriptionApprovalNotActive(approvalId, currentStatus);
-        }
+        if (currentStatus != ApprovalStatus.NONE) revert SubscriptionApprovalNotActive(approvalId, currentStatus);
 
         _subscriptionApprovals[approvalId] = SubscriptionApprovalRecord({
             issuer: issuer,
@@ -197,16 +178,13 @@ contract BondIssuance is
             expiresAt: expiresAt,
             status: ApprovalStatus.ACTIVE
         });
-
         emit SubscriptionApproved(approvalId, issuer, bondToken, msg.sender, maxUnits, expiresAt);
     }
 
     /// @inheritdoc IBondIssuance
     function revokeSubscriptionApproval(bytes32 approvalId) external onlyRole(ISSUANCE_APPROVER_ROLE) {
         SubscriptionApprovalRecord storage record = _subscriptionApprovals[approvalId];
-        if (record.status != ApprovalStatus.ACTIVE) {
-            revert SubscriptionApprovalNotActive(approvalId, record.status);
-        }
+        if (record.status != ApprovalStatus.ACTIVE) revert SubscriptionApprovalNotActive(approvalId, record.status);
         record.status = ApprovalStatus.REVOKED;
         emit SubscriptionApprovalRevoked(approvalId, record.issuer, msg.sender);
     }
@@ -214,9 +192,7 @@ contract BondIssuance is
     /// @inheritdoc IBondIssuance
     function markSubscriptionExpired(bytes32 approvalId) external {
         SubscriptionApprovalRecord storage record = _subscriptionApprovals[approvalId];
-        if (record.status != ApprovalStatus.ACTIVE) {
-            revert SubscriptionApprovalNotActive(approvalId, record.status);
-        }
+        if (record.status != ApprovalStatus.ACTIVE) revert SubscriptionApprovalNotActive(approvalId, record.status);
         if (record.expiresAt == 0 || record.expiresAt > block.timestamp) {
             revert SubscriptionApprovalNotActive(approvalId, record.status);
         }
@@ -239,12 +215,8 @@ contract BondIssuance is
         if (approval.expiresAt != 0 && approval.expiresAt <= block.timestamp) {
             revert SubscriptionApprovalNotActive(approvalId, ApprovalStatus.EXPIRED);
         }
-        if (approval.issuer != msg.sender) {
-            revert InvalidParticipantRole(msg.sender, Role.ISSUER, Role.NONE);
-        }
-        if (approval.bondToken != terms.bondToken) {
-            revert SubscriptionApprovalNotActive(approvalId, approval.status);
-        }
+        if (approval.issuer != msg.sender) revert InvalidParticipantRole(msg.sender, Role.ISSUER, Role.NONE);
+        if (approval.bondToken != terms.bondToken) revert SubscriptionApprovalNotActive(approvalId, approval.status);
         if (terms.maxUnits > approval.maxUnits) {
             revert MaxUnitsExceedsApproval(approvalId, terms.maxUnits, approval.maxUnits);
         }
@@ -253,13 +225,10 @@ contract BondIssuance is
         if (bondToken.settlementToken() != terms.settlementToken) {
             revert UnsupportedSettlementToken(terms.settlementToken);
         }
-
         _requireIssuer(bondToken, msg.sender);
         _requireValidWindow(terms.opensAt, terms.closesAt);
-
-        uint256 bondIssueDate = bondToken.issueDate();
-        if (terms.closesAt > bondIssueDate) {
-            revert SubscriptionWindowExceedsIssueDate(terms.closesAt, bondIssueDate);
+        if (terms.closesAt > bondToken.issueDate()) {
+            revert SubscriptionWindowExceedsIssueDate(terms.closesAt, bondToken.issueDate());
         }
         if (block.timestamp >= bondToken.maturityTimestamp()) {
             revert BondAlreadyMatured(terms.bondToken, bondToken.maturityTimestamp(), block.timestamp);
@@ -267,7 +236,6 @@ contract BondIssuance is
         if (terms.unitPrice == 0) revert ZeroAmount();
 
         approval.status = ApprovalStatus.CONSUMED;
-
         offerId = bytes32(++_nextOfferId);
         _subscriptionOffers[offerId] = SubscriptionOffer({
             issuer: msg.sender,
@@ -280,7 +248,6 @@ contract BondIssuance is
             closesAt: terms.closesAt,
             status: SubscriptionStatus.ACTIVE
         });
-
         emit SubscriptionCreated(
             offerId,
             terms.bondToken,
@@ -297,16 +264,13 @@ contract BondIssuance is
     function closeSubscription(bytes32 offerId) external {
         SubscriptionOffer storage offer = _subscriptionOffers[offerId];
         if (offer.status != SubscriptionStatus.ACTIVE) revert SubscriptionNotActive(offerId);
-        if (offer.issuer != msg.sender) {
-            revert InvalidParticipantRole(msg.sender, Role.ISSUER, Role.NONE);
-        }
+        if (offer.issuer != msg.sender) revert InvalidParticipantRole(msg.sender, Role.ISSUER, Role.NONE);
         offer.status = SubscriptionStatus.CLOSED;
         emit SubscriptionClosed(offerId, offer.bondToken, offer.issuer);
     }
 
     /// @inheritdoc IBondIssuance
-    /// @dev Primary-market subscriptions carry no accrued interest; interest accrual
-    /// begins at the bond's issueDate, typically set after the subscription window closes.
+    /// @dev Primary-market subscriptions carry no accrued interest; interest accrual begins at issueDate.
     function subscribe(bytes32 offerId, uint256 units) external nonReentrant {
         if (units == 0) revert ZeroAmount();
         _requireDomainActive(PauseDomain.SUBSCRIPTION);
@@ -316,28 +280,23 @@ contract BondIssuance is
         if (block.timestamp < offer.opensAt || block.timestamp > offer.closesAt) {
             revert SubscriptionWindowClosed(offerId, block.timestamp);
         }
-
         _requireIssuanceTokenEnabled(offer.settlementToken);
 
         IBondToken bondToken = IBondToken(offer.bondToken);
         if (block.timestamp >= bondToken.maturityTimestamp()) {
             revert BondAlreadyMatured(offer.bondToken, bondToken.maturityTimestamp(), block.timestamp);
         }
-        IComplianceModule complianceModule = IComplianceModule(bondToken.complianceModule());
-        _requireMaker(complianceModule, msg.sender);
+        _requireMaker(IComplianceModule(bondToken.complianceModule()), msg.sender);
 
         uint256 remainingUnits = offer.maxUnits - offer.soldUnits;
         if (units > remainingUnits) revert SubscriptionCapExceeded(offerId, units, remainingUnits);
 
-        uint8 bondDecimals = IERC20Metadata(offer.bondToken).decimals();
-        uint256 cost = _quoteSubscriptionCost(units, offer.unitPrice, bondDecimals);
-
+        uint256 cost = _quoteSubscriptionCost(units, offer.unitPrice, IERC20Metadata(offer.bondToken).decimals());
         offer.soldUnits += units;
         if (offer.soldUnits == offer.maxUnits) offer.status = SubscriptionStatus.CLOSED;
 
         IERC20(offer.settlementToken).safeTransferFrom(msg.sender, bondToken.issuer(), cost);
         bondToken.mint(msg.sender, units);
-
         emit Subscribed(offerId, offer.bondToken, msg.sender, offer.settlementToken, units, cost);
     }
 
@@ -350,13 +309,11 @@ contract BondIssuance is
         bool enabledForRedemption
     ) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
         if (token == address(0)) revert ZeroAddress();
-
         _settlementTokenPolicies[token] = SettlementTokenPolicy({
             issuanceEnabled: enabledForIssuance,
             settlementEnabled: enabledForSettlement,
             redemptionEnabled: enabledForRedemption
         });
-
         emit SettlementTokenPolicyUpdated(
             token, enabledForIssuance, enabledForSettlement, enabledForRedemption, msg.sender
         );
@@ -374,16 +331,13 @@ contract BondIssuance is
 
         address settlementToken = bondToken.settlementToken();
         uint256 balanceBefore = IERC20(settlementToken).balanceOf(address(this));
-
         IERC20(settlementToken).safeTransferFrom(msg.sender, address(this), amount);
-
         uint256 received = IERC20(settlementToken).balanceOf(address(this)) - balanceBefore;
 
         RedemptionState storage state = _redemptionStates[bondTokenAddress];
         state.fundedAmount += received;
         state.lastFundingAt = block.timestamp;
         _totalRedemptionLiability[settlementToken] += received;
-
         emit RedemptionDeposited(bondTokenAddress, msg.sender, settlementToken, received, state.fundedAmount);
     }
 
@@ -460,12 +414,10 @@ contract BondIssuance is
     /// @dev Protects all outstanding redemption liabilities from being withdrawn.
     function rescueTokens(address token, address to, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (token == address(0) || to == address(0)) revert ZeroAddress();
-
         uint256 balance = IERC20(token).balanceOf(address(this));
         uint256 locked = _totalRedemptionLiability[token];
         uint256 rescuable = balance > locked ? balance - locked : 0;
         if (amount > rescuable) revert InsufficientRescuableBalance(token, rescuable, amount);
-
         IERC20(token).safeTransfer(to, amount);
         emit TokensRescued(token, to, amount, msg.sender);
     }
@@ -484,8 +436,8 @@ contract BondIssuance is
         uint256 outstanding = IERC20(bondTokenAddress).totalSupply();
         uint256 actualObligation;
         if (outstanding > 0) {
-            uint8 bondDecimals = IERC20Metadata(bondTokenAddress).decimals();
-            actualObligation = _quoteRedemptionPayout(bondToken, outstanding, bondDecimals);
+            actualObligation =
+                _quoteRedemptionPayout(bondToken, outstanding, IERC20Metadata(bondTokenAddress).decimals());
         }
 
         if (deposited > actualObligation) {
@@ -542,21 +494,18 @@ contract BondIssuance is
         returns (uint256)
     {
         uint256 principal = Math.mulDiv(bondAmount, bondToken.faceValue(), 10 ** uint256(bondDecimals));
-        uint256 aiPerUnit = bondToken.accruedInterestPerUnit(bondToken.maturityTimestamp());
-        uint256 interest = Math.mulDiv(aiPerUnit, bondAmount, 10 ** uint256(bondDecimals));
+        uint256 interest = Math.mulDiv(
+            bondToken.accruedInterestPerUnit(bondToken.maturityTimestamp()), bondAmount, 10 ** uint256(bondDecimals)
+        );
         return principal + interest;
     }
 
     function _requireIssuanceTokenEnabled(address token) internal view {
-        if (!_settlementTokenPolicies[token].issuanceEnabled) {
-            revert UnsupportedSettlementToken(token);
-        }
+        if (!_settlementTokenPolicies[token].issuanceEnabled) revert UnsupportedSettlementToken(token);
     }
 
     function _requireRedemptionTokenEnabled(address token) internal view {
-        if (!_settlementTokenPolicies[token].redemptionEnabled) {
-            revert UnsupportedSettlementToken(token);
-        }
+        if (!_settlementTokenPolicies[token].redemptionEnabled) revert UnsupportedSettlementToken(token);
     }
 
     function _requireIssuer(IBondToken bondToken, address account) internal view {
@@ -571,15 +520,12 @@ contract BondIssuance is
     function _requireMaker(IComplianceModule complianceModule, address account) internal view {
         if (!complianceModule.isWhitelisted(account)) revert NotWhitelisted(account);
         Role actualRole = complianceModule.roleOf(account);
-        if (actualRole != Role.MARKET_MAKER) {
-            revert InvalidParticipantRole(account, Role.MARKET_MAKER, actualRole);
-        }
+        if (actualRole != Role.MARKET_MAKER) revert InvalidParticipantRole(account, Role.MARKET_MAKER, actualRole);
     }
 
     /// @dev Whitelist check prevents AML/sanctions-removed addresses from redeeming.
     function _claimFor(address bondTokenAddress, address holder, address caller) internal {
         _requireDomainActive(PauseDomain.CLAIMS);
-
         if (caller != holder && caller != _claimDelegates[holder]) {
             revert UnauthorizedClaimCaller(caller, holder, _claimDelegates[holder]);
         }
@@ -588,30 +534,24 @@ contract BondIssuance is
         if (block.timestamp <= bondToken.maturityTimestamp()) {
             revert BondNotMatured(bondTokenAddress, bondToken.maturityTimestamp(), block.timestamp);
         }
-
-        IComplianceModule complianceModule = IComplianceModule(bondToken.complianceModule());
-        if (!complianceModule.isWhitelisted(holder)) revert NotWhitelisted(holder);
+        if (!IComplianceModule(bondToken.complianceModule()).isWhitelisted(holder)) revert NotWhitelisted(holder);
         _requireRedemptionTokenEnabled(bondToken.settlementToken());
 
         uint256 bondAmount = IERC20(bondTokenAddress).balanceOf(holder);
         if (bondAmount < 1) revert NoClaimableBalance(holder, bondTokenAddress);
 
-        uint8 bondDecimals = IERC20Metadata(bondTokenAddress).decimals();
-        uint256 payout = _quoteRedemptionPayout(bondToken, bondAmount, bondDecimals);
+        uint256 payout = _quoteRedemptionPayout(bondToken, bondAmount, IERC20Metadata(bondTokenAddress).decimals());
         if (payout == 0) revert ZeroAmount();
 
         RedemptionState storage state = _redemptionStates[bondTokenAddress];
         uint256 availableAmount = state.fundedAmount - state.claimedAmount;
-        if (availableAmount < payout) {
-            revert InsufficientRedemptionFunding(bondTokenAddress, availableAmount, payout);
-        }
+        if (availableAmount < payout) revert InsufficientRedemptionFunding(bondTokenAddress, availableAmount, payout);
 
         // Burn first, then transfer — prevents holder from re-using the same balance.
         state.claimedAmount += payout;
         _totalRedemptionLiability[bondToken.settlementToken()] -= payout;
         bondToken.burn(holder, bondAmount);
         IERC20(bondToken.settlementToken()).safeTransfer(holder, payout);
-
         emit RedemptionClaimed(bondTokenAddress, holder, caller, bondAmount, payout);
 
         // Auto-release excess redemption liability once all bonds are burned.
@@ -627,18 +567,14 @@ contract BondIssuance is
 
     /// @dev No whitelist/role check — ensures redemption funding cannot be blocked by compliance admin.
     function _requireIssuerIdentity(IBondToken bondToken, address account) internal view {
-        if (bondToken.issuer() != account) {
-            revert InvalidParticipantRole(account, Role.ISSUER, Role.NONE);
-        }
+        if (bondToken.issuer() != account) revert InvalidParticipantRole(account, Role.ISSUER, Role.NONE);
     }
 
     function _requireValidWindow(uint256 opensAt, uint256 closesAt) internal view {
         if (closesAt == 0) revert SubscriptionWindowMissingCloseTime();
         if (closesAt <= opensAt) revert InvalidSubscriptionWindow(opensAt, closesAt);
-        if (closesAt <= block.timestamp) {
-            revert SubscriptionWindowAlreadyClosed(closesAt, block.timestamp);
-        }
+        if (closesAt <= block.timestamp) revert SubscriptionWindowAlreadyClosed(closesAt, block.timestamp);
     }
 
-    function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) { }
 }

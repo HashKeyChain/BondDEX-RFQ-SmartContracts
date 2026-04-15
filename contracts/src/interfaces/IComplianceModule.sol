@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {PauseDomain, Role} from "../types/BondTypes.sol";
+import { PauseDomain, Role } from "../types/BondTypes.sol";
 
 /// @title IComplianceModule
 /// @notice Interface for per-bond whitelist, role, and transfer-restriction policy modules.

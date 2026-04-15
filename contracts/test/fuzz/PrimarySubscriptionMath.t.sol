@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {Test} from "forge-std/Test.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {BondIssuance} from "../../src/BondIssuance.sol";
+import { BondIssuance } from "../../src/BondIssuance.sol";
 
 contract BondIssuanceMathHarness is BondIssuance {
     function quoteSubscriptionCost(uint256 units, uint256 unitPrice, uint8 bondDecimals)

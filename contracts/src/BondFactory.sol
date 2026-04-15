@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-import {BondToken} from "./BondToken.sol";
-import {ComplianceModule} from "./compliance/ComplianceModule.sol";
-import {DomainPausable} from "./abstracts/DomainPausable.sol";
-import {RoleManaged} from "./abstracts/RoleManaged.sol";
+import { BondToken } from "./BondToken.sol";
+import { ComplianceModule } from "./compliance/ComplianceModule.sol";
+import { DomainPausable } from "./abstracts/DomainPausable.sol";
+import { RoleManaged } from "./abstracts/RoleManaged.sol";
 import {
     ExpiredDeadline,
     InvalidApprovalState,
@@ -21,8 +21,8 @@ import {
     ZeroAddress,
     ZeroId
 } from "./libraries/BondErrors.sol";
-import {ApprovalStatus, BondConfig, PauseDomain} from "./types/BondTypes.sol";
-import {IBondFactory} from "./interfaces/IBondFactory.sol";
+import { ApprovalStatus, BondConfig, PauseDomain } from "./types/BondTypes.sol";
+import { IBondFactory } from "./interfaces/IBondFactory.sol";
 
 /// @title BondFactory
 /// @notice Control-plane contract that approves launches and deploys new bond instances.
@@ -49,17 +49,12 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         address complianceImplementation,
         bytes32 metadataHash
     );
-
     event IssuanceRevoked(bytes32 indexed approvalId, address indexed issuer, address revoker);
-
     event ComplianceImplementationRegistered(
         address indexed implementation, address indexed registrar, bytes4 interfaceId, bool enabled
     );
-
     event IssuanceApprovalExpired(bytes32 indexed approvalId, address indexed issuer, address operator);
-
     event PlatformAdminUpdated(address indexed previousAdmin, address indexed newAdmin, address indexed operator);
-
     /// @dev Split into two events to avoid stack-too-deep.
     event BondCreated(
         address indexed bondToken,
@@ -74,7 +69,6 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         address settlementToken,
         uint256 issueDate
     );
-
     event BondMetadata(
         address indexed bondToken, uint8 dayCountConvention, uint8 couponFrequency, uint8 bondCategory, bytes12 isin
     );
@@ -89,10 +83,8 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
     constructor(address admin, address issuanceController_) {
         _ensureNonZero(admin);
         _ensureNonZero(issuanceController_);
-
         platformAdmin = admin;
         issuanceController = issuanceController_;
-
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ISSUANCE_APPROVER_ROLE, admin);
         _grantRole(COMPLIANCE_ADMIN_ROLE, admin);
@@ -112,9 +104,7 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         if (!_approvedComplianceImplementations[complianceImplementation]) {
             revert UnsupportedInterface(complianceImplementation, bytes4(0));
         }
-        if (expiresAt != 0 && expiresAt <= block.timestamp) {
-            revert ExpiredDeadline(expiresAt, block.timestamp);
-        }
+        if (expiresAt != 0 && expiresAt <= block.timestamp) revert ExpiredDeadline(expiresAt, block.timestamp);
 
         ApprovalStatus currentStatus = _issuanceApprovals[approvalId].status;
         if (currentStatus != ApprovalStatus.NONE) revert InvalidApprovalState(currentStatus);
@@ -126,7 +116,6 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
             expiresAt: expiresAt,
             metadataHash: metadataHash
         });
-
         emit IssuanceApproved(approvalId, issuer, msg.sender, expiresAt, complianceImplementation, metadataHash);
     }
 
@@ -142,9 +131,7 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
     function markIssuanceExpired(bytes32 approvalId) external {
         IssuanceApprovalRecord storage record = _issuanceApprovals[approvalId];
         if (record.status != ApprovalStatus.ACTIVE) revert InvalidApprovalState(record.status);
-        if (record.expiresAt == 0 || record.expiresAt > block.timestamp) {
-            revert InvalidApprovalState(record.status);
-        }
+        if (record.expiresAt == 0 || record.expiresAt > block.timestamp) revert InvalidApprovalState(record.status);
         record.status = ApprovalStatus.EXPIRED;
         emit IssuanceApprovalExpired(approvalId, record.issuer, msg.sender);
     }
@@ -191,9 +178,7 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
             revert UnsupportedInterface(config.complianceImplementation, bytes4(0));
         }
 
-        if (config.settlementToken == address(0)) {
-            revert UnsupportedSettlementToken(config.settlementToken);
-        }
+        if (config.settlementToken == address(0)) revert UnsupportedSettlementToken(config.settlementToken);
         try IERC20Metadata(config.settlementToken).decimals() returns (uint8 actualDecimals) {
             if (config.settlementTokenDecimals != actualDecimals) {
                 revert InvalidBondConfig("settlementTokenDecimals mismatch");
@@ -208,12 +193,8 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
             revert InvalidBondConfig("maturityTimestamp must be in the future");
         }
         if (config.decimals > 18) revert InvalidBondConfig("decimals must be <= 18");
-        if (config.couponRateBps > 10_000) {
-            revert InvalidBondConfig("couponRateBps must be <= 10000");
-        }
-        if (config.issueDate < block.timestamp) {
-            revert InvalidBondConfig("issueDate must not be in the past");
-        }
+        if (config.couponRateBps > 10_000) revert InvalidBondConfig("couponRateBps must be <= 10000");
+        if (config.issueDate < block.timestamp) revert InvalidBondConfig("issueDate must not be in the past");
         if (config.issueDate >= config.maturityTimestamp) {
             revert InvalidIssueDate(config.issueDate, config.maturityTimestamp);
         }
@@ -223,8 +204,7 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
 
         approval.status = ApprovalStatus.CONSUMED;
         _createdBonds[approvalId] =
-            CreatedBondRecord({bondToken: bondTokenAddress, complianceModule: complianceModuleAddress});
-
+            CreatedBondRecord({ bondToken: bondTokenAddress, complianceModule: complianceModuleAddress });
         ComplianceModule(complianceModuleAddress).bindBondToken(bondTokenAddress);
         _emitBondCreated(config, bondTokenAddress, complianceModuleAddress);
     }
@@ -240,12 +220,10 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         _ensureNonZero(newAdmin);
         address previousAdmin = platformAdmin;
         platformAdmin = newAdmin;
-
         if (!hasRole(DEFAULT_ADMIN_ROLE, newAdmin)) _grantRole(DEFAULT_ADMIN_ROLE, newAdmin);
         if (previousAdmin != newAdmin && previousAdmin != msg.sender && hasRole(DEFAULT_ADMIN_ROLE, previousAdmin)) {
             _revokeRole(DEFAULT_ADMIN_ROLE, previousAdmin);
         }
-
         emit PlatformAdminUpdated(previousAdmin, newAdmin, msg.sender);
     }
 
