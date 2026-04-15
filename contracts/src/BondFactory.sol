@@ -5,7 +5,6 @@ import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol"
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-
 import { BondToken } from "./BondToken.sol";
 import { ComplianceModule } from "./compliance/ComplianceModule.sol";
 import { DomainPausable } from "./abstracts/DomainPausable.sol";
@@ -24,9 +23,6 @@ import {
 import { ApprovalStatus, BondConfig, PauseDomain } from "./types/BondTypes.sol";
 import { IBondFactory } from "./interfaces/IBondFactory.sol";
 
-/// @title BondFactory
-/// @notice Control-plane contract that approves launches and deploys new bond instances.
-/// @dev Intentionally NOT upgradeable to reduce attack surface; deploy a new factory if a bug is found.
 contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory {
     struct IssuanceApprovalRecord {
         address issuer;
@@ -55,7 +51,6 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
     );
     event IssuanceApprovalExpired(bytes32 indexed approvalId, address indexed issuer, address operator);
     event PlatformAdminUpdated(address indexed previousAdmin, address indexed newAdmin, address indexed operator);
-    /// @dev Split into two events to avoid stack-too-deep.
     event BondCreated(
         address indexed bondToken,
         address indexed issuer,
@@ -91,7 +86,6 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         _grantRole(PAUSER_ROLE, admin);
     }
 
-    /// @inheritdoc IBondFactory
     function approveIssuance(
         bytes32 approvalId,
         address issuer,
@@ -105,10 +99,8 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
             revert UnsupportedInterface(complianceImplementation, bytes4(0));
         }
         if (expiresAt != 0 && expiresAt <= block.timestamp) revert ExpiredDeadline(expiresAt, block.timestamp);
-
         ApprovalStatus currentStatus = _issuanceApprovals[approvalId].status;
         if (currentStatus != ApprovalStatus.NONE) revert InvalidApprovalState(currentStatus);
-
         _issuanceApprovals[approvalId] = IssuanceApprovalRecord({
             issuer: issuer,
             complianceImplementation: complianceImplementation,
@@ -119,7 +111,6 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         emit IssuanceApproved(approvalId, issuer, msg.sender, expiresAt, complianceImplementation, metadataHash);
     }
 
-    /// @inheritdoc IBondFactory
     function revokeIssuance(bytes32 approvalId) external onlyRole(ISSUANCE_APPROVER_ROLE) {
         IssuanceApprovalRecord storage record = _issuanceApprovals[approvalId];
         if (record.status != ApprovalStatus.ACTIVE) revert InvalidApprovalState(record.status);
@@ -127,7 +118,6 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         emit IssuanceRevoked(approvalId, record.issuer, msg.sender);
     }
 
-    /// @inheritdoc IBondFactory
     function markIssuanceExpired(bytes32 approvalId) external {
         IssuanceApprovalRecord storage record = _issuanceApprovals[approvalId];
         if (record.status != ApprovalStatus.ACTIVE) revert InvalidApprovalState(record.status);
@@ -136,7 +126,6 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         emit IssuanceApprovalExpired(approvalId, record.issuer, msg.sender);
     }
 
-    /// @inheritdoc IBondFactory
     function registerComplianceImplementation(address implementation, bytes4 interfaceId)
         external
         onlyRole(COMPLIANCE_ADMIN_ROLE)
@@ -149,20 +138,17 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         emit ComplianceImplementationRegistered(implementation, msg.sender, interfaceId, true);
     }
 
-    /// @inheritdoc IBondFactory
     function disableComplianceImplementation(address implementation) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         if (implementation == address(0)) revert ZeroAddress();
         _approvedComplianceImplementations[implementation] = false;
         emit ComplianceImplementationRegistered(implementation, msg.sender, bytes4(0), false);
     }
 
-    /// @inheritdoc IBondFactory
     function createBond(BondConfig calldata config, bytes32 approvalId)
         external
         returns (address bondTokenAddress, address complianceModuleAddress)
     {
         _requireDomainActive(PauseDomain.FACTORY);
-
         IssuanceApprovalRecord storage approval = _issuanceApprovals[approvalId];
         if (approval.status != ApprovalStatus.ACTIVE) revert InvalidApprovalState(approval.status);
         if (approval.expiresAt != 0 && approval.expiresAt <= block.timestamp) {
@@ -177,7 +163,6 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         ) {
             revert UnsupportedInterface(config.complianceImplementation, bytes4(0));
         }
-
         if (config.settlementToken == address(0)) revert UnsupportedSettlementToken(config.settlementToken);
         try IERC20Metadata(config.settlementToken).decimals() returns (uint8 actualDecimals) {
             if (config.settlementTokenDecimals != actualDecimals) {
@@ -198,10 +183,8 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         if (config.issueDate >= config.maturityTimestamp) {
             revert InvalidIssueDate(config.issueDate, config.maturityTimestamp);
         }
-
         complianceModuleAddress = _deployComplianceModule(config);
         bondTokenAddress = _deployBondToken(config, complianceModuleAddress);
-
         approval.status = ApprovalStatus.CONSUMED;
         _createdBonds[approvalId] =
             CreatedBondRecord({ bondToken: bondTokenAddress, complianceModule: complianceModuleAddress });
@@ -209,13 +192,10 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         _emitBondCreated(config, bondTokenAddress, complianceModuleAddress);
     }
 
-    /// @inheritdoc IBondFactory
     function pauseDomain(PauseDomain domain, bool paused) external onlyRole(PAUSER_ROLE) {
         _setDomainPaused(domain, paused);
     }
 
-    /// @inheritdoc IBondFactory
-    /// @dev Only updates platformAdmin; does NOT perform a full admin role transfer.
     function setPlatformAdmin(address newAdmin) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _ensureNonZero(newAdmin);
         address previousAdmin = platformAdmin;
@@ -227,7 +207,6 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         emit PlatformAdminUpdated(previousAdmin, newAdmin, msg.sender);
     }
 
-    /// @inheritdoc IBondFactory
     function getIssuanceApproval(bytes32 approvalId)
         external
         view
@@ -243,12 +222,10 @@ contract BondFactory is AccessControl, DomainPausable, RoleManaged, IBondFactory
         return (record.issuer, record.complianceImplementation, record.status, record.expiresAt, record.metadataHash);
     }
 
-    /// @inheritdoc IBondFactory
     function isComplianceImplementationApproved(address implementation) external view returns (bool) {
         return _approvedComplianceImplementations[implementation];
     }
 
-    /// @inheritdoc IBondFactory
     function getBondAddresses(bytes32 approvalId) external view returns (address bondToken, address complianceModule) {
         CreatedBondRecord memory record = _createdBonds[approvalId];
         return (record.bondToken, record.complianceModule);

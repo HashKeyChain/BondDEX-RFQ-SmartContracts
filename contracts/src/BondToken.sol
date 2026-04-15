@@ -3,20 +3,13 @@ pragma solidity ^0.8.28;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-
 import {
-    InvalidBondConfig,
-    InvalidIssueDate,
-    UnauthorizedController,
-    TransferRestricted,
-    ZeroAddress
+    InvalidBondConfig, InvalidIssueDate, UnauthorizedController, TransferRestricted, ZeroAddress
 } from "./libraries/BondErrors.sol";
 import { IComplianceModule } from "./interfaces/IComplianceModule.sol";
 import { IBondToken } from "./interfaces/IBondToken.sol";
 import { BondCategory, CouponFrequency, DayCount } from "./types/BondTypes.sol";
 
-/// @title BondToken
-/// @notice ERC-20 bond instrument with immutable issuance terms and compliance-gated transfers.
 contract BondToken is ERC20, IBondToken {
     address public immutable settlementToken;
     address public immutable complianceModule;
@@ -25,7 +18,6 @@ contract BondToken is ERC20, IBondToken {
     uint256 public immutable faceValue;
     uint256 public immutable couponRateBps;
     uint256 public immutable maturityTimestamp;
-    /// @notice Interest accrual start date, typically set after the subscription window closes.
     uint256 public immutable issueDate;
     DayCount public immutable dayCountConvention;
     CouponFrequency public immutable couponFrequency;
@@ -65,7 +57,6 @@ contract BondToken is ERC20, IBondToken {
         if (params_.issueDate >= params_.maturityTimestamp) {
             revert InvalidIssueDate(params_.issueDate, params_.maturityTimestamp);
         }
-
         issuer = params_.issuer;
         settlementToken = params_.settlementToken;
         complianceModule = params_.complianceModule;
@@ -81,13 +72,8 @@ contract BondToken is ERC20, IBondToken {
         _tokenDecimals = params_.decimals;
     }
 
-    /// @inheritdoc ERC20
-    function decimals() public view override returns (uint8) {
-        return _tokenDecimals;
-    }
+    function decimals() public view override returns (uint8) { return _tokenDecimals; }
 
-    /// @inheritdoc IBondToken
-    /// @dev Returns 0 before issueDate; caps at maturityTimestamp.
     function accruedInterestPerUnit(uint256 timestamp) external view returns (uint256) {
         if (timestamp <= issueDate) return 0;
         uint256 effectiveTs = timestamp < maturityTimestamp ? timestamp : maturityTimestamp;
@@ -96,26 +82,21 @@ contract BondToken is ERC20, IBondToken {
         return Math.mulDiv(faceValue, couponRateBps * elapsedSeconds, 10_000 * yearSeconds);
     }
 
-    /// @inheritdoc IBondToken
     function mint(address to, uint256 amount) external {
         if (msg.sender != issuanceController) revert UnauthorizedController(msg.sender);
         _mint(to, amount);
     }
 
-    /// @inheritdoc IBondToken
     function burn(address from, uint256 amount) external {
         if (msg.sender != issuanceController) revert UnauthorizedController(msg.sender);
         _burn(from, amount);
     }
 
-    /// @inheritdoc IBondToken
-    /// @dev Mint/burn (from/to == address(0)) bypass compliance checks.
     function detectTransferRestriction(address from, address to, uint256 amount) public view returns (uint8) {
         if (from == address(0) || to == address(0)) return 0;
         return IComplianceModule(complianceModule).checkTransfer(from, to, amount, msg.sender);
     }
 
-    /// @dev Off-chain overload: pass the intended operator to preview transfer eligibility.
     function detectTransferRestriction(address from, address to, uint256 amount, address operator)
         public
         view
@@ -125,7 +106,6 @@ contract BondToken is ERC20, IBondToken {
         return IComplianceModule(complianceModule).checkTransfer(from, to, amount, operator);
     }
 
-    /// @inheritdoc IBondToken
     function messageForTransferRestriction(uint8 restrictionCode) external pure returns (string memory) {
         if (restrictionCode == 0) return "SUCCESS";
         if (restrictionCode == 1) return "BOND_TOKEN_NOT_BOUND";

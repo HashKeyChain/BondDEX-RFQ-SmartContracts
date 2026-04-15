@@ -4,21 +4,14 @@ pragma solidity ^0.8.28;
 import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-
 import { DomainPausable } from "../abstracts/DomainPausable.sol";
 import { RoleManaged } from "../abstracts/RoleManaged.sol";
 import {
-    BondTokenAlreadyBound,
-    InvalidArrayLength,
-    InvalidBatchSize,
-    InvalidParticipantRole,
-    ZeroAddress
+    BondTokenAlreadyBound, InvalidArrayLength, InvalidBatchSize, InvalidParticipantRole, ZeroAddress
 } from "../libraries/BondErrors.sol";
 import { IComplianceModule } from "../interfaces/IComplianceModule.sol";
 import { PauseDomain, Role } from "../types/BondTypes.sol";
 
-/// @title ComplianceModule
-/// @notice Per-bond compliance policy enforcing whitelist and role-based transfer rules.
 contract ComplianceModule is
     Initializable,
     AccessControlUpgradeable,
@@ -68,9 +61,7 @@ contract ComplianceModule is
     mapping(address operator => bool authorized) private _authorizedOperators;
     uint256[44] private __gap;
 
-    constructor() {
-        _disableInitializers();
-    }
+    constructor() { _disableInitializers(); }
 
     function initialize(address admin, address factory, bytes32 policyId_, uint256 policyVersion_)
         external
@@ -94,7 +85,6 @@ contract ComplianceModule is
         emit BondTokenBound(bondToken_, address(this));
     }
 
-    /// @inheritdoc IComplianceModule
     function setWhitelist(address account, bool allowed) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         if (account == address(0)) revert ZeroAddress();
@@ -102,7 +92,6 @@ contract ComplianceModule is
         emit WhitelistUpdated(bondToken, account, address(this), allowed, msg.sender);
     }
 
-    /// @inheritdoc IComplianceModule
     function batchSetWhitelist(address[] calldata accounts, bool[] calldata allowed)
         external
         onlyRole(COMPLIANCE_ADMIN_ROLE)
@@ -119,7 +108,6 @@ contract ComplianceModule is
         }
     }
 
-    /// @inheritdoc IComplianceModule
     function setRole(address account, Role role) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         if (account == address(0)) revert ZeroAddress();
         if (uint8(role) > uint8(Role.INVESTOR)) revert InvalidParticipantRole(account, Role.INVESTOR, role);
@@ -128,7 +116,6 @@ contract ComplianceModule is
         emit RoleUpdated(bondToken, account, address(this), role, msg.sender);
     }
 
-    /// @inheritdoc IComplianceModule
     function batchSetRole(address[] calldata accounts, Role[] calldata roles) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         if (accounts.length != roles.length) revert InvalidArrayLength();
@@ -145,7 +132,6 @@ contract ComplianceModule is
         }
     }
 
-    /// @inheritdoc IComplianceModule
     function setPolicyMetadata(bytes32 policyId_, uint256 policyVersion_) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         _policyId = policyId_;
@@ -153,48 +139,34 @@ contract ComplianceModule is
         emit PolicyMetadataUpdated(bondToken, address(this), policyId_, policyVersion_);
     }
 
-    /// @inheritdoc IComplianceModule
     function pauseDomain(PauseDomain domain, bool paused) external onlyRole(PAUSER_ROLE) {
         _setDomainPaused(domain, paused);
     }
 
-    /// @inheritdoc IComplianceModule
     function setTransferOperator(address operator, bool authorized) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         if (operator == address(0)) revert ZeroAddress();
         _authorizedOperators[operator] = authorized;
         emit TransferOperatorUpdated(bondToken, operator, authorized, msg.sender);
     }
 
-    /// @inheritdoc IComplianceModule
     function isTransferOperator(address operator) external view returns (bool) {
         return _authorizedOperators[operator];
     }
 
-    /// @inheritdoc IComplianceModule
-    function isWhitelisted(address account) external view returns (bool) {
-        return _whitelist[account];
-    }
+    function isWhitelisted(address account) external view returns (bool) { return _whitelist[account]; }
 
-    /// @inheritdoc IComplianceModule
-    function roleOf(address account) external view returns (Role) {
-        return _roles[account];
-    }
+    function roleOf(address account) external view returns (Role) { return _roles[account]; }
 
-    /// @inheritdoc IComplianceModule
     function isDomainPaused(PauseDomain domain) public view override(DomainPausable, IComplianceModule) returns (bool) {
         return super.isDomainPaused(domain);
     }
 
-    /// @inheritdoc IComplianceModule
-    /// @dev `amount` is unused — current policy is address/role-based only.
-    /// `operator` is the address that initiated the transfer (e.g. RFQSettlement).
     function checkTransfer(address from, address to, uint256, address operator) external view returns (uint8) {
         if (bondToken == address(0)) return UNBOUND_BOND_CODE;
         if (isDomainPaused(PauseDomain.SETTLEMENT)) return TRANSFERS_PAUSED_CODE;
         if (!_authorizedOperators[operator]) return UNAUTHORIZED_OPERATOR_CODE;
         if (!_whitelist[from]) return SENDER_NOT_WHITELISTED_CODE;
         if (!_whitelist[to]) return RECEIVER_NOT_WHITELISTED_CODE;
-
         Role fromRole = _roles[from];
         Role toRole = _roles[to];
         if (fromRole != Role.MARKET_MAKER && fromRole != Role.INVESTOR) return INVALID_SENDER_ROLE_CODE;
@@ -203,15 +175,9 @@ contract ComplianceModule is
         return SUCCESS_CODE;
     }
 
-    /// @inheritdoc IComplianceModule
-    function policyId() external view returns (bytes32) {
-        return _policyId;
-    }
+    function policyId() external view returns (bytes32) { return _policyId; }
 
-    /// @inheritdoc IComplianceModule
-    function policyVersion() external view returns (uint256) {
-        return _policyVersion;
-    }
+    function policyVersion() external view returns (uint256) { return _policyVersion; }
 
     function supportsInterface(bytes4 interfaceId) public view override(AccessControlUpgradeable) returns (bool) {
         return interfaceId == type(IComplianceModule).interfaceId || super.supportsInterface(interfaceId);
