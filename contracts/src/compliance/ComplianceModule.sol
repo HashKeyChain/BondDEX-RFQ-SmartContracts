@@ -63,6 +63,19 @@ contract ComplianceModule is
 
     constructor() { _disableInitializers(); }
 
+    /// @dev AUDIT-FIX(N11) revisited: principle of least privilege at initialization, applied
+    ///      consistently across BondFactory / BondIssuance / RFQSettlement / ComplianceModule.
+    ///      Only DEFAULT_ADMIN_ROLE goes to `admin` (typically BondFactory.platformAdmin); the
+    ///      operational secondary roles (COMPLIANCE_ADMIN_ROLE / PAUSER_ROLE / UPGRADER_ROLE) must
+    ///      be granted explicitly via standard AccessControl `grantRole` after createBond returns.
+    ///      `BOND_FACTORY_ROLE` is intentionally granted here because BondFactory.createBond
+    ///      synchronously calls `bindBondToken` immediately after this initializer, before any
+    ///      external party can intervene.
+    ///      Recommended SOP for the platform admin (Safe / multicall) right after createBond:
+    ///        1. complianceModule.grantRole(COMPLIANCE_ADMIN_ROLE, complianceOpsTeam);
+    ///        2. complianceModule.grantRole(PAUSER_ROLE, incidentResponseTeam);
+    ///        3. complianceModule.grantRole(UPGRADER_ROLE, technicalTeam);
+    ///        4. complianceModule.setWhitelist(...) / setRole(...) / setTransferOperator(...);
     function initialize(address admin, address factory, bytes32 policyId_, uint256 policyVersion_)
         external
         initializer
@@ -72,9 +85,6 @@ contract ComplianceModule is
         _ensureNonZero(factory);
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(COMPLIANCE_ADMIN_ROLE, admin);
-        _grantRole(PAUSER_ROLE, admin);
-        _grantRole(UPGRADER_ROLE, admin);
         _grantRole(BOND_FACTORY_ROLE, factory);
         _policyId = policyId_;
         _policyVersion = policyVersion_;

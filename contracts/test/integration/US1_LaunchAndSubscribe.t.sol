@@ -86,7 +86,10 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
         BondToken bondToken = BondToken(bondTokenAddress);
         ComplianceModule complianceModule = ComplianceModule(complianceModuleAddress);
 
+        // AUDIT-FIX(N11) revisited: ComplianceModule.initialize now grants only DEFAULT_ADMIN_ROLE
+        // to admin. Self-grant COMPLIANCE_ADMIN_ROLE before exercising whitelist/role setters.
         vm.startPrank(admin);
+        complianceModule.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
         complianceModule.setWhitelist(issuer, true);
         complianceModule.setWhitelist(maker, true);
         complianceModule.setRole(issuer, Role.ISSUER);
@@ -154,7 +157,9 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
         (address bondTokenAddress, address complianceModuleAddress) = factory.createBond(config, approvalId);
 
         ComplianceModule complianceModule = ComplianceModule(complianceModuleAddress);
+        // AUDIT-FIX(N11) revisited: self-grant COMPLIANCE_ADMIN_ROLE under the new minimal init.
         vm.startPrank(admin);
+        complianceModule.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
         complianceModule.setWhitelist(issuer, true);
         complianceModule.setRole(issuer, Role.ISSUER);
         vm.stopPrank();

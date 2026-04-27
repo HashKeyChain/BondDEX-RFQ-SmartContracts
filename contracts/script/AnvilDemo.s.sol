@@ -343,6 +343,11 @@ contract AnvilDemo is Script {
         console2.log("=== Phase 3: Compliance Setup ===");
 
         vm.startBroadcast(ADMIN_PK);
+        // AUDIT-FIX(N11) revisited: ComplianceModule.initialize now grants only DEFAULT_ADMIN_ROLE
+        // to admin (principle of least privilege). Self-grant the operational secondary roles
+        // before exercising whitelist/role/operator setters. In production deployments this is
+        // typically done via Safe multicall right after createBond returns.
+        complianceModule.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
         complianceModule.setWhitelist(issuer, true);
         complianceModule.setWhitelist(makerA, true);
         complianceModule.setWhitelist(makerB, true);

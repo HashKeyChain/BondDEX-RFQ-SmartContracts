@@ -85,6 +85,8 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         issuance.grantRole(keccak256("SETTLEMENT_ADMIN_ROLE"), admin);
         issuance.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
         issuance.grantRole(keccak256("PAUSER_ROLE"), admin);
+        // AUDIT-FIX(N11) revisited: ComplianceModule.initialize now grants only DEFAULT_ADMIN_ROLE.
+        module.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
         module.setWhitelist(issuer, true);
         module.setWhitelist(maker, true);
         module.setRole(issuer, Role.ISSUER);

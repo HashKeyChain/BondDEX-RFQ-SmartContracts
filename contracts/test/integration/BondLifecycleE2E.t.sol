@@ -106,7 +106,9 @@ contract BondLifecycleE2ETest is Test {
         BondToken bondToken = BondToken(bondTokenAddress);
         ComplianceModule complianceModule = ComplianceModule(complianceModuleAddress);
 
+        // AUDIT-FIX(N11) revisited: self-grant COMPLIANCE_ADMIN_ROLE under the new minimal init.
         vm.startPrank(admin);
+        complianceModule.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
         complianceModule.setWhitelist(issuer, true);
         complianceModule.setWhitelist(maker, true);
         complianceModule.setWhitelist(investor, true);

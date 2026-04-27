@@ -18,7 +18,7 @@
 > - `BondIssuance.setSettlementTokenPolicy` 在 `_totalRedemptionLiability[token] > 0` 时禁止关闭 redemption 通道（AUDIT-FIX N11）。新增 `SettlementTokenHasRedemptionLiability(address, uint256)` error。
 > - `BondIssuance._claimFor` 现在允许 dust 持仓（payout==0）销毁通过，不再 revert `ZeroAmount`（AUDIT-FIX N9）。
 > - `BondIssuance.createSubscription` 新增校验：`terms.closesAt <= approval.expiresAt`（AUDIT-FIX N10）。新增 `SubscriptionWindowExceedsApprovalExpiry(uint256, uint256)` error。
-> - **最小权限初始化（AUDIT-FIX N11 revisited）**：`BondFactory` 构造函数、`BondIssuance.initialize`、`RFQSettlement.initialize` 现在**只**给初始 admin grant `DEFAULT_ADMIN_ROLE`。后续次级角色（ISSUANCE_APPROVER / COMPLIANCE_ADMIN / SETTLEMENT_ADMIN / PAUSER / UPGRADER）必须通过标准 `AccessControl.grantRole` 显式授予。`BondFactory.setPlatformAdmin` 已纯化为 storage-only，不再触碰任何 AccessControl 角色。
+> - **最小权限初始化（AUDIT-FIX N11 revisited）**：四个核心合约（`BondFactory` / `BondIssuance` / `RFQSettlement` / `ComplianceModule`）的构造函数或 `initialize` 现在**只**给初始 admin grant `DEFAULT_ADMIN_ROLE`。后续次级角色（ISSUANCE_APPROVER / COMPLIANCE_ADMIN / SETTLEMENT_ADMIN / PAUSER / UPGRADER）必须通过标准 `AccessControl.grantRole` 显式授予。`ComplianceModule.initialize` 仍会发放 `BOND_FACTORY_ROLE` 给 factory（`createBond` 同笔交易内同步调用 `bindBondToken` 所必需，与 admin 权限无关）。`BondFactory.setPlatformAdmin` 已纯化为 storage-only，不再触碰任何 AccessControl 角色。每支新债券创建后，platformAdmin 必须显式向 ComplianceModule 发放 `COMPLIANCE_ADMIN_ROLE` / `PAUSER_ROLE` / `UPGRADER_ROLE`，详见 `docs/部署后操作手册.md §6.3.5`。
 > - `CouponFrequency` 枚举从 4 变体收窄为 2：`enum CouponFrequency { BULLET, ANNUAL }`（删除 `SEMI_ANNUAL`、`QUARTERLY`）。
 >
 > **下游需要做的事：**

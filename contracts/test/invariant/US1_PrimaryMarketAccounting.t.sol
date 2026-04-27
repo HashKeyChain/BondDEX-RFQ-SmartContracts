@@ -99,9 +99,11 @@ contract US1PrimaryMarketAccountingInvariantTest is StdInvariant, Test {
         module.bindBondToken(address(bondToken));
 
         vm.startPrank(admin);
-        // AUDIT-FIX(N11) revisited: self-grant secondary roles this invariant test exercises.
+        // AUDIT-FIX(N11) revisited: self-grant secondary roles this invariant test exercises,
+        // including ComplianceModule.COMPLIANCE_ADMIN_ROLE under the new minimal init.
         issuance.grantRole(keccak256("SETTLEMENT_ADMIN_ROLE"), admin);
         issuance.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
+        module.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
         module.setWhitelist(issuer, true);
         module.setWhitelist(maker, true);
         module.setRole(issuer, Role.ISSUER);

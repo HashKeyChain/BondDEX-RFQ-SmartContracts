@@ -78,10 +78,13 @@ contract BondIssuanceSubscriptionTest is Test {
         module.bindBondToken(address(bondToken));
 
         vm.startPrank(admin);
-        // AUDIT-FIX(N11) revisited: self-grant secondary roles for setSettlementTokenPolicy / approveSubscription / pauseDomain.
+        // AUDIT-FIX(N11) revisited: self-grant secondary roles for setSettlementTokenPolicy /
+        // approveSubscription / pauseDomain (BondIssuance) and setWhitelist / setRole
+        // (ComplianceModule), since both contracts now grant only DEFAULT_ADMIN_ROLE at init.
         issuance.grantRole(keccak256("SETTLEMENT_ADMIN_ROLE"), admin);
         issuance.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
         issuance.grantRole(keccak256("PAUSER_ROLE"), admin);
+        module.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
         module.setWhitelist(issuer, true);
         module.setWhitelist(maker, true);
         module.setRole(issuer, Role.ISSUER);

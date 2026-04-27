@@ -77,7 +77,10 @@ contract BondIssuanceRescueAndRedemptionIsolationTest is BondIssuanceRedemptionF
         vm.prank(factory);
         moduleB.bindBondToken(address(bondTokenB));
 
+        // AUDIT-FIX(N11) revisited: ComplianceModule.initialize now grants only DEFAULT_ADMIN_ROLE
+        // to admin. Self-grant COMPLIANCE_ADMIN_ROLE before exercising whitelist/role setters.
         vm.startPrank(admin);
+        moduleB.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
         moduleB.setWhitelist(issuerB, true);
         moduleB.setWhitelist(holderB, true);
         moduleB.setRole(issuerB, Role.ISSUER);

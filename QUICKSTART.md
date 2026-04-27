@@ -367,7 +367,7 @@ The external audit hardening batch (N1–N18) lands as the following interface c
 function hashBondConfig(BondConfig calldata config) external pure returns (bytes32);
 ```
 
-> **Constructor behaviour change (least-privilege initialization)**: now grants ONLY `DEFAULT_ADMIN_ROLE`; the other 4 governance roles are granted explicitly by deployer/admin via `grantRole`. `setPlatformAdmin` is purified to ONLY update the `platformAdmin` storage field (which seeds the initial admin of newly deployed ComplianceModule proxies); **it no longer touches any AccessControl roles**.
+> **Constructor behaviour change (least-privilege initialization)**: all four core contracts (`BondFactory` / `BondIssuance` / `RFQSettlement` / `ComplianceModule`) now grant ONLY `DEFAULT_ADMIN_ROLE` to the supplied admin in their constructor / `initialize`; every other governance role is granted explicitly via standard OZ AccessControl `grantRole` (the only exception is `BOND_FACTORY_ROLE`, which `ComplianceModule.initialize` still issues to the factory because `createBond` calls `bindBondToken` synchronously in the same transaction). `setPlatformAdmin` is purified to ONLY update the `platformAdmin` storage field (which seeds the initial admin of newly deployed ComplianceModule proxies); **it no longer touches any AccessControl roles**. After every `createBond`, the platformAdmin must run the explicit ComplianceModule role-bootstrap SOP described in `docs/部署后操作手册.md §6.3.5` — otherwise subsequent compliance-ops calls will revert.
 
 ### BondToken (added)
 

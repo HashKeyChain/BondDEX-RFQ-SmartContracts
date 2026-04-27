@@ -26,6 +26,11 @@ contract ComplianceModuleBatchOpsTest is Test {
 
         vm.prank(factory);
         module.bindBondToken(makeAddr("bondToken"));
+
+        // AUDIT-FIX(N11) revisited: ComplianceModule.initialize now grants only DEFAULT_ADMIN_ROLE
+        // to admin. Self-grant the operational secondary roles this test exercises.
+        vm.prank(admin);
+        module.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
     }
 
     // ── batchSetWhitelist ─────────────────────────────────────────

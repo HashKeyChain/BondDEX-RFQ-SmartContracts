@@ -65,14 +65,16 @@ abstract contract BondIssuanceRedemptionFixtures is Test {
         vm.prank(factory);
         complianceModule.bindBondToken(address(bondToken));
 
-        // AUDIT-FIX(N11) revisited: contracts now grant only DEFAULT_ADMIN_ROLE to admin at init.
-        // Self-grant the secondary roles this fixture exercises so existing test bodies (which
-        // still vm.prank(admin) for setSettlementTokenPolicy / approveSubscription / pauseDomain
-        // / etc.) keep working.
+        // AUDIT-FIX(N11) revisited: contracts now grant only DEFAULT_ADMIN_ROLE to admin at init
+        // (BondIssuance + ComplianceModule). Self-grant the secondary roles this fixture exercises
+        // so existing test bodies (which still vm.prank(admin) for setSettlementTokenPolicy /
+        // approveSubscription / pauseDomain / setWhitelist / setRole / etc.) keep working.
         vm.startPrank(admin);
         issuance.grantRole(keccak256("SETTLEMENT_ADMIN_ROLE"), admin);
         issuance.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
         issuance.grantRole(keccak256("PAUSER_ROLE"), admin);
+        complianceModule.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
+        complianceModule.grantRole(keccak256("PAUSER_ROLE"), admin);
         complianceModule.setWhitelist(issuer, true);
         complianceModule.setWhitelist(holder, true);
         complianceModule.setWhitelist(delegate, true);

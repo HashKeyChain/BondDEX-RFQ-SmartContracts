@@ -367,7 +367,7 @@ BondConfig({
 function hashBondConfig(BondConfig calldata config) external pure returns (bytes32);
 ```
 
-> **构造函数行为变更（最小权限初始化）**：现在只 grant `DEFAULT_ADMIN_ROLE`；其他 4 个治理角色由部署脚本/管理员显式 grantRole 授予。`setPlatformAdmin` 已纯化为只更新 `platformAdmin` storage（决定后续新部署的 ComplianceModule 的初始 admin），**不再触碰任何 AccessControl 角色**。
+> **构造函数行为变更（最小权限初始化）**：四个核心合约（`BondFactory` / `BondIssuance` / `RFQSettlement` / `ComplianceModule`）的构造函数或 `initialize` **都只 grant `DEFAULT_ADMIN_ROLE`** 给传入的 admin；其他治理角色由部署脚本 / 管理员通过标准 OZ AccessControl `grantRole` 显式授予（`ComplianceModule` 还会额外发放 `BOND_FACTORY_ROLE` 给 factory，因为 `createBond` 需要在同一笔交易内同步调用 `bindBondToken`）。`setPlatformAdmin` 已纯化为只更新 `platformAdmin` storage（决定后续新部署的 ComplianceModule 的初始 admin），**不再触碰任何 AccessControl 角色**。每支新债券创建之后，platformAdmin 必须按 `docs/部署后操作手册.md §6.3.5` 的 SOP 显式发放 ComplianceModule 的 `COMPLIANCE_ADMIN_ROLE` / `PAUSER_ROLE` / `UPGRADER_ROLE`，否则后续合规运维调用会 revert。
 
 ### BondToken（新增）
 

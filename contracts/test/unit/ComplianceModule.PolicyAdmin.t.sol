@@ -49,6 +49,13 @@ contract ComplianceModulePolicyAdminTest is Test {
 
         vm.prank(factory);
         module.bindBondToken(bondTokenAddress);
+
+        // AUDIT-FIX(N11) revisited: ComplianceModule.initialize now grants only DEFAULT_ADMIN_ROLE
+        // to admin. Self-grant the operational secondary roles this test exercises.
+        vm.startPrank(admin);
+        module.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
+        module.grantRole(keccak256("PAUSER_ROLE"), admin);
+        vm.stopPrank();
     }
 
     function test_adminCanManageWhitelistAndRole() public {
