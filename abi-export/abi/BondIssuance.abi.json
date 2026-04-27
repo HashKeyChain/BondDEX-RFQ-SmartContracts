@@ -183,6 +183,29 @@
   },
   {
     "type": "function",
+    "name": "forceRedeem",
+    "inputs": [
+      {
+        "name": "bondTokenAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "holder",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "getClaimDelegate",
     "inputs": [
       {
@@ -261,11 +284,6 @@
     "outputs": [
       {
         "name": "issuanceEnabled",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
-        "name": "settlementEnabled",
         "type": "bool",
         "internalType": "bool"
       },
@@ -620,11 +638,6 @@
         "internalType": "bool"
       },
       {
-        "name": "enabledForSettlement",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
         "name": "enabledForRedemption",
         "type": "bool",
         "internalType": "bool"
@@ -715,6 +728,37 @@
   },
   {
     "type": "event",
+    "name": "ExcessRedemptionRefunded",
+    "inputs": [
+      {
+        "name": "bondToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "settlementToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "issuer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "excessAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "ExcessRedemptionReleased",
     "inputs": [
       {
@@ -734,6 +778,49 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ForceRedemption",
+    "inputs": [
+      {
+        "name": "bondToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "holder",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "bondAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "payout",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "operator",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -937,12 +1024,6 @@
       },
       {
         "name": "issuanceEnabled",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
-      },
-      {
-        "name": "settlementEnabled",
         "type": "bool",
         "indexed": false,
         "internalType": "bool"
@@ -1515,6 +1596,22 @@
   },
   {
     "type": "error",
+    "name": "SettlementTokenHasRedemptionLiability",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "outstandingLiability",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "SubscriptionApprovalNotActive",
     "inputs": [
       {
@@ -1588,6 +1685,22 @@
       },
       {
         "name": "currentTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "SubscriptionWindowExceedsApprovalExpiry",
+    "inputs": [
+      {
+        "name": "closesAt",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "approvalExpiresAt",
         "type": "uint256",
         "internalType": "uint256"
       }

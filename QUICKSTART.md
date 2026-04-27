@@ -70,7 +70,6 @@ config/
       "token": "0xSettlementTokenAddress(e.g.USDC)",
       "bondIssuancePolicy": {
         "issuanceEnabled": true,
-        "settlementEnabled": false,
         "redemptionEnabled": true
       },
       "rfqSettlementEnabled": true
@@ -111,7 +110,7 @@ config/
 | `.upgrader` | UPGRADER_ROLE — execute UUPS proxy upgrades |
 | **settlementTokens[]** | Settlement token array, supporting multiple currencies |
 | `.token` | ERC20 token address (`0x0` auto-deploys MockERC20, local testing only) |
-| `.bondIssuancePolicy` | BondIssuance tri-dimensional policy: issuance / settlement / redemption |
+| `.bondIssuancePolicy` | BondIssuance two-dimensional policy: `issuanceEnabled` (primary subscription) / `redemptionEnabled` (claim payouts). RFQ secondary trading is controlled by the separate `rfqSettlementEnabled` flag |
 | `.rfqSettlementEnabled` | Whether this token is enabled for RFQSettlement secondary trading |
 | **feeConfig** | |
 | `.feeRecipient` | RFQ secondary market fee recipient address |
@@ -173,7 +172,7 @@ make demo-anvil
 
 This command automatically starts Anvil with a timestamp of 2025-12-31, deploys contracts, then executes in multiple phases along a real timeline: subscription window (2026-01-01) → 12 minutes after issue date → +2 days → monthly progression to +3 months → maturity date (2027-01-09). The Makefile advances Anvil time via `cast rpc`. Each RFQ trade includes accrued interest automatically calculated from onchain time. Anvil shuts down automatically after the demo.
 
-The demo covers 9 participants (admin / issuer / makerA / makerB / makerC / investorA / investorB / investorC / delegate), including: over-subscription error, unauthorized subscription error, **direct transfer rejection (authorized operator mechanism)**, RFQ buy/sell with accrued interest and fees, market maker-to-market maker fee exemption with accrued interest, order cancellation, expired orders, investor-to-investor restriction, delegated claims, surplus fund rescue, and more.
+The demo covers 9 participants (admin / issuer / makerA / makerB / makerC / investorA / investorB / investorC / delegate), including: over-subscription error, unauthorized subscription error, **direct transfer rejection (authorized operator mechanism)**, RFQ buy/sell with accrued interest and fees, market maker-to-market maker fee exemption with accrued interest, order cancellation, expired orders, investor-to-investor restriction, delegated claims, **automatic refund of redemption surplus to the issuer once all holders claim**, and more.
 
 For simulation mode (no Anvil required, uses `vm.warp`, single-pass full lifecycle; requires existing `deployments/31337.json`):
 
@@ -245,7 +244,6 @@ Fill in all real addresses (each role can point to a different Safe multisig):
       "token": "0xTestnetUSDC",
       "bondIssuancePolicy": {
         "issuanceEnabled": true,
-        "settlementEnabled": false,
         "redemptionEnabled": true
       },
       "rfqSettlementEnabled": true
@@ -299,7 +297,7 @@ Edit `config/mainnet.json` → `DEPLOYER_PRIVATE_KEY=0x... make deploy-mainnet` 
 | `DEPLOYER_PRIVATE_KEY=0x... make deploy-anvil` | Local Anvil one-stop deployment |
 | `DEPLOYER_PRIVATE_KEY=0x... make deploy-testnet` | Testnet one-stop deployment + permission handoff |
 | `DEPLOYER_PRIVATE_KEY=0x... make deploy-mainnet` | Mainnet one-stop deployment + permission handoff |
-| `make ops-release-excess-redemption ARGS="<bondToken>"` | Release excess redemption liability (post-maturity) |
+| `make ops-release-excess-redemption ARGS="<bondToken>"` | Manually release excess redemption funds (post-maturity); funds are **atomically refunded to the issuer** in the same tx (v0.3.0+) |
 | `make demo-anvil` | Anvil E2E demo (multi-phase: real-timeline subscription → RFQ → redemption) |
 | `make demo-anvil-sim` | Simulation demo (no broadcast, uses vm.warp, single-pass) |
 | `make export-abi` | Export ABI |
@@ -317,7 +315,7 @@ BondConfig({
     symbol:                   "HKB-Q1",
     decimals:                 0,
     faceValue:                1_000e6,           // 1,000 USDC
-    couponRateBps:            500,               // 5% annualized (note: annualized rate)
+    couponRateBps:            500,               // 5% annualized (basis points)
     maturityTimestamp:        1767225600,         // 2026-01-01 maturity
     issueDate:                1704067200,         // 2024-01-01 issue date
     dayCountConvention:       DayCount.ACT_365,
@@ -345,8 +343,8 @@ BondConfig({
 | --- | --- | --- |
 | `BULLET` | 0 | Bullet payment at maturity (most common) |
 | `ANNUAL` | 1 | Annual coupon |
-| `SEMI_ANNUAL` | 2 | Semi-annual coupon |
-| `QUARTERLY` | 3 | Quarterly coupon |
+
+> SEMI_ANNUAL / QUARTERLY frequencies are not supported by the platform.
 
 **BondCategory Enum Values:**
 
@@ -356,3 +354,72 @@ BondConfig({
 | `GOVERNMENT` | 1 | Government bond |
 | `CONVERTIBLE` | 2 | Convertible bond |
 | `ABS` | 3 | Asset-backed security |
+
+## v0.3.0 Added / Changed API Reference
+
+The external audit hardening batch (N1–N18) lands as the following interface changes. Integrators upgrading to v0.3.0 **must regenerate** wagmi typegen / abigen / Subgraph mappings.
+
+### BondFactory (added)
+
+```solidity
+/// Computes the canonical hash of a BondConfig. Approver computes this off-chain before
+/// approveIssuance; createBond verifies it. Any field mismatch reverts BondConfigHashMismatch.
+function hashBondConfig(BondConfig calldata config) external pure returns (bytes32);
+```
+
+> **Constructor behaviour change (least-privilege initialization)**: now grants ONLY `DEFAULT_ADMIN_ROLE`; the other 4 governance roles are granted explicitly by deployer/admin via `grantRole`. `setPlatformAdmin` is purified to ONLY update the `platformAdmin` storage field (which seeds the initial admin of newly deployed ComplianceModule proxies); **it no longer touches any AccessControl roles**.
+
+### BondToken (added)
+
+```solidity
+/// High-precision total accrued interest in settlement-token smallest units (deferred-division mulDiv).
+function accruedInterestFor(uint256 bondAmount, uint256 timestamp) external view returns (uint256);
+
+/// Principal of bondAmount in settlement-token smallest units.
+function principalOf(uint256 bondAmount) external view returns (uint256);
+
+/// Settlement token decimals captured + verified at construction.
+function settlementTokenDecimals() external view returns (uint8);
+```
+
+> **Removed**: legacy `accruedInterestPerUnit(timestamp)` is gone — for the historical "per-unit" value, call `accruedInterestFor(10 ** decimals(), timestamp)` (mathematically equivalent, strictly higher precision).
+>
+> **Constructor params change**: `BondToken.ConstructorParams` adds a `uint8 settlementTokenDecimals` field; the constructor cross-checks it against `IERC20Metadata(settlementToken).decimals()` and reverts on mismatch.
+
+### BondIssuance (added + changed)
+
+```solidity
+/// Force-redeem a sanctioned/permanently-blacklisted holder, routing the proceeds to a
+/// regulator custody / issuer wallet. Bypasses the holder whitelist check.
+function forceRedeem(address bondToken, address holder, address recipient) external;  // DEFAULT_ADMIN_ROLE
+
+/// Signature change: v0.2.0 was (address, bool, bool, bool); v0.3.0 drops the middle settlementEnabled bool.
+function setSettlementTokenPolicy(address token, bool enabledForIssuance, bool enabledForRedemption) external;
+function getSettlementTokenPolicy(address token) external view returns (bool, bool);
+```
+
+> **Excess-redemption behaviour (N6)**: `releaseExcessRedemption` and the auto-release branch on full-claim now **atomically transfer the surplus back to the issuer** instead of "release-then-rescue". Listen to the new event `ExcessRedemptionRefunded(bondToken, settlementToken, issuer, excessAmount)` for accounting reconciliation. `rescueTokens` is now reserved for tokens accidentally transferred into the contract.
+>
+> **Redemption-channel close gating (N11)**: when `_totalRedemptionLiability[token] > 0`, you can no longer flip `enabledForRedemption` to false for that token — preventing admin policy changes from trapping issuer-deposited redemption funds.
+
+### RFQSettlement (added + behaviour)
+
+```solidity
+/// Recompute the cached EIP-712 domain separator. Call after any UUPS upgrade that changed
+/// SettlementOrderEIP712.NAME or VERSION; otherwise off-chain signatures will fail.
+function refreshDomainSeparator() external;  // DEFAULT_ADMIN_ROLE
+```
+
+> **Onchain enforcement (N1)**: `order.quoteToken` must equal `bondToken.settlementToken()`. Frontends should auto-derive this field from the bond and not let users edit it.
+>
+> **Accrued-interest verification (N7 + N8)**: onchain validation now uses `BondToken.accruedInterestFor` (high precision). When `expectedAI == 0` (e.g. trades before issueDate), the strict invariant `order.accruedInterest == 0` is enforced **with no tolerance window**.
+
+### New events
+
+| Event | Source | Trigger |
+| :-- | :-- | :-- |
+| `ExcessRedemptionRefunded(bondToken, settlementToken, issuer, excessAmount)` | BondIssuance | Surplus actually transferred back to issuer (same tx as `ExcessRedemptionReleased`) |
+| `ForceRedemption(bondToken, holder, recipient, bondAmount, payout, operator)` | BondIssuance | Admin invoked `forceRedeem` |
+| `DomainSeparatorRefreshed(chainId, domainSeparator, operator)` | RFQSettlement | Admin invoked `refreshDomainSeparator` |
+
+Full ABI + version notes: `abi-export/metadata/event-interface.md`.

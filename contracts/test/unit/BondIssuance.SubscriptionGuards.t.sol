@@ -66,6 +66,7 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
                 couponRateBps: 500,
                 maturityTimestamp: block.timestamp + 30 days,
                 settlementToken: address(usdc),
+                settlementTokenDecimals: 6,
                 complianceModule: address(module),
                 issuanceController: address(issuance),
                 issueDate: block.timestamp + 8 days,
@@ -80,11 +81,15 @@ contract BondIssuanceSubscriptionGuardsTest is Test {
         module.bindBondToken(address(bondToken));
 
         vm.startPrank(admin);
+        // AUDIT-FIX(N11) revisited: self-grant secondary roles this test exercises.
+        issuance.grantRole(keccak256("SETTLEMENT_ADMIN_ROLE"), admin);
+        issuance.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
+        issuance.grantRole(keccak256("PAUSER_ROLE"), admin);
         module.setWhitelist(issuer, true);
         module.setWhitelist(maker, true);
         module.setRole(issuer, Role.ISSUER);
         module.setRole(maker, Role.MARKET_MAKER);
-        issuance.setSettlementTokenPolicy(address(usdc), true, false, true);
+        issuance.setSettlementTokenPolicy(address(usdc), true, true);
         vm.stopPrank();
 
         usdc.mint(maker, 10_000_000e6);

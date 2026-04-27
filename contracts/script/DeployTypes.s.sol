@@ -32,10 +32,12 @@ struct DeployConfig {
 }
 
 /// @dev 单条结算代币策略。
+///      - issuanceEnabled / redemptionEnabled 对应 BondIssuance 一级认购、到期赎回的准入；
+///      - rfqSettlementEnabled 对应 RFQSettlement 二级 RFQ 流通的准入；
+///      （settlementEnabled 字段已删除——它在合约里没有任何 require 用处，与 RFQ 准入也无关。）
 struct TokenPolicy {
     address token;
     bool issuanceEnabled;
-    bool settlementEnabled;
     bool redemptionEnabled;
     bool rfqSettlementEnabled;
 }

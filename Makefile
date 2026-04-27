@@ -185,9 +185,12 @@ OPS_SCRIPT := $(SCRIPT_DIR)/Operations.s.sol:Operations
 .PHONY: ops-query-bond-token ops-query-balance ops-query-bond-balances
 
 # 审批发行
+# AUDIT-FIX(N3): metadataHash 必须等于 BondFactory.hashBondConfig(config)
+#   ARGS 形如：<approvalId> <issuer> <expiresAt> <metadataHash>
+#   metadataHash 可由 `cast call $$FACTORY 'hashBondConfig((<bondConfigAbi>))' "$$CFG"` 取得。
 ops-approve-issuance:
 	cd $(CONTRACTS_DIR) && forge script $(OPS_SCRIPT) \
-		--sig "approveIssuance(bytes32,address,uint256)" $(ARGS) \
+		--sig "approveIssuance(bytes32,address,uint256,bytes32)" $(ARGS) \
 		--rpc-url $(OPS_RPC) --broadcast
 
 # 创建债券

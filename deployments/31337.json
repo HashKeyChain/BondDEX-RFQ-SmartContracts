@@ -20,7 +20,6 @@
         "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
         "bondIssuancePolicy": {
           "issuanceEnabled": true,
-          "settlementEnabled": false,
           "redemptionEnabled": true
         },
         "rfqSettlementEnabled": true

@@ -90,37 +90,64 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
         BondIssuance issuance = BondIssuance(r.bondIssuance);
         RFQSettlement settlement = RFQSettlement(r.rfqSettlement);
 
-        // ① 注册 ComplianceModule 实现模板
+        // AUDIT-FIX(N11) revisited: contracts now grant ONLY DEFAULT_ADMIN_ROLE to the initial admin
+        // (deployer). To run the configuration steps below the deployer needs to self-grant the
+        // specific secondary roles each step requires. These grants are revoked at the end (step ⑧).
+        _grantDeployerProvisioningRoles(factory, issuance, settlement, cfg);
+
+        // ① 注册 ComplianceModule 实现模板（需要 COMPLIANCE_ADMIN_ROLE on factory）
         factory.registerComplianceImplementation(r.complianceImpl, type(IComplianceModule).interfaceId);
 
-        // ② 配置全部结算代币策略
+        // ② 配置全部结算代币策略（需要 SETTLEMENT_ADMIN_ROLE on issuance + RFQ）
         for (uint256 i = 0; i < tokens.length; i++) {
             issuance.setSettlementTokenPolicy(
-                tokens[i].token, tokens[i].issuanceEnabled, tokens[i].settlementEnabled, tokens[i].redemptionEnabled
+                tokens[i].token, tokens[i].issuanceEnabled, tokens[i].redemptionEnabled
             );
             settlement.setSettlementTokenPolicy(tokens[i].token, tokens[i].rfqSettlementEnabled);
         }
 
-        // ③ 配置 RFQ 手续费
+        // ③ 配置 RFQ 手续费（需要 SETTLEMENT_ADMIN_ROLE on RFQ）
         settlement.setFeeConfig(
             FeeConfig({ feeRecipient: cfg.feeRecipient, currentFeeBps: cfg.currentFeeBps, maxFeeBps: cfg.maxFeeBps })
         );
 
-        // ④ 设置 platformAdmin
+        // ④ 设置 platformAdmin（仅更新 factory.platformAdmin storage，不动任何 AccessControl 角色）
         factory.setPlatformAdmin(cfg.platformAdmin);
 
-        // ⑤⑥⑦ 逐角色授权
+        // ⑤⑥⑦ 逐角色授权（grant 给目标地址；不再需要任何 follow-up 清理）
         _grantFactoryRoles(factory, cfg);
         _grantIssuanceRoles(issuance, cfg);
         _grantSettlementRoles(settlement, cfg);
 
-        // ⑧ 选择性撤销 deployer 角色（已移交给他人的角色才撤销）
+        // ⑧ 选择性撤销 deployer 角色（包括 ⓪ 步自我授予的临时角色）
         if (cfg.revokeDeployer) {
             _revokeDeployerRoles(factory, issuance, settlement, cfg);
         }
     }
 
+    /// @dev AUDIT-FIX(N11) revisited helper: at construction the contracts only grant
+    ///      DEFAULT_ADMIN_ROLE to the initial admin (deployer). Self-grant the secondary roles
+    ///      required by the subsequent configuration steps. Idempotent — safe even if the same
+    ///      role was already granted (e.g. by a re-run on a partially configured deployment).
+    function _grantDeployerProvisioningRoles(
+        BondFactory factory,
+        BondIssuance issuance,
+        RFQSettlement settlement,
+        DeployConfig memory cfg
+    ) internal {
+        address d = cfg.deployer;
+        // Step ① needs COMPLIANCE_ADMIN_ROLE on factory.
+        if (!factory.hasRole(COMPLIANCE_ADMIN_ROLE, d)) factory.grantRole(COMPLIANCE_ADMIN_ROLE, d);
+        // Step ② needs SETTLEMENT_ADMIN_ROLE on issuance + settlement.
+        if (!issuance.hasRole(SETTLEMENT_ADMIN_ROLE, d)) issuance.grantRole(SETTLEMENT_ADMIN_ROLE, d);
+        if (!settlement.hasRole(SETTLEMENT_ADMIN_ROLE, d)) settlement.grantRole(SETTLEMENT_ADMIN_ROLE, d);
+    }
+
     function _grantFactoryRoles(BondFactory factory, DeployConfig memory cfg) internal {
+        // AUDIT-FIX(N11) revisited: setPlatformAdmin no longer touches AccessControl roles, and the
+        // BondFactory constructor only grants DEFAULT_ADMIN_ROLE to the initial admin. Therefore
+        // this helper is the single, explicit source of truth for which address holds which
+        // BondFactory role in production.
         factory.grantRole(0x00, cfg.factoryAdmin);
         factory.grantRole(ISSUANCE_APPROVER_ROLE, cfg.factoryIssuanceApprover);
         factory.grantRole(COMPLIANCE_ADMIN_ROLE, cfg.factoryComplianceAdmin);
@@ -161,8 +188,10 @@ contract FullDeploy is DeployConfigParser, DeployJsonWriter {
             factory, COMPLIANCE_ADMIN_ROLE, d, cfg.factoryComplianceAdmin, "BondFactory.COMPLIANCE_ADMIN_ROLE"
         );
         retained += _renounceIf(factory, PAUSER_ROLE, d, cfg.factoryPauser, "BondFactory.PAUSER_ROLE");
-        // DEFAULT_ADMIN_ROLE: setPlatformAdmin 也会授予 admin，两者都要检查
-        if (cfg.factoryAdmin != d && cfg.platformAdmin != d) {
+        // AUDIT-FIX(N11) revisited: setPlatformAdmin no longer grants any AccessControl role, so the
+        // sole on-chain assignee for BondFactory.DEFAULT_ADMIN_ROLE is cfg.factoryAdmin (granted via
+        // _grantFactoryRoles).
+        if (cfg.factoryAdmin != d) {
             factory.renounceRole(0x00, d);
         } else {
             console2.log("  [RETAINED] BondFactory.DEFAULT_ADMIN_ROLE -> deployer");

@@ -40,17 +40,17 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
 
         complianceImplementation = new ComplianceModule();
         factory = new BondFactory(admin, address(issuance));
+
+        // AUDIT-FIX(N11) revisited: self-grant secondary roles this integration test exercises.
+        vm.startPrank(admin);
+        factory.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
+        factory.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
+        issuance.grantRole(keccak256("SETTLEMENT_ADMIN_ROLE"), admin);
+        issuance.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
+        vm.stopPrank();
     }
 
     function test_launchAndSubscribeEndToEnd() public {
-        vm.startPrank(admin);
-        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
-        factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, keccak256("metadata")
-        );
-        issuance.setSettlementTokenPolicy(address(usdc), true, false, false);
-        vm.stopPrank();
-
         BondConfig memory config = BondConfig({
             issuer: issuer,
             name: "HashKey Bond",
@@ -70,6 +70,15 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
             bondCategory: BondCategory.CORPORATE,
             isin: bytes12(0)
         });
+
+        vm.startPrank(admin);
+        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
+        // AUDIT-FIX(N3): bind metadataHash to canonical config hash.
+        factory.approveIssuance(
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, factory.hashBondConfig(config)
+        );
+        issuance.setSettlementTokenPolicy(address(usdc), true, false);
+        vm.stopPrank();
 
         vm.prank(issuer);
         (address bondTokenAddress, address complianceModuleAddress) = factory.createBond(config, approvalId);
@@ -114,13 +123,6 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
     }
 
     function test_revertWhenSubscriptionUsesUnsupportedSettlementToken() public {
-        vm.startPrank(admin);
-        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
-        factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, keccak256("metadata")
-        );
-        vm.stopPrank();
-
         BondConfig memory config = BondConfig({
             issuer: issuer,
             name: "HashKey Bond",
@@ -140,6 +142,13 @@ contract US1LaunchAndSubscribeIntegrationTest is Test {
             bondCategory: BondCategory.CORPORATE,
             isin: bytes12(0)
         });
+
+        vm.startPrank(admin);
+        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
+        factory.approveIssuance(
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, factory.hashBondConfig(config)
+        );
+        vm.stopPrank();
 
         vm.prank(issuer);
         (address bondTokenAddress, address complianceModuleAddress) = factory.createBond(config, approvalId);

@@ -30,6 +30,8 @@ interface IRFQSettlement {
         view
         returns (uint256 feeAmount);
     function rescueTokens(address token, address to, uint256 amount) external;
+    /// @dev AUDIT-FIX(N15): admin trigger to recompute the cached EIP-712 domain separator after a UUPS upgrade.
+    function refreshDomainSeparator() external;
     function eip712Domain()
         external
         view

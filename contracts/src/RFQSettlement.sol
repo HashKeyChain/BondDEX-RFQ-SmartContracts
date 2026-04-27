@@ -4,9 +4,7 @@ pragma solidity ^0.8.28;
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ReentrancyGuardTransient } from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -21,6 +19,7 @@ import {
     FeeCapImmutable,
     FeeExceedsOrderLimit,
     InvalidAiTolerance,
+    InvalidBasisPoints,
     InvalidBatchLength,
     InvalidBatchSize,
     InvalidFeeConfig,
@@ -30,6 +29,7 @@ import {
     InvalidSignature,
     OrderAlreadyCancelled,
     OrderAlreadyConsumed,
+    QuoteTokenMismatch,
     UnauthorizedOrderMaker,
     NotWhitelisted,
     UnregisteredBondToken,
@@ -76,6 +76,8 @@ contract RFQSettlement is
     event BondTokenRegistrationUpdated(address indexed bondToken, bool registered, address operator);
     event AiToleranceUpdated(uint256 newToleranceSeconds, address operator);
     event TokensRescued(address indexed token, address indexed to, uint256 amount, address indexed operator);
+    /// @dev AUDIT-FIX(N15): emitted whenever an admin refreshes the cached EIP-712 domain separator.
+    event DomainSeparatorRefreshed(uint256 chainId, bytes32 domainSeparator, address indexed operator);
 
     uint256 internal constant MAX_BATCH_SIZE = 24;
     uint256 internal constant DEFAULT_AI_TOLERANCE_SECONDS = 300;
@@ -95,14 +97,18 @@ contract RFQSettlement is
 
     constructor() { _disableInitializers(); }
 
+    /// @dev AUDIT-FIX(N11) revisited: principle of least privilege at initialization. Only
+    ///      DEFAULT_ADMIN_ROLE is granted to the initial admin; secondary governance roles
+    ///      (SETTLEMENT_ADMIN_ROLE / PAUSER_ROLE / UPGRADER_ROLE) must be granted explicitly via
+    ///      standard AccessControl. The initial admin can immediately self-grant any role they
+    ///      need because DEFAULT_ADMIN_ROLE is the OZ default `getRoleAdmin` for every role.
     function initialize(address admin, uint16 maxFeeBps_) external initializer {
-        if (admin == address(0)) revert ZeroAddress();
-        if (maxFeeBps_ > 10_000) revert InvalidFeeConfig(0, maxFeeBps_);
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(admin);
+        // AUDIT-FIX(N16): out-of-range maxFeeBps must raise InvalidBasisPoints, not InvalidFeeConfig.
+        if (maxFeeBps_ > 10_000) revert InvalidBasisPoints(maxFeeBps_);
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(SETTLEMENT_ADMIN_ROLE, admin);
-        _grantRole(PAUSER_ROLE, admin);
-        _grantRole(UPGRADER_ROLE, admin);
         _feeConfig = FeeConfig({ feeRecipient: admin, currentFeeBps: 0, maxFeeBps: maxFeeBps_ });
         _aiToleranceSeconds = DEFAULT_AI_TOLERANCE_SECONDS;
         _cachedChainId = block.chainid;
@@ -154,7 +160,8 @@ contract RFQSettlement is
     }
 
     function setFeeConfig(FeeConfig calldata config) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
-        if (config.feeRecipient == address(0)) revert ZeroAddress();
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(config.feeRecipient);
         if (config.maxFeeBps != _feeConfig.maxFeeBps) revert FeeCapImmutable();
         if (config.currentFeeBps > config.maxFeeBps) revert InvalidFeeConfig(config.currentFeeBps, config.maxFeeBps);
         _feeConfig = config;
@@ -162,13 +169,15 @@ contract RFQSettlement is
     }
 
     function setSettlementTokenPolicy(address token, bool enabled) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
-        if (token == address(0)) revert ZeroAddress();
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(token);
         _settlementTokenPolicies[token] = enabled;
         emit SettlementTokenPolicyUpdated(token, enabled, msg.sender);
     }
 
     function setBondTokenRegistration(address bondToken, bool registered) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
-        if (bondToken == address(0)) revert ZeroAddress();
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(bondToken);
         _registeredBondTokens[bondToken] = registered;
         emit BondTokenRegistrationUpdated(bondToken, registered, msg.sender);
     }
@@ -221,10 +230,24 @@ contract RFQSettlement is
     }
 
     function rescueTokens(address token, address to, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (token == address(0) || to == address(0)) revert ZeroAddress();
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(token);
+        _ensureNonZero(to);
         if (amount == 0) revert ZeroAmount();
         IERC20(token).safeTransfer(to, amount);
         emit TokensRescued(token, to, amount, msg.sender);
+    }
+
+    /// @notice Recompute and overwrite the cached EIP-712 domain separator.
+    /// @dev AUDIT-FIX(N15): RFQSettlement caches the EIP-712 domain separator at initialization.
+    ///      A UUPS upgrade that changes SettlementOrderEIP712.NAME or VERSION would otherwise leave
+    ///      the cached value stale (initialize is not re-run during upgrades), causing fresh
+    ///      signatures generated by upgraded frontends to be rejected on-chain. Admin must call
+    ///      this immediately after any such upgrade.
+    function refreshDomainSeparator() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _cachedChainId = block.chainid;
+        _cachedDomainSeparator = SettlementOrderEIP712.domainSeparator(address(this), block.chainid);
+        emit DomainSeparatorRefreshed(_cachedChainId, _cachedDomainSeparator, msg.sender);
     }
 
     function eip712Domain()
@@ -274,6 +297,12 @@ contract RFQSettlement is
     {
         if (order.bondAmount == 0 || order.quoteAmount == 0) revert ZeroAmount();
         if (!isBondTokenRegistered(order.bondToken)) revert UnregisteredBondToken(order.bondToken);
+        // AUDIT-FIX(N1): the RFQ accruedInterest field is denominated in the bond's native settlement
+        //                token; mixing a different quoteToken (e.g. an 18-decimal asset) into
+        //                dirtyAmount = quoteAmount + accruedInterest causes a catastrophic decimal
+        //                collision. Reject any order whose quoteToken does not match.
+        address bondSettlement = IBondToken(order.bondToken).settlementToken();
+        if (order.quoteToken != bondSettlement) revert QuoteTokenMismatch(order.quoteToken, bondSettlement);
         {
             uint256 maturity = IBondToken(order.bondToken).maturityTimestamp();
             if (block.timestamp >= maturity) revert BondAlreadyMatured(order.bondToken, maturity, block.timestamp);
@@ -293,21 +322,27 @@ contract RFQSettlement is
         _validateAccruedInterest(order);
     }
 
+    /// @dev AUDIT-FIX(N7): use BondToken.accruedInterestFor (deferred-division mulDiv) for AI verification.
+    ///                     The legacy lossy `accruedInterestPerUnit` helper was removed in v0.3.0.
+    /// @dev AUDIT-FIX(N8): when the on-chain expected accrued interest is exactly zero (e.g. trades
+    ///                     occurring before issueDate or at the issueDate boundary) the maker must
+    ///                     not be allowed to inject any non-zero accruedInterest — no tolerance is
+    ///                     applied for that case.
     function _validateAccruedInterest(Order calldata order) internal view {
         IBondToken bt = IBondToken(order.bondToken);
-        uint8 bondDecimals = IERC20Metadata(order.bondToken).decimals();
-        uint256 aiPerUnit = bt.accruedInterestPerUnit(block.timestamp);
-        uint256 expectedAI = Math.mulDiv(aiPerUnit, order.bondAmount, 10 ** uint256(bondDecimals));
+        uint256 expectedAI = bt.accruedInterestFor(order.bondAmount, block.timestamp);
+        if (expectedAI == 0) {
+            if (order.accruedInterest != 0) {
+                revert AccruedInterestMismatch(order.accruedInterest, 0, 0);
+            }
+            return;
+        }
         uint256 tolerance;
         if (_aiToleranceSeconds > 0) {
-            uint256 expectedAILater = Math.mulDiv(
-                bt.accruedInterestPerUnit(block.timestamp + _aiToleranceSeconds),
-                order.bondAmount,
-                10 ** uint256(bondDecimals)
-            );
+            uint256 expectedAILater = bt.accruedInterestFor(order.bondAmount, block.timestamp + _aiToleranceSeconds);
             tolerance = expectedAILater > expectedAI ? expectedAILater - expectedAI : 0;
         }
-        if (tolerance == 0 && expectedAI > 0) tolerance = 1;
+        if (tolerance == 0) tolerance = 1;
         if (
             order.accruedInterest > expectedAI + tolerance
                 || (expectedAI > tolerance && order.accruedInterest < expectedAI - tolerance)

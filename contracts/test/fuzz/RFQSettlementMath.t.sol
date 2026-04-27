@@ -26,6 +26,8 @@ contract RFQSettlementMathTest is Test {
                 )
             )
         );
+        // AUDIT-FIX(N11) revisited: self-grant SETTLEMENT_ADMIN_ROLE for setFeeConfig.
+        harness.grantRole(keccak256("SETTLEMENT_ADMIN_ROLE"), address(this));
         harness.setFeeConfig(FeeConfig({ feeRecipient: address(this), currentFeeBps: 100, maxFeeBps: 1_000 }));
     }
 

@@ -5,6 +5,7 @@ import { Test } from "forge-std/Test.sol";
 
 import { BondToken } from "../../src/BondToken.sol";
 import { IComplianceModule } from "../../src/interfaces/IComplianceModule.sol";
+import { MockERC20Decimals } from "../mocks/MockERC20Decimals.sol";
 import { BondCategory, CouponFrequency, DayCount, PauseDomain, Role } from "../../src/types/BondTypes.sol";
 
 contract StaticRestrictionComplianceMock is IComplianceModule {
@@ -60,7 +61,8 @@ contract StaticRestrictionComplianceMock is IComplianceModule {
 contract BondTokenMetadataAndMintBurnTest is Test {
     address internal issuer = makeAddr("issuer");
     address internal issuanceController = makeAddr("issuanceController");
-    address internal stablecoin = makeAddr("stablecoin");
+    // AUDIT-FIX(N13): use a real MockERC20Decimals so BondToken.constructor can probe decimals().
+    address internal stablecoin;
     address internal holder = makeAddr("holder");
     address internal receiver = makeAddr("receiver");
 
@@ -69,6 +71,7 @@ contract BondTokenMetadataAndMintBurnTest is Test {
 
     function setUp() public {
         complianceModule = new StaticRestrictionComplianceMock();
+        stablecoin = address(new MockERC20Decimals("Mock USDC", "mUSDC", 6));
         bondToken = new BondToken(
             BondToken.ConstructorParams({
                 issuer: issuer,
@@ -79,6 +82,7 @@ contract BondTokenMetadataAndMintBurnTest is Test {
                 couponRateBps: 500,
                 maturityTimestamp: block.timestamp + 30 days,
                 settlementToken: stablecoin,
+                settlementTokenDecimals: 6,
                 complianceModule: address(complianceModule),
                 issuanceController: issuanceController,
                 issueDate: block.timestamp,
@@ -102,6 +106,7 @@ contract BondTokenMetadataAndMintBurnTest is Test {
                 couponRateBps: 500,
                 maturityTimestamp: block.timestamp + 30 days,
                 settlementToken: stablecoin,
+                settlementTokenDecimals: 6,
                 complianceModule: address(complianceModule),
                 issuanceController: issuanceController,
                 issueDate: block.timestamp,
@@ -125,6 +130,7 @@ contract BondTokenMetadataAndMintBurnTest is Test {
                 couponRateBps: 10_001,
                 maturityTimestamp: block.timestamp + 30 days,
                 settlementToken: stablecoin,
+                settlementTokenDecimals: 6,
                 complianceModule: address(complianceModule),
                 issuanceController: issuanceController,
                 issueDate: block.timestamp,
@@ -148,6 +154,7 @@ contract BondTokenMetadataAndMintBurnTest is Test {
                 couponRateBps: 500,
                 maturityTimestamp: block.timestamp - 1,
                 settlementToken: stablecoin,
+                settlementTokenDecimals: 6,
                 complianceModule: address(complianceModule),
                 issuanceController: issuanceController,
                 issueDate: block.timestamp,

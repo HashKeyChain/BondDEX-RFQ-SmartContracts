@@ -11,8 +11,10 @@ contract US3RedemptionAndClaimsIntegrationTest is BondIssuanceRedemptionFixtures
     function test_directAndDelegatedClaimLifecycle() public {
         warpToMaturity();
 
+        // AUDIT-FIX(N7): payout uses high-precision accruedInterestFor (was 100_301_369_800).
+        uint256 expectedPayout = 100_301_369_863;
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 100_301_369_800);
+        issuance.depositRedemption(address(bondToken), expectedPayout);
 
         vm.prank(holder);
         issuance.setClaimDelegate(delegate);
@@ -20,7 +22,7 @@ contract US3RedemptionAndClaimsIntegrationTest is BondIssuanceRedemptionFixtures
         vm.prank(delegate);
         issuance.claimFor(address(bondToken), holder);
 
-        assertEq(usdc.balanceOf(holder), 100_301_369_800);
+        assertEq(usdc.balanceOf(holder), expectedPayout);
         assertEq(usdc.balanceOf(delegate), 0);
         assertEq(bondToken.balanceOf(holder), 0);
     }

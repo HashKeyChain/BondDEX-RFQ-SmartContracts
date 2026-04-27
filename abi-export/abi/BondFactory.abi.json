@@ -316,6 +316,112 @@
   },
   {
     "type": "function",
+    "name": "hashBondConfig",
+    "inputs": [
+      {
+        "name": "config",
+        "type": "tuple",
+        "internalType": "struct BondConfig",
+        "components": [
+          {
+            "name": "issuer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "symbol",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "decimals",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "faceValue",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "couponRateBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maturityTimestamp",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "settlementToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "settlementTokenDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "complianceImplementation",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "policyId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "policyVersion",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "issueDate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "dayCountConvention",
+            "type": "uint8",
+            "internalType": "enum DayCount"
+          },
+          {
+            "name": "couponFrequency",
+            "type": "uint8",
+            "internalType": "enum CouponFrequency"
+          },
+          {
+            "name": "bondCategory",
+            "type": "uint8",
+            "internalType": "enum BondCategory"
+          },
+          {
+            "name": "isin",
+            "type": "bytes12",
+            "internalType": "bytes12"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
     "name": "isComplianceImplementationApproved",
     "inputs": [
       {
@@ -883,6 +989,22 @@
       },
       {
         "name": "neededRole",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "BondConfigHashMismatch",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "provided",
         "type": "bytes32",
         "internalType": "bytes32"
       }

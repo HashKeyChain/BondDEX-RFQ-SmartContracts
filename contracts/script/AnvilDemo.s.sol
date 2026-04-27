@@ -296,11 +296,6 @@ contract AnvilDemo is Script {
         console2.log("  issueDate: 2026-01-09 (day after subscription closes)");
         console2.log("  maturity:  2027-01-09 (issueDate + 365 days)");
 
-        vm.startBroadcast(ADMIN_PK);
-        factory.approveIssuance(APPROVAL_ID, issuer, complianceImpl, SUB_CLOSES, keccak256("demo-metadata"));
-        vm.stopBroadcast();
-        console2.log("  Issuance approved");
-
         BondConfig memory config = BondConfig({
             issuer: issuer,
             name: "HashKey Demo Bond 2026",
@@ -320,6 +315,13 @@ contract AnvilDemo is Script {
             bondCategory: BondCategory.CORPORATE,
             isin: bytes12(0)
         });
+        // AUDIT-FIX(N3): bind metadataHash to canonical config hash so createBond accepts it.
+        bytes32 metadataHash = factory.hashBondConfig(config);
+
+        vm.startBroadcast(ADMIN_PK);
+        factory.approveIssuance(APPROVAL_ID, issuer, complianceImpl, SUB_CLOSES, metadataHash);
+        vm.stopBroadcast();
+        console2.log("  Issuance approved");
 
         vm.startBroadcast(ISSUER_PK);
         (address bt, address cm) = factory.createBond(config, APPROVAL_ID);
@@ -558,11 +560,11 @@ contract AnvilDemo is Script {
 
         _logBalances("After Redemption");
 
-        // admin 将多余资金 rescue 回 issuer
-        _rescueExcess(address(usdc), issuer, 50_000e6);
-        console2.log("  Admin rescued 50,000 excess USDC to issuer");
+        // AUDIT-FIX(N6): 超额赎回资金会在最后一个持仓 claim 触发的自动释放分支里直接转回发行人，
+        //                不再需要 admin 手动 rescue。这里只是日志说明，不再执行 rescueTokens。
+        console2.log("  Excess USDC auto-refunded to issuer (AUDIT-FIX N6)");
 
-        _logBalances("After Rescue");
+        _logBalances("After Auto-Refund");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -659,10 +661,11 @@ contract AnvilDemo is Script {
     //  原子操作：RFQ
     // ═══════════════════════════════════════════════════════════════
 
-    /// @dev 计算当前时间的应计利息总额（decimals=0 简化版）
+    /// @dev 计算当前时间的应计利息总额。
+    /// @dev AUDIT-FIX(N7): 改用 BondToken.accruedInterestFor，避免老 perUnit 接口的早除精度损失，
+    ///                     与 RFQSettlement._validateAccruedInterest 的链上 expectedAI 完全对齐。
     function _computeAI(uint256 bondAmt) internal view returns (uint256) {
-        uint256 aiPerUnit = bondToken.accruedInterestPerUnit(block.timestamp);
-        return aiPerUnit * bondAmt;
+        return bondToken.accruedInterestFor(bondAmt, block.timestamp);
     }
 
     function _buildOrder(

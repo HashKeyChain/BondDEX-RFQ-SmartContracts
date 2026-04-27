@@ -18,19 +18,19 @@ contract BondIssuanceClaimDirectTest is BondIssuanceRedemptionFixtures {
         warpToMaturity();
 
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 100_301_369_800);
+        issuance.depositRedemption(address(bondToken), 100_301_369_863);
 
         vm.expectEmit(true, true, true, true);
-        emit RedemptionClaimed(address(bondToken), holder, holder, 100e18, 100_301_369_800);
+        emit RedemptionClaimed(address(bondToken), holder, holder, 100e18, 100_301_369_863);
 
         vm.prank(holder);
         issuance.claim(address(bondToken));
 
         assertEq(bondToken.balanceOf(holder), 0);
-        assertEq(usdc.balanceOf(holder), 100_301_369_800);
+        assertEq(usdc.balanceOf(holder), 100_301_369_863);
         (uint256 fundedAmount, uint256 claimedAmount,) = issuance.getRedemptionState(address(bondToken));
-        assertEq(fundedAmount, 100_301_369_800);
-        assertEq(claimedAmount, 100_301_369_800);
+        assertEq(fundedAmount, 100_301_369_863);
+        assertEq(claimedAmount, 100_301_369_863);
     }
 
     function test_revertWhenInsufficientFunding() public {
@@ -48,7 +48,7 @@ contract BondIssuanceClaimDirectTest is BondIssuanceRedemptionFixtures {
         warpToMaturity();
 
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 100_301_369_800);
+        issuance.depositRedemption(address(bondToken), 100_301_369_863);
 
         vm.prank(admin);
         complianceModule.setWhitelist(holder, false);
@@ -59,22 +59,19 @@ contract BondIssuanceClaimDirectTest is BondIssuanceRedemptionFixtures {
     }
 
     function test_getSettlementTokenPolicyReturnsCorrectFlags() public {
-        (bool iss, bool stl, bool red) = issuance.getSettlementTokenPolicy(address(usdc));
+        (bool iss, bool red) = issuance.getSettlementTokenPolicy(address(usdc));
         assertFalse(iss);
-        assertFalse(stl);
         assertTrue(red);
 
         vm.prank(admin);
-        issuance.setSettlementTokenPolicy(address(usdc), true, true, false);
-        (iss, stl, red) = issuance.getSettlementTokenPolicy(address(usdc));
+        issuance.setSettlementTokenPolicy(address(usdc), true, false);
+        (iss, red) = issuance.getSettlementTokenPolicy(address(usdc));
         assertTrue(iss);
-        assertTrue(stl);
         assertFalse(red);
 
         address unknownToken = makeAddr("unknown");
-        (iss, stl, red) = issuance.getSettlementTokenPolicy(unknownToken);
+        (iss, red) = issuance.getSettlementTokenPolicy(unknownToken);
         assertFalse(iss);
-        assertFalse(stl);
         assertFalse(red);
     }
 
@@ -82,7 +79,7 @@ contract BondIssuanceClaimDirectTest is BondIssuanceRedemptionFixtures {
         warpToMaturity();
 
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 100_301_369_800);
+        issuance.depositRedemption(address(bondToken), 100_301_369_863);
 
         vm.prank(admin);
         complianceModule.setWhitelist(holder, false);
@@ -97,27 +94,27 @@ contract BondIssuanceClaimDirectTest is BondIssuanceRedemptionFixtures {
         vm.prank(holder);
         issuance.claim(address(bondToken));
         assertEq(bondToken.balanceOf(holder), 0);
-        assertEq(usdc.balanceOf(holder), 100_301_369_800);
+        assertEq(usdc.balanceOf(holder), 100_301_369_863);
     }
 
     function test_claimIgnoresNonClaimPauseDomainsButRespectsClaimsPause() public {
         warpToMaturity();
 
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 100_301_369_800);
+        issuance.depositRedemption(address(bondToken), 100_301_369_863);
 
         vm.prank(admin);
         issuance.pauseDomain(PauseDomain.SETTLEMENT, true);
 
         vm.prank(holder);
         issuance.claim(address(bondToken));
-        assertEq(usdc.balanceOf(holder), 100_301_369_800);
+        assertEq(usdc.balanceOf(holder), 100_301_369_863);
 
         vm.prank(address(issuance));
         bondToken.mint(holder, 100e18);
-        usdc.mint(issuer, 100_301_369_800);
+        usdc.mint(issuer, 100_301_369_863);
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 100_301_369_800);
+        issuance.depositRedemption(address(bondToken), 100_301_369_863);
 
         vm.prank(admin);
         issuance.pauseDomain(PauseDomain.CLAIMS, true);

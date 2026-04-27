@@ -48,6 +48,11 @@
             "internalType": "address"
           },
           {
+            "name": "settlementTokenDecimals",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
             "name": "complianceModule",
             "type": "address",
             "internalType": "address"
@@ -89,8 +94,13 @@
   },
   {
     "type": "function",
-    "name": "accruedInterestPerUnit",
+    "name": "accruedInterestFor",
     "inputs": [
+      {
+        "name": "bondAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
       {
         "name": "timestamp",
         "type": "uint256",
@@ -462,6 +472,25 @@
   },
   {
     "type": "function",
+    "name": "principalOf",
+    "inputs": [
+      {
+        "name": "bondAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "settlementToken",
     "inputs": [],
     "outputs": [
@@ -469,6 +498,19 @@
         "name": "",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "settlementTokenDecimals",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
       }
     ],
     "stateMutability": "view"

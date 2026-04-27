@@ -5,6 +5,7 @@ import { Test } from "forge-std/Test.sol";
 
 import { BondToken } from "../../src/BondToken.sol";
 import { IComplianceModule } from "../../src/interfaces/IComplianceModule.sol";
+import { MockERC20Decimals } from "../mocks/MockERC20Decimals.sol";
 import { BondCategory, CouponFrequency, DayCount, PauseDomain, Role } from "../../src/types/BondTypes.sol";
 
 contract MinimalComplianceMock is IComplianceModule {
@@ -52,6 +53,9 @@ contract BondTokenAccruedInterestAndMessagesTest is Test {
 
     function setUp() public {
         MinimalComplianceMock compliance = new MinimalComplianceMock();
+        // AUDIT-FIX(N13): BondToken's constructor probes settlementToken.decimals(); use a real
+        //                 MockERC20Decimals (was previously a vm.makeAddr placeholder).
+        MockERC20Decimals usdc = new MockERC20Decimals("Mock USDC", "mUSDC", 6);
         bondToken = new BondToken(
             BondToken.ConstructorParams({
                 issuer: makeAddr("issuer"),
@@ -61,7 +65,8 @@ contract BondTokenAccruedInterestAndMessagesTest is Test {
                 faceValue: 1_000e6,
                 couponRateBps: 500,
                 maturityTimestamp: block.timestamp + MATURITY_OFFSET,
-                settlementToken: makeAddr("usdc"),
+                settlementToken: address(usdc),
+                settlementTokenDecimals: 6,
                 complianceModule: address(compliance),
                 issuanceController: makeAddr("issuance"),
                 issueDate: block.timestamp + ISSUE_DATE_OFFSET,
@@ -73,44 +78,58 @@ contract BondTokenAccruedInterestAndMessagesTest is Test {
         );
     }
 
-    // ── accruedInterestPerUnit ────────────────────────────────────
+    // ── accruedInterestFor ────────────────────────────────────────
+    // (legacy `accruedInterestPerUnit` was removed in v0.3.0 — for the historical "per-unit"
+    //  value, callers should pass `bondAmount = 10**decimals()` to `accruedInterestFor`.)
+
+    /// @dev Helper: returns the per-unit accrued interest using the v0.3.0 high-precision API.
+    function _aiPerUnit(uint256 timestamp) internal view returns (uint256) {
+        return bondToken.accruedInterestFor(10 ** uint256(bondToken.decimals()), timestamp);
+    }
 
     function test_accruedInterestReturnsZeroBeforeIssueDate() public view {
-        uint256 ai = bondToken.accruedInterestPerUnit(block.timestamp);
-        assertEq(ai, 0);
+        assertEq(_aiPerUnit(block.timestamp), 0);
     }
 
     function test_accruedInterestReturnsZeroAtIssueDate() public view {
-        uint256 ai = bondToken.accruedInterestPerUnit(bondToken.issueDate());
-        assertEq(ai, 0);
+        assertEq(_aiPerUnit(bondToken.issueDate()), 0);
     }
 
     function test_accruedInterestIncreasesOverTime() public {
         uint256 issueDate = bondToken.issueDate();
         vm.warp(issueDate + 30 days);
-        uint256 ai30 = bondToken.accruedInterestPerUnit(block.timestamp);
+        uint256 ai30 = _aiPerUnit(block.timestamp);
 
         vm.warp(issueDate + 60 days);
-        uint256 ai60 = bondToken.accruedInterestPerUnit(block.timestamp);
+        uint256 ai60 = _aiPerUnit(block.timestamp);
 
         assertTrue(ai30 > 0);
         assertTrue(ai60 > ai30);
     }
 
-    function test_accruedInterestCapsAtMaturity() public {
+    function test_accruedInterestCapsAtMaturity() public view {
         uint256 maturity = bondToken.maturityTimestamp();
-        uint256 aiAtMaturity = bondToken.accruedInterestPerUnit(maturity);
-        uint256 aiBeyond = bondToken.accruedInterestPerUnit(maturity + 365 days);
+        uint256 aiAtMaturity = _aiPerUnit(maturity);
+        uint256 aiBeyond = _aiPerUnit(maturity + 365 days);
 
         assertEq(aiAtMaturity, aiBeyond);
     }
 
     function test_accruedInterestFullTermEqualsAnnualCoupon() public view {
         uint256 maturity = bondToken.maturityTimestamp();
-        uint256 ai = bondToken.accruedInterestPerUnit(maturity);
+        uint256 ai = _aiPerUnit(maturity);
         uint256 elapsed = maturity - bondToken.issueDate();
+        // Decimals == 0 in this fixture, so per-unit math reduces to the legacy formula.
         uint256 expected = (1_000e6 * 500 * elapsed) / (10_000 * 365 days);
         assertEq(ai, expected);
+    }
+
+    /// @dev Confirms the v0.3.0 superset behaviour: accruedInterestFor scales linearly with bondAmount.
+    function test_accruedInterestForScalesLinearlyWithBondAmount() public {
+        vm.warp(bondToken.issueDate() + 90 days);
+        uint256 oneUnit = _aiPerUnit(block.timestamp);
+        uint256 fiveUnits = bondToken.accruedInterestFor(5 * 10 ** uint256(bondToken.decimals()), block.timestamp);
+        assertEq(fiveUnits, 5 * oneUnit);
     }
 
     // ── messageForTransferRestriction ─────────────────────────────

@@ -35,6 +35,16 @@ contract BondFactoryAdminAndViewsTest is Test {
         );
         complianceImplementation = new ComplianceModule();
         factory = new BondFactory(admin, address(issuance));
+
+        // AUDIT-FIX(N11) revisited: contracts now grant only DEFAULT_ADMIN_ROLE at construction.
+        // Self-grant the secondary roles this test exercises (COMPLIANCE_ADMIN_ROLE for
+        // registerComplianceImplementation, PAUSER_ROLE for pauseDomain, ISSUANCE_APPROVER_ROLE
+        // for approveIssuance).
+        vm.startPrank(admin);
+        factory.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
+        factory.grantRole(keccak256("PAUSER_ROLE"), admin);
+        factory.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
+        vm.stopPrank();
     }
 
     // ── pauseDomain ───────────────────────────────────────────────
@@ -52,15 +62,15 @@ contract BondFactoryAdminAndViewsTest is Test {
     }
 
     function test_revertWhenCreateBondWhileFactoryPaused() public {
+        BondConfig memory config = _defaultConfig();
         vm.startPrank(admin);
         factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
         factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, keccak256("meta")
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, factory.hashBondConfig(config)
         );
         factory.pauseDomain(PauseDomain.FACTORY, true);
         vm.stopPrank();
 
-        BondConfig memory config = _defaultConfig();
         vm.prank(issuer);
         vm.expectRevert();
         factory.createBond(config, approvalId);
@@ -72,7 +82,8 @@ contract BondFactoryAdminAndViewsTest is Test {
         vm.prank(admin);
         factory.setPlatformAdmin(newAdmin);
         assertEq(factory.platformAdmin(), newAdmin);
-        assertTrue(factory.hasRole(0x00, newAdmin));
+        // AUDIT-FIX(N11) revisited: setPlatformAdmin no longer touches AccessControl roles.
+        assertFalse(factory.hasRole(0x00, newAdmin));
     }
 
     function test_revertWhenNonAdminSetsPlatformAdmin() public {
@@ -96,14 +107,14 @@ contract BondFactoryAdminAndViewsTest is Test {
     }
 
     function test_getBondAddressesReturnsCorrectAfterCreation() public {
+        BondConfig memory config = _defaultConfig();
         vm.startPrank(admin);
         factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
         factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, keccak256("meta")
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, factory.hashBondConfig(config)
         );
         vm.stopPrank();
 
-        BondConfig memory config = _defaultConfig();
         vm.prank(issuer);
         (address bt, address cm) = factory.createBond(config, approvalId);
 
@@ -117,15 +128,15 @@ contract BondFactoryAdminAndViewsTest is Test {
     // ── settlementTokenDecimals mismatch ─────────────────────────
 
     function test_revertWhenSettlementTokenDecimalsMismatch() public {
+        BondConfig memory config = _defaultConfig();
+        config.settlementTokenDecimals = 18;
+
         vm.startPrank(admin);
         factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
         factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, keccak256("meta")
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, factory.hashBondConfig(config)
         );
         vm.stopPrank();
-
-        BondConfig memory config = _defaultConfig();
-        config.settlementTokenDecimals = 18;
 
         vm.prank(issuer);
         vm.expectRevert();

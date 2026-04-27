@@ -14,7 +14,6 @@ abstract contract DeployConfigParser is Script {
     struct BondIssuancePolicyJson {
         bool issuanceEnabled;
         bool redemptionEnabled;
-        bool settlementEnabled;
     }
 
     struct SettlementTokenJson {
@@ -62,7 +61,6 @@ abstract contract DeployConfigParser is Script {
             tokens[i] = TokenPolicy({
                 token: parsed[i].token,
                 issuanceEnabled: parsed[i].bondIssuancePolicy.issuanceEnabled,
-                settlementEnabled: parsed[i].bondIssuancePolicy.settlementEnabled,
                 redemptionEnabled: parsed[i].bondIssuancePolicy.redemptionEnabled,
                 rfqSettlementEnabled: parsed[i].rfqSettlementEnabled
             });

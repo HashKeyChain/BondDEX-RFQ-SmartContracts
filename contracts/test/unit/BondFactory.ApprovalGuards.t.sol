@@ -34,6 +34,9 @@ contract BondFactoryApprovalGuardsTest is Test {
         factory = new BondFactory(admin, address(issuance));
 
         vm.startPrank(admin);
+        // AUDIT-FIX(N11) revisited: self-grant the secondary roles this test exercises.
+        factory.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
+        factory.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
         factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
         vm.stopPrank();
     }
@@ -41,13 +44,14 @@ contract BondFactoryApprovalGuardsTest is Test {
     // ─── approveIssuance CONSUMED 保护 ────────────────────────────
 
     function test_revertWhenApproveIssuanceOverwritesConsumedApproval() public {
+        BondConfig memory config = _defaultConfig();
         vm.startPrank(admin);
+        // AUDIT-FIX(N3): bind to canonical hash so createBond accepts the same struct.
         factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, metadataHash
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, factory.hashBondConfig(config)
         );
         vm.stopPrank();
 
-        BondConfig memory config = _defaultConfig();
         vm.prank(issuer);
         factory.createBond(config, approvalId);
 
@@ -77,14 +81,15 @@ contract BondFactoryApprovalGuardsTest is Test {
     // ─── revokeIssuance 状态校验 ─────────────────────────────────
 
     function test_revertWhenRevokeIssuanceOnConsumedApproval() public {
+        BondConfig memory config = _defaultConfig();
         vm.startPrank(admin);
         factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, metadataHash
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, factory.hashBondConfig(config)
         );
         vm.stopPrank();
 
         vm.prank(issuer);
-        factory.createBond(_defaultConfig(), approvalId);
+        factory.createBond(config, approvalId);
 
         vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(InvalidApprovalState.selector, ApprovalStatus.CONSUMED));

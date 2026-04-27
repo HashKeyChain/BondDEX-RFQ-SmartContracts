@@ -31,10 +31,11 @@ import { BaseConfig } from "./BaseConfig.s.sol";
 ///   调用者私钥通过 DEPLOYER_PRIVATE_KEY 环境变量传入（broadcast 身份）。
 ///
 ///   用法示例：
-///   # Anvil
+///   # Anvil — 注意 AUDIT-FIX(N3): metadataHash 必须 = factory.hashBondConfig(config)
+///   HASH=$(cast call $FACTORY 'hashBondConfig((address,string,...))' "$CFG_ABI")
 ///   cd contracts && forge script script/Operations.s.sol:Operations \
-///     --sig "approveIssuance(bytes32,address,uint256)" \
-///     0x$(cast keccak "bond-001") 0x3C44...issuer 1735689600 \
+///     --sig "approveIssuance(bytes32,address,uint256,bytes32)" \
+///     0x$(cast keccak "bond-001") 0x3C44...issuer 1735689600 $HASH \
 ///     --rpc-url http://127.0.0.1:8545 --broadcast
 ///
 ///   # 测试网
@@ -80,15 +81,20 @@ contract Operations is BaseConfig {
     // ================================================================
 
     /// @notice 审批发行（ISSUANCE_APPROVER_ROLE 调用）
+    /// @dev AUDIT-FIX(N3): metadataHash MUST equal `BondFactory.hashBondConfig(config)` for the
+    ///      exact BondConfig the issuer will later submit to createBond. Compute off-chain via
+    ///      `cast call $factory "hashBondConfig((...))" $config` or by invoking the canonical
+    ///      hashBondConfig helper, then pass the resulting bytes32 here.
     /// @param approvalId 唯一审批 ID
     /// @param issuerAddr 发行人地址
     /// @param expiresAt 审批有效期 Unix 时间戳（0=永不过期）
-    function approveIssuance(bytes32 approvalId, address issuerAddr, uint256 expiresAt) external {
+    /// @param metadataHash hashBondConfig(config) — must match the BondConfig used in createBond.
+    function approveIssuance(bytes32 approvalId, address issuerAddr, uint256 expiresAt, bytes32 metadataHash) external {
         (address factoryAddr,,, address compImpl) = _deployment();
         BondFactory factory = BondFactory(factoryAddr);
 
         vm.startBroadcast(_senderPk());
-        factory.approveIssuance(approvalId, issuerAddr, compImpl, expiresAt, keccak256("metadata"));
+        factory.approveIssuance(approvalId, issuerAddr, compImpl, expiresAt, metadataHash);
         vm.stopBroadcast();
 
         console2.log("Issuance approved:");
@@ -107,7 +113,7 @@ contract Operations is BaseConfig {
     /// @param extendedData abi.encode(uint256 issueDate, uint8 dayCount, uint8 couponFreq, uint8 bondCategory, bytes12 isin)
     ///   - issueDate: 起息日（Unix 时间戳）
     ///   - dayCount: 计息惯例（0=ACT_365, 1=ACT_360）
-    ///   - couponFreq: 付息频率（0=BULLET, 1=ANNUAL, 2=SEMI_ANNUAL, 3=QUARTERLY）
+    ///   - couponFreq: 付息频率（0=BULLET, 1=ANNUAL）
     ///   - bondCategory: 债券类别（0=CORPORATE, 1=GOVERNMENT, 2=CONVERTIBLE, 3=ABS）
     ///   - isin: ISIN 代码（12 字节，留空填 bytes12(0)）
     function createBond(

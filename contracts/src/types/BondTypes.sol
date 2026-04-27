@@ -13,7 +13,7 @@ enum SubscriptionStatus { NONE, ACTIVE, CLOSED, CANCELLED }
 
 enum DayCount { ACT_365, ACT_360 }
 
-enum CouponFrequency { BULLET, ANNUAL, SEMI_ANNUAL, QUARTERLY }
+enum CouponFrequency { BULLET, ANNUAL }
 
 enum BondCategory { CORPORATE, GOVERNMENT, CONVERTIBLE, ABS }
 

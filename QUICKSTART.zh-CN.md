@@ -70,7 +70,6 @@ config/
       "token": "0x结算代币地址（如USDC）",
       "bondIssuancePolicy": {
         "issuanceEnabled": true,
-        "settlementEnabled": false,
         "redemptionEnabled": true
       },
       "rfqSettlementEnabled": true
@@ -111,7 +110,7 @@ config/
 | `.upgrader` | UPGRADER_ROLE — 执行 UUPS 代理升级 |
 | **settlementTokens[]** | 结算代币数组，支持多币种 |
 | `.token` | ERC20 代币地址（填 `0x0` 时自动部署 MockERC20，仅限本地测试） |
-| `.bondIssuancePolicy` | BondIssuance 三维策略：认购(issuance) / 结算(settlement) / 赎回(redemption) |
+| `.bondIssuancePolicy` | BondIssuance 二维策略：认购(`issuanceEnabled`) / 赎回(`redemptionEnabled`)。RFQ 二级流通由独立的 `rfqSettlementEnabled` 控制 |
 | `.rfqSettlementEnabled` | RFQSettlement 该代币是否允许二级结算 |
 | **feeConfig** | |
 | `.feeRecipient` | RFQ 二级市场手续费接收地址 |
@@ -173,7 +172,7 @@ make demo-anvil
 
 该命令自动以 2025-12-31 时间戳启动 Anvil，部署合约后按真实时间线多阶段执行：认购窗口（2026-01-01）→ 起息后 12 分钟 → +2 天 → 每月推进至 +3 月 → 到期日（2027-01-09），Makefile 通过 `cast rpc` 自动推进 Anvil 时间。每笔 RFQ 交易包含基于链上时间自动计算的应计利息。演示结束后自动关闭 Anvil。
 
-演示覆盖 9 个参与者（admin / issuer / makerA / makerB / makerC / investorA / investorB / investorC / delegate），包括：超额认购报错、未授权认购报错、**私下直接转账被拒绝（授权 operator 机制）**、RFQ 买卖含应计利息和手续费、做市商间免手续费但有应计利息、取消订单、过期订单、投资者间交易限制、代理领取、多余资金救援等场景。
+演示覆盖 9 个参与者（admin / issuer / makerA / makerB / makerC / investorA / investorB / investorC / delegate），包括：超额认购报错、未授权认购报错、**私下直接转账被拒绝（授权 operator 机制）**、RFQ 买卖含应计利息和手续费、做市商间免手续费但有应计利息、取消订单、过期订单、投资者间交易限制、代理领取、**全员赎回完毕后超额资金自动转回发行人**等场景。
 
 如需纯模拟（不需要 Anvil 运行，含 `vm.warp`，单次完成全流程；需要先有 `deployments/31337.json`）：
 
@@ -245,7 +244,6 @@ make export-abi
       "token": "0x测试网USDC",
       "bondIssuancePolicy": {
         "issuanceEnabled": true,
-        "settlementEnabled": false,
         "redemptionEnabled": true
       },
       "rfqSettlementEnabled": true
@@ -299,7 +297,7 @@ DEPLOYER_PRIVATE_KEY=0x你的私钥 make deploy-testnet
 | `DEPLOYER_PRIVATE_KEY=0x... make deploy-anvil` | 本地 Anvil 一站式部署 |
 | `DEPLOYER_PRIVATE_KEY=0x... make deploy-testnet` | 测试网一站式部署 + 权限移交 |
 | `DEPLOYER_PRIVATE_KEY=0x... make deploy-mainnet` | 主网一站式部署 + 权限移交 |
-| `make ops-release-excess-redemption ARGS="<bondToken>"` | 释放超额赎回负债（到期后） |
+| `make ops-release-excess-redemption ARGS="<bondToken>"` | 主动释放超额赎回资金（到期后），释放后**直接转回发行人**（v0.3.0 起） |
 | `make demo-anvil` | Anvil 端到端演示（多阶段：按真实时间线推进认购→RFQ→赎回） |
 | `make demo-anvil-sim` | 纯模拟演示（不 broadcast，含 vm.warp，单次完成） |
 | `make export-abi` | 导出 ABI |
@@ -317,7 +315,7 @@ BondConfig({
     symbol:                   "HKB-Q1",
     decimals:                 0,
     faceValue:                1_000e6,           // 1,000 USDC
-    couponRateBps:            500,               // 年化 5%（注意：现在是年化利率）
+    couponRateBps:            500,               // 年化 5%（基点）
     maturityTimestamp:        1767225600,         // 2026-01-01 到期
     issueDate:                1704067200,         // 2024-01-01 发行
     dayCountConvention:       DayCount.ACT_365,
@@ -345,8 +343,8 @@ BondConfig({
 | --- | --- | --- |
 | `BULLET` | 0 | 到期一次性付息（最常见） |
 | `ANNUAL` | 1 | 每年付息 |
-| `SEMI_ANNUAL` | 2 | 每半年付息 |
-| `QUARTERLY` | 3 | 每季度付息 |
+
+> 平台暂不支持 SEMI_ANNUAL / QUARTERLY 频率。
 
 **BondCategory 枚举值：**
 
@@ -356,3 +354,70 @@ BondConfig({
 | `GOVERNMENT` | 1 | 政府债 |
 | `CONVERTIBLE` | 2 | 可转债 |
 | `ABS` | 3 | 资产支持证券 |
+
+## v0.3.0 新增 / 变更 API 速查
+
+外部审计修复批次（N1–N18）落地为以下接口变化。**集成方升级到 v0.3.0 时必须重新跑** wagmi typegen / abigen / Subgraph mappings。
+
+### BondFactory（新增）
+
+```solidity
+/// 计算 BondConfig 的规范哈希。审批方调 approveIssuance 前先调它取 hash，
+/// 发行人调 createBond 时合约会比对，参数任何字段不一致都会 revert BondConfigHashMismatch。
+function hashBondConfig(BondConfig calldata config) external pure returns (bytes32);
+```
+
+> **构造函数行为变更（最小权限初始化）**：现在只 grant `DEFAULT_ADMIN_ROLE`；其他 4 个治理角色由部署脚本/管理员显式 grantRole 授予。`setPlatformAdmin` 已纯化为只更新 `platformAdmin` storage（决定后续新部署的 ComplianceModule 的初始 admin），**不再触碰任何 AccessControl 角色**。
+
+### BondToken（新增）
+
+```solidity
+/// 高精度的应计利息总额（settlement token 最小单位）。延迟除法 mulDiv，避免精度截断。
+function accruedInterestFor(uint256 bondAmount, uint256 timestamp) external view returns (uint256);
+
+/// bondAmount 对应的本金（settlement token 最小单位）。
+function principalOf(uint256 bondAmount) external view returns (uint256);
+
+/// 构造期校验过的 settlement token decimals。
+function settlementTokenDecimals() external view returns (uint8);
+```
+
+> **删除**：legacy `accruedInterestPerUnit(timestamp)` 已删除——所有"per-unit"展示场景请改为 `accruedInterestFor(10 ** decimals(), timestamp)`，数学等价且精度更好。
+>
+> **构造参数变更**：`BondToken.ConstructorParams` 新增 `uint8 settlementTokenDecimals` 字段；构造期会与 `IERC20Metadata(settlementToken).decimals()` 严格比对，不一致时 revert。
+
+### BondIssuance（新增 + 变更）
+
+```solidity
+/// 强制赎回受制裁/被永久移出白名单的持有人，资金转入指定 recipient（监管托管/发行人）。
+function forceRedeem(address bondToken, address holder, address recipient) external;  // DEFAULT_ADMIN_ROLE
+
+/// 签名变更：v0.2.0 是 (address, bool, bool, bool)，v0.3.0 删除中间的 settlementEnabled。
+function setSettlementTokenPolicy(address token, bool enabledForIssuance, bool enabledForRedemption) external;
+function getSettlementTokenPolicy(address token) external view returns (bool, bool);
+```
+
+> **超额赎回行为变更（N6）**：`releaseExcessRedemption` 与全员赎回触发的自动释放分支现在**原子地把超额转回发行人**，不再"先释放、后由 admin rescue"。监听新事件 `ExcessRedemptionRefunded(bondToken, settlementToken, issuer, excessAmount)` 做财务对账。`rescueTokens` 现仅用于救援误转入的代币。
+>
+> **redemption 通道关停受限（N11）**：在 `_totalRedemptionLiability[token] > 0` 时禁止把该 token 的 `enabledForRedemption` 关闭，防止管理员策略变更把 issuer 已存入的赎回资金锁死。
+
+### RFQSettlement（新增 + 行为）
+
+```solidity
+/// UUPS 升级后由 admin 调用以刷新 EIP-712 缓存。如果升级了 SettlementOrderEIP712.NAME / VERSION 必须立即调用。
+function refreshDomainSeparator() external;  // DEFAULT_ADMIN_ROLE
+```
+
+> **链上强制（N1）**：`order.quoteToken` 必须等于 `bondToken.settlementToken()`，前端构造订单时应自动派生该字段、禁止用户填写。
+>
+> **应计利息验证（N7 + N8）**：链上验算改用 `BondToken.accruedInterestFor`（高精度）。当 `expectedAI == 0`（如交易在 issueDate 之前发生），strict require `order.accruedInterest == 0`，**不允许任何容差**。
+
+### 新增事件
+
+| 事件 | 来源 | 触发场景 |
+| :-- | :-- | :-- |
+| `ExcessRedemptionRefunded(bondToken, settlementToken, issuer, excessAmount)` | BondIssuance | 超额赎回款实际转回发行人后发出（与 `ExcessRedemptionReleased` 同一交易内） |
+| `ForceRedemption(bondToken, holder, recipient, bondAmount, payout, operator)` | BondIssuance | admin 调用 `forceRedeem` 时发出 |
+| `DomainSeparatorRefreshed(chainId, domainSeparator, operator)` | RFQSettlement | admin 调用 `refreshDomainSeparator` 时发出 |
+
+完整 ABI 与版本说明见 `abi-export/metadata/event-interface.md`。

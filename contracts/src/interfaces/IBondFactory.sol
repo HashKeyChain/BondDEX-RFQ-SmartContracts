@@ -32,4 +32,7 @@ interface IBondFactory {
         );
     function isComplianceImplementationApproved(address implementation) external view returns (bool);
     function getBondAddresses(bytes32 approvalId) external view returns (address bondToken, address complianceModule);
+    /// @dev AUDIT-FIX(N3): canonical hashing function shared between approver and issuer to bind
+    ///      the BondConfig integrity to the approval record's metadataHash.
+    function hashBondConfig(BondConfig calldata config) external pure returns (bytes32);
 }

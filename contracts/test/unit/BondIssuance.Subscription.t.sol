@@ -12,7 +12,7 @@ import { BondCategory, CouponFrequency, DayCount, Role, SubscriptionTerms } from
 
 contract BondIssuanceSubscriptionTest is Test {
     event SettlementTokenPolicyUpdated(
-        address indexed token, bool issuanceEnabled, bool settlementEnabled, bool redemptionEnabled, address operator
+        address indexed token, bool issuanceEnabled, bool redemptionEnabled, address operator
     );
 
     event Subscribed(
@@ -63,6 +63,7 @@ contract BondIssuanceSubscriptionTest is Test {
                 couponRateBps: 500,
                 maturityTimestamp: block.timestamp + 30 days,
                 settlementToken: address(usdc),
+                settlementTokenDecimals: 6,
                 complianceModule: address(module),
                 issuanceController: address(issuance),
                 issueDate: block.timestamp + 8 days,
@@ -77,6 +78,10 @@ contract BondIssuanceSubscriptionTest is Test {
         module.bindBondToken(address(bondToken));
 
         vm.startPrank(admin);
+        // AUDIT-FIX(N11) revisited: self-grant secondary roles for setSettlementTokenPolicy / approveSubscription / pauseDomain.
+        issuance.grantRole(keccak256("SETTLEMENT_ADMIN_ROLE"), admin);
+        issuance.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
+        issuance.grantRole(keccak256("PAUSER_ROLE"), admin);
         module.setWhitelist(issuer, true);
         module.setWhitelist(maker, true);
         module.setRole(issuer, Role.ISSUER);
@@ -86,16 +91,16 @@ contract BondIssuanceSubscriptionTest is Test {
 
     function test_adminCanEnableSettlementTokenForIssuance() public {
         vm.expectEmit(true, false, false, true);
-        emit SettlementTokenPolicyUpdated(address(usdc), true, false, false, admin);
+        emit SettlementTokenPolicyUpdated(address(usdc), true, false, admin);
         vm.prank(admin);
-        issuance.setSettlementTokenPolicy(address(usdc), true, false, false);
+        issuance.setSettlementTokenPolicy(address(usdc), true, false);
 
         assertTrue(issuance.isSettlementTokenEnabled(address(usdc)));
     }
 
     function test_issuerCanCreateSubscriptionAndMakerCanSubscribe() public {
         vm.prank(admin);
-        issuance.setSettlementTokenPolicy(address(usdc), true, false, false);
+        issuance.setSettlementTokenPolicy(address(usdc), true, false);
 
         bytes32 approvalId = keccak256("sub-approval-1");
         vm.prank(admin);
@@ -129,7 +134,7 @@ contract BondIssuanceSubscriptionTest is Test {
 
     function test_revertWhenOutsiderSubscribesWithoutMakerRole() public {
         vm.prank(admin);
-        issuance.setSettlementTokenPolicy(address(usdc), true, false, false);
+        issuance.setSettlementTokenPolicy(address(usdc), true, false);
 
         bytes32 approvalId = keccak256("sub-approval-2");
         vm.prank(admin);

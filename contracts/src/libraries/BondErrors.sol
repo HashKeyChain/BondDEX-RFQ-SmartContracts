@@ -54,3 +54,11 @@ error FeeCapImmutable();
 error InvalidAiTolerance(uint256 provided, uint256 min, uint256 max);
 error SubscriptionWindowMissingCloseTime();
 error SubscriptionWindowAlreadyClosed(uint256 closesAt, uint256 currentTimestamp);
+// AUDIT-FIX(N1): raised when an RFQ order's quoteToken does not match the bond's native settlementToken.
+error QuoteTokenMismatch(address quoteToken, address settlementToken);
+// AUDIT-FIX(N3): raised when the BondConfig submitted to createBond does not hash to the approved metadataHash.
+error BondConfigHashMismatch(bytes32 expected, bytes32 provided);
+// AUDIT-FIX(N10): raised when a SubscriptionTerms.closesAt extends past the approval expiry window.
+error SubscriptionWindowExceedsApprovalExpiry(uint256 closesAt, uint256 approvalExpiresAt);
+// AUDIT-FIX(N11): raised when an admin attempts to disable redemption while liability is still outstanding for the token.
+error SettlementTokenHasRedemptionLiability(address token, uint256 outstandingLiability);

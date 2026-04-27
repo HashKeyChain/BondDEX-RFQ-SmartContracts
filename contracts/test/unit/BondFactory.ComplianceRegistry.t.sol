@@ -20,6 +20,10 @@ contract BondFactoryComplianceRegistryTest is Test {
     function setUp() public {
         complianceImplementation = new ComplianceModule();
         factory = new BondFactory(admin, makeAddr("issuanceController"));
+
+        // AUDIT-FIX(N11) revisited: self-grant COMPLIANCE_ADMIN_ROLE for register/disable Impl ops.
+        vm.prank(admin);
+        factory.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
     }
 
     function test_registerComplianceImplementationStoresApproval() public {

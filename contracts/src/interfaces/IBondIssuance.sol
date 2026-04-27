@@ -18,12 +18,7 @@ interface IBondIssuance {
         returns (bytes32 offerId);
     function closeSubscription(bytes32 offerId) external;
     function subscribe(bytes32 offerId, uint256 units) external;
-    function setSettlementTokenPolicy(
-        address token,
-        bool enabledForIssuance,
-        bool enabledForSettlement,
-        bool enabledForRedemption
-    ) external;
+    function setSettlementTokenPolicy(address token, bool enabledForIssuance, bool enabledForRedemption) external;
     function depositRedemption(address bondToken, uint256 amount) external;
     function claim(address bondToken) external;
     function claimFor(address bondToken, address holder) external;
@@ -51,9 +46,11 @@ interface IBondIssuance {
     function getSettlementTokenPolicy(address token)
         external
         view
-        returns (bool issuanceEnabled, bool settlementEnabled, bool redemptionEnabled);
+        returns (bool issuanceEnabled, bool redemptionEnabled);
     function rescueTokens(address token, address to, uint256 amount) external;
     function releaseExcessRedemption(address bondToken) external;
+    /// @dev AUDIT-FIX(N5): admin-only forced redemption for sanctioned/blacklisted holders.
+    function forceRedeem(address bondToken, address holder, address recipient) external;
     function getSubscriptionApproval(bytes32 approvalId)
         external
         view

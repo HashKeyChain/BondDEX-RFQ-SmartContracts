@@ -63,6 +63,7 @@ contract BondIssuanceRescueAndRedemptionIsolationTest is BondIssuanceRedemptionF
                 couponRateBps: 300,
                 maturityTimestamp: block.timestamp + 30 days,
                 settlementToken: address(usdc),
+                settlementTokenDecimals: 6,
                 complianceModule: address(moduleB),
                 issuanceController: address(issuance),
                 issueDate: block.timestamp,
@@ -90,34 +91,37 @@ contract BondIssuanceRescueAndRedemptionIsolationTest is BondIssuanceRedemptionF
         vm.prank(issuerB);
         usdc.approve(address(issuance), type(uint256).max);
 
-        // bond A: ACT/365 accrual from issueDate+8d to maturity (22d), 100e18 * (1000e6 + aiPerUnit) = 100_301_369_800
+        // AUDIT-FIX(N7): payouts now use accruedInterestFor (deferred division).
+        //   bond A: principal 100_000_000_000 + interest 301_369_863 = 100_301_369_863
+        //   bond B: principal  25_000_000_000 + interest  61_643_835 =  25_061_643_835
+        uint256 payoutA = 100_301_369_863;
+        uint256 payoutB = 25_061_643_835;
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 100_301_369_800);
+        issuance.depositRedemption(address(bondToken), payoutA);
 
-        // bond B: ACT/365 accrual over 30d, 50e18 * (500e6 + aiPerUnit) = 25_061_643_800
         vm.prank(issuerB);
-        issuance.depositRedemption(address(bondTokenB), 25_061_643_800);
+        issuance.depositRedemption(address(bondTokenB), payoutB);
 
         uint256 totalBalance = usdc.balanceOf(address(issuance));
-        assertEq(totalBalance, 100_301_369_800 + 25_061_643_800);
+        assertEq(totalBalance, payoutA + payoutB);
 
         warpToMaturity();
 
         // holder A claim 全部
         vm.prank(holder);
         issuance.claim(address(bondToken));
-        assertEq(usdc.balanceOf(holder), 100_301_369_800);
+        assertEq(usdc.balanceOf(holder), payoutA);
         assertEq(bondToken.balanceOf(holder), 0);
 
         // bond B 的资金不受影响
         (uint256 fundedB, uint256 claimedB,) = issuance.getRedemptionState(address(bondTokenB));
-        assertEq(fundedB, 25_061_643_800);
+        assertEq(fundedB, payoutB);
         assertEq(claimedB, 0);
 
         // holder B claim 全部
         vm.prank(holderB);
         issuance.claim(address(bondTokenB));
-        assertEq(usdc.balanceOf(holderB), 25_061_643_800);
+        assertEq(usdc.balanceOf(holderB), payoutB);
         assertEq(bondTokenB.balanceOf(holderB), 0);
 
         assertEq(usdc.balanceOf(address(issuance)), 0);
@@ -126,50 +130,54 @@ contract BondIssuanceRescueAndRedemptionIsolationTest is BondIssuanceRedemptionF
     // ─── 多存后自动释放超额负债（所有 bond 赎回后） ─────────────
 
     event ExcessRedemptionReleased(address indexed bondToken, address indexed settlementToken, uint256 excessAmount);
+    event ExcessRedemptionRefunded(
+        address indexed bondToken, address indexed settlementToken, address indexed issuer, uint256 excessAmount
+    );
 
     function test_excessLiabilityAutoReleasedAfterAllClaims() public {
-        uint256 exactPayout = 100_301_369_800;
+        // AUDIT-FIX(N7): payout uses high-precision accruedInterestFor (was 100_301_369_800).
+        uint256 exactPayout = 100_301_369_863;
         uint256 excess = 50_000e6;
         uint256 deposit = exactPayout + excess;
+        uint256 issuerBalanceBefore = usdc.balanceOf(issuer);
 
         vm.prank(issuer);
         issuance.depositRedemption(address(bondToken), deposit);
 
         warpToMaturity();
 
-        vm.expectEmit(true, true, false, true);
-        emit ExcessRedemptionReleased(address(bondToken), address(usdc), excess);
+        // AUDIT-FIX(N6): excess is auto-refunded to the issuer (was: parked as rescuable balance).
+        vm.expectEmit(true, true, true, true);
+        emit ExcessRedemptionRefunded(address(bondToken), address(usdc), issuer, excess);
 
         vm.prank(holder);
         issuance.claim(address(bondToken));
 
         assertEq(bondToken.totalSupply(), 0);
-        assertEq(usdc.balanceOf(address(issuance)), excess);
-
-        vm.prank(admin);
-        issuance.rescueTokens(address(usdc), admin, excess);
-        assertEq(usdc.balanceOf(admin), excess);
+        // The contract no longer retains the excess; it returned to the issuer atomically.
         assertEq(usdc.balanceOf(address(issuance)), 0);
+        assertEq(usdc.balanceOf(issuer), issuerBalanceBefore - deposit + excess);
+        assertEq(usdc.balanceOf(holder), exactPayout);
     }
 
     // ─── 主动释放超额负债（部分赎回场景） ───────────────────────
 
     function test_adminCanReleaseExcessRedemptionBeforeAllClaims() public {
-        uint256 exactPayout = 100_301_369_800;
+        uint256 exactPayout = 100_301_369_863;
         uint256 excess = 80_000e6;
         uint256 deposit = exactPayout + excess;
+        uint256 issuerBalanceBefore = usdc.balanceOf(issuer);
 
         vm.prank(issuer);
         issuance.depositRedemption(address(bondToken), deposit);
 
         warpToMaturity();
 
+        // AUDIT-FIX(N6): the manual release path now atomically transfers excess to the issuer.
         vm.prank(admin);
         issuance.releaseExcessRedemption(address(bondToken));
 
-        vm.prank(admin);
-        issuance.rescueTokens(address(usdc), admin, excess);
-        assertEq(usdc.balanceOf(admin), excess);
+        assertEq(usdc.balanceOf(issuer), issuerBalanceBefore - deposit + excess);
 
         vm.prank(holder);
         issuance.claim(address(bondToken));
@@ -178,7 +186,7 @@ contract BondIssuanceRescueAndRedemptionIsolationTest is BondIssuanceRedemptionF
 
     function test_revertReleaseExcessBeforeMaturity() public {
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 100_301_369_800);
+        issuance.depositRedemption(address(bondToken), 100_301_369_863);
 
         vm.prank(admin);
         vm.expectRevert();
@@ -187,7 +195,7 @@ contract BondIssuanceRescueAndRedemptionIsolationTest is BondIssuanceRedemptionF
 
     function test_revertReleaseExcessByNonAdmin() public {
         vm.prank(issuer);
-        issuance.depositRedemption(address(bondToken), 100_301_369_800);
+        issuance.depositRedemption(address(bondToken), 100_301_369_863);
 
         warpToMaturity();
 

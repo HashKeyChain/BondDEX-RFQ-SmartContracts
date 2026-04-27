@@ -57,6 +57,12 @@ contract BondFactoryIssuanceApprovalTest is Test {
         );
         complianceImplementation = new ComplianceModule();
         factory = new BondFactory(admin, address(issuance));
+
+        // AUDIT-FIX(N11) revisited: self-grant the secondary roles this test exercises.
+        vm.startPrank(admin);
+        factory.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
+        factory.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
+        vm.stopPrank();
     }
 
     function test_approveIssuanceStoresActiveApproval() public {
@@ -100,13 +106,6 @@ contract BondFactoryIssuanceApprovalTest is Test {
     }
 
     function test_createBondConsumesApprovalAndStoresAddresses() public {
-        vm.startPrank(admin);
-        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
-        factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, metadataHash
-        );
-        vm.stopPrank();
-
         BondConfig memory config = BondConfig({
             issuer: issuer,
             name: "HashKey Bond",
@@ -126,6 +125,14 @@ contract BondFactoryIssuanceApprovalTest is Test {
             bondCategory: BondCategory.CORPORATE,
             isin: bytes12(0)
         });
+
+        vm.startPrank(admin);
+        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
+        // AUDIT-FIX(N3): approver must commit to the canonical hash of the BondConfig.
+        factory.approveIssuance(
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, factory.hashBondConfig(config)
+        );
+        vm.stopPrank();
 
         vm.expectEmit(false, true, false, true);
         emit BondCreated(
@@ -157,14 +164,6 @@ contract BondFactoryIssuanceApprovalTest is Test {
     }
 
     function test_revertWhenCreateBondUsesRevokedApproval() public {
-        vm.startPrank(admin);
-        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
-        factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, metadataHash
-        );
-        factory.revokeIssuance(approvalId);
-        vm.stopPrank();
-
         BondConfig memory config = BondConfig({
             issuer: issuer,
             name: "HashKey Bond",
@@ -184,6 +183,14 @@ contract BondFactoryIssuanceApprovalTest is Test {
             bondCategory: BondCategory.CORPORATE,
             isin: bytes12(0)
         });
+
+        vm.startPrank(admin);
+        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
+        factory.approveIssuance(
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, factory.hashBondConfig(config)
+        );
+        factory.revokeIssuance(approvalId);
+        vm.stopPrank();
 
         vm.prank(issuer);
         vm.expectRevert();

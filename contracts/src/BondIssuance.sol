@@ -22,10 +22,12 @@ import {
     MaxUnitsExceedsApproval,
     NoClaimableBalance,
     NotWhitelisted,
+    SettlementTokenHasRedemptionLiability,
     SubscriptionApprovalNotActive,
     SubscriptionCapExceeded,
     SubscriptionNotActive,
     SubscriptionWindowClosed,
+    SubscriptionWindowExceedsApprovalExpiry,
     SubscriptionWindowExceedsIssueDate,
     SubscriptionWindowAlreadyClosed,
     SubscriptionWindowMissingCloseTime,
@@ -51,9 +53,12 @@ contract BondIssuance is
 {
     using SafeERC20 for IERC20;
 
+    /// @dev `settlementEnabled` was removed in the post-N1 cleanup: it was a zombie field with no
+    ///      `require` site in the codebase. Token-level RFQ settlement gating lives entirely in
+    ///      `RFQSettlement.setSettlementTokenPolicy`. BondIssuance only cares about the two
+    ///      flow-specific gates below.
     struct SettlementTokenPolicy {
         bool issuanceEnabled;
-        bool settlementEnabled;
         bool redemptionEnabled;
     }
 
@@ -84,7 +89,7 @@ contract BondIssuance is
     }
 
     event SettlementTokenPolicyUpdated(
-        address indexed token, bool issuanceEnabled, bool settlementEnabled, bool redemptionEnabled, address operator
+        address indexed token, bool issuanceEnabled, bool redemptionEnabled, address operator
     );
     event SubscriptionCreated(
         bytes32 indexed offerId,
@@ -127,7 +132,20 @@ contract BondIssuance is
     event SubscriptionClosed(bytes32 indexed offerId, address indexed bondToken, address indexed issuer);
     event TokensRescued(address indexed token, address indexed to, uint256 amount, address indexed operator);
     event ExcessRedemptionReleased(address indexed bondToken, address indexed settlementToken, uint256 excessAmount);
+    /// @dev AUDIT-FIX(N6): emitted whenever the auto-release path actually transfers excess to issuer.
+    event ExcessRedemptionRefunded(
+        address indexed bondToken, address indexed settlementToken, address indexed issuer, uint256 excessAmount
+    );
     event ClaimDelegateSet(address indexed holder, address indexed delegate, address operator);
+    /// @dev AUDIT-FIX(N5): emitted when an admin force-redeems a sanctioned/blacklisted holder.
+    event ForceRedemption(
+        address indexed bondToken,
+        address indexed holder,
+        address indexed recipient,
+        uint256 bondAmount,
+        uint256 payout,
+        address operator
+    );
 
     uint256 private _nextOfferId;
     mapping(address token => SettlementTokenPolicy policy) private _settlementTokenPolicies;
@@ -140,14 +158,17 @@ contract BondIssuance is
 
     constructor() { _disableInitializers(); }
 
+    /// @dev AUDIT-FIX(N11) revisited: principle of least privilege at initialization. Only
+    ///      DEFAULT_ADMIN_ROLE is granted to the initial admin; secondary governance roles
+    ///      (ISSUANCE_APPROVER_ROLE / SETTLEMENT_ADMIN_ROLE / PAUSER_ROLE / UPGRADER_ROLE) must
+    ///      be granted explicitly via standard AccessControl. The initial admin can immediately
+    ///      self-grant any role they need because DEFAULT_ADMIN_ROLE is the OZ default
+    ///      `getRoleAdmin` for every role.
     function initialize(address admin) external initializer {
-        if (admin == address(0)) revert ZeroAddress();
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(admin);
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(ISSUANCE_APPROVER_ROLE, admin);
-        _grantRole(SETTLEMENT_ADMIN_ROLE, admin);
-        _grantRole(PAUSER_ROLE, admin);
-        _grantRole(UPGRADER_ROLE, admin);
     }
 
     function approveSubscription(
@@ -158,7 +179,9 @@ contract BondIssuance is
         uint256 expiresAt
     ) external onlyRole(ISSUANCE_APPROVER_ROLE) {
         if (approvalId == bytes32(0)) revert ZeroId();
-        if (issuer == address(0) || bondToken == address(0)) revert ZeroAddress();
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(issuer);
+        _ensureNonZero(bondToken);
         if (maxUnits == 0) revert ZeroAmount();
         if (expiresAt != 0 && expiresAt <= block.timestamp) revert ExpiredDeadline(expiresAt, block.timestamp);
         ApprovalStatus currentStatus = _subscriptionApprovals[approvalId].status;
@@ -202,6 +225,12 @@ contract BondIssuance is
         }
         if (approval.expiresAt != 0 && approval.expiresAt <= block.timestamp) {
             revert SubscriptionApprovalNotActive(approvalId, ApprovalStatus.EXPIRED);
+        }
+        // AUDIT-FIX(N10): subscription window must not extend past the approval expiry; otherwise an
+        //                 issuer could open the window seconds before approval expiry and let it run for
+        //                 the entire bond pre-issue period, bypassing the platform-imposed deadline.
+        if (approval.expiresAt != 0 && terms.closesAt > approval.expiresAt) {
+            revert SubscriptionWindowExceedsApprovalExpiry(terms.closesAt, approval.expiresAt);
         }
         if (approval.issuer != msg.sender) revert InvalidParticipantRole(msg.sender, Role.ISSUER, Role.NONE);
         if (approval.bondToken != terms.bondToken) revert SubscriptionApprovalNotActive(approvalId, approval.status);
@@ -278,21 +307,25 @@ contract BondIssuance is
         emit Subscribed(offerId, offer.bondToken, msg.sender, offer.settlementToken, units, cost);
     }
 
-    function setSettlementTokenPolicy(
-        address token,
-        bool enabledForIssuance,
-        bool enabledForSettlement,
-        bool enabledForRedemption
-    ) external onlyRole(SETTLEMENT_ADMIN_ROLE) {
-        if (token == address(0)) revert ZeroAddress();
-        _settlementTokenPolicies[token] = SettlementTokenPolicy({
-            issuanceEnabled: enabledForIssuance,
-            settlementEnabled: enabledForSettlement,
-            redemptionEnabled: enabledForRedemption
-        });
-        emit SettlementTokenPolicyUpdated(
-            token, enabledForIssuance, enabledForSettlement, enabledForRedemption, msg.sender
-        );
+    function setSettlementTokenPolicy(address token, bool enabledForIssuance, bool enabledForRedemption)
+        external
+        onlyRole(SETTLEMENT_ADMIN_ROLE)
+    {
+        // AUDIT-FIX(N18): use the inherited helper for consistent zero-address validation.
+        _ensureNonZero(token);
+        // AUDIT-FIX(N11): forbid disabling redemption while there is still outstanding liability for
+        //                 the token. Otherwise admin policy changes could trap issuer-deposited
+        //                 redemption funds and prevent rightful holders from claiming.
+        SettlementTokenPolicy memory previousPolicy = _settlementTokenPolicies[token];
+        if (
+            previousPolicy.redemptionEnabled && !enabledForRedemption
+                && _totalRedemptionLiability[token] > 0
+        ) {
+            revert SettlementTokenHasRedemptionLiability(token, _totalRedemptionLiability[token]);
+        }
+        _settlementTokenPolicies[token] =
+            SettlementTokenPolicy({ issuanceEnabled: enabledForIssuance, redemptionEnabled: enabledForRedemption });
+        emit SettlementTokenPolicyUpdated(token, enabledForIssuance, enabledForRedemption, msg.sender);
     }
 
     function depositRedemption(address bondTokenAddress, uint256 amount) external nonReentrant {
@@ -372,7 +405,9 @@ contract BondIssuance is
     }
 
     function rescueTokens(address token, address to, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (token == address(0) || to == address(0)) revert ZeroAddress();
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(token);
+        _ensureNonZero(to);
         uint256 balance = IERC20(token).balanceOf(address(this));
         uint256 locked = _totalRedemptionLiability[token];
         uint256 rescuable = balance > locked ? balance - locked : 0;
@@ -381,6 +416,10 @@ contract BondIssuance is
         emit TokensRescued(token, to, amount, msg.sender);
     }
 
+    /// @notice Release any redemption funds in excess of the outstanding obligation back to the issuer.
+    /// @dev AUDIT-FIX(N6): perform an actual safeTransfer so excess capital reaches the issuer
+    ///      atomically instead of being parked as protocol "rescuable" balance awaiting a multisig.
+    /// @dev AUDIT-FIX(N7,N13): obligation now flows through bondToken.principalOf + accruedInterestFor.
     function releaseExcessRedemption(address bondTokenAddress) external nonReentrant onlyRole(DEFAULT_ADMIN_ROLE) {
         IBondToken bondToken = IBondToken(bondTokenAddress);
         if (block.timestamp <= bondToken.maturityTimestamp()) {
@@ -392,14 +431,11 @@ contract BondIssuance is
         uint256 outstanding = IERC20(bondTokenAddress).totalSupply();
         uint256 actualObligation;
         if (outstanding > 0) {
-            actualObligation =
-                _quoteRedemptionPayout(bondToken, outstanding, IERC20Metadata(bondTokenAddress).decimals());
+            actualObligation = _quoteRedemptionPayout(bondToken, outstanding);
         }
         if (deposited > actualObligation) {
             uint256 excess = deposited - actualObligation;
-            _totalRedemptionLiability[bondToken.settlementToken()] -= excess;
-            state.fundedAmount -= excess;
-            emit ExcessRedemptionReleased(bondTokenAddress, bondToken.settlementToken(), excess);
+            _refundExcessToIssuer(bondToken, state, excess);
         }
     }
 
@@ -418,16 +454,16 @@ contract BondIssuance is
 
     function isSettlementTokenEnabled(address token) public view returns (bool) {
         SettlementTokenPolicy memory policy = _settlementTokenPolicies[token];
-        return policy.issuanceEnabled || policy.settlementEnabled || policy.redemptionEnabled;
+        return policy.issuanceEnabled || policy.redemptionEnabled;
     }
 
     function getSettlementTokenPolicy(address token)
         external
         view
-        returns (bool issuanceEnabled, bool settlementEnabled, bool redemptionEnabled)
+        returns (bool issuanceEnabled, bool redemptionEnabled)
     {
         SettlementTokenPolicy memory policy = _settlementTokenPolicies[token];
-        return (policy.issuanceEnabled, policy.settlementEnabled, policy.redemptionEnabled);
+        return (policy.issuanceEnabled, policy.redemptionEnabled);
     }
 
     function _quoteSubscriptionCost(uint256 units, uint256 unitPrice, uint8 bondDecimals)
@@ -438,16 +474,11 @@ contract BondIssuance is
         return Math.mulDiv(unitPrice, units, 10 ** uint256(bondDecimals), Math.Rounding.Ceil);
     }
 
-    function _quoteRedemptionPayout(IBondToken bondToken, uint256 bondAmount, uint8 bondDecimals)
-        internal
-        view
-        returns (uint256)
-    {
-        uint256 principal = Math.mulDiv(bondAmount, bondToken.faceValue(), 10 ** uint256(bondDecimals));
-        uint256 interest = Math.mulDiv(
-            bondToken.accruedInterestPerUnit(bondToken.maturityTimestamp()), bondAmount, 10 ** uint256(bondDecimals)
-        );
-        return principal + interest;
+    /// @dev AUDIT-FIX(N7,N13): defer the division to BondToken helpers so that principal/accrual are
+    ///      computed in settlement smallest units uniformly. The legacy lossy `accruedInterestPerUnit`
+    ///      was removed in v0.3.0; all callers now go through `principalOf` + `accruedInterestFor`.
+    function _quoteRedemptionPayout(IBondToken bondToken, uint256 bondAmount) internal view returns (uint256) {
+        return bondToken.principalOf(bondAmount) + bondToken.accruedInterestFor(bondAmount, bondToken.maturityTimestamp());
     }
 
     function _requireIssuanceTokenEnabled(address token) internal view {
@@ -486,24 +517,86 @@ contract BondIssuance is
         _requireRedemptionTokenEnabled(bondToken.settlementToken());
         uint256 bondAmount = IERC20(bondTokenAddress).balanceOf(holder);
         if (bondAmount < 1) revert NoClaimableBalance(holder, bondTokenAddress);
-        uint256 payout = _quoteRedemptionPayout(bondToken, bondAmount, IERC20Metadata(bondTokenAddress).decimals());
-        if (payout == 0) revert ZeroAmount();
+        uint256 payout = _quoteRedemptionPayout(bondToken, bondAmount);
+        // AUDIT-FIX(N9): allow payout==0 (dust positions) to proceed so the bond tokens can be burned
+        //                and totalSupply can ultimately reach 0; only the safeTransfer / funding check
+        //                are skipped for the zero-payout path.
         RedemptionState storage state = _redemptionStates[bondTokenAddress];
-        uint256 availableAmount = state.fundedAmount - state.claimedAmount;
-        if (availableAmount < payout) revert InsufficientRedemptionFunding(bondTokenAddress, availableAmount, payout);
-        state.claimedAmount += payout;
-        _totalRedemptionLiability[bondToken.settlementToken()] -= payout;
-        bondToken.burn(holder, bondAmount);
-        IERC20(bondToken.settlementToken()).safeTransfer(holder, payout);
-        emit RedemptionClaimed(bondTokenAddress, holder, caller, bondAmount, payout);
-        if (IERC20(bondTokenAddress).totalSupply() == 0) {
-            uint256 excess = state.fundedAmount - state.claimedAmount;
-            if (excess > 0) {
-                _totalRedemptionLiability[bondToken.settlementToken()] -= excess;
-                state.fundedAmount = state.claimedAmount;
-                emit ExcessRedemptionReleased(bondTokenAddress, bondToken.settlementToken(), excess);
+        if (payout > 0) {
+            uint256 availableAmount = state.fundedAmount - state.claimedAmount;
+            if (availableAmount < payout) {
+                revert InsufficientRedemptionFunding(bondTokenAddress, availableAmount, payout);
             }
+            state.claimedAmount += payout;
+            _totalRedemptionLiability[bondToken.settlementToken()] -= payout;
         }
+        bondToken.burn(holder, bondAmount);
+        if (payout > 0) {
+            IERC20(bondToken.settlementToken()).safeTransfer(holder, payout);
+        }
+        emit RedemptionClaimed(bondTokenAddress, holder, caller, bondAmount, payout);
+        _autoReleaseExcessIfFullyRedeemed(bondToken, state);
+    }
+
+    /// @notice Force-redeem a sanctioned/blacklisted holder's full position to a designated recipient.
+    /// @dev AUDIT-FIX(N5): admins can break the deadlock caused by post-issuance compliance actions
+    ///      that would otherwise permanently freeze the holder's bonds and the corresponding
+    ///      redemption funds. The whitelist check is intentionally bypassed; the recipient is meant
+    ///      to be a regulatory custody wallet or the issuer themselves.
+    function forceRedeem(address bondTokenAddress, address holder, address recipient)
+        external
+        nonReentrant
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        _requireDomainActive(PauseDomain.CLAIMS);
+        _ensureNonZero(bondTokenAddress);
+        _ensureNonZero(holder);
+        _ensureNonZero(recipient);
+        IBondToken bondToken = IBondToken(bondTokenAddress);
+        if (block.timestamp <= bondToken.maturityTimestamp()) {
+            revert BondNotMatured(bondTokenAddress, bondToken.maturityTimestamp(), block.timestamp);
+        }
+        _requireRedemptionTokenEnabled(bondToken.settlementToken());
+        uint256 bondAmount = IERC20(bondTokenAddress).balanceOf(holder);
+        if (bondAmount < 1) revert NoClaimableBalance(holder, bondTokenAddress);
+        uint256 payout = _quoteRedemptionPayout(bondToken, bondAmount);
+        RedemptionState storage state = _redemptionStates[bondTokenAddress];
+        if (payout > 0) {
+            uint256 availableAmount = state.fundedAmount - state.claimedAmount;
+            if (availableAmount < payout) {
+                revert InsufficientRedemptionFunding(bondTokenAddress, availableAmount, payout);
+            }
+            state.claimedAmount += payout;
+            _totalRedemptionLiability[bondToken.settlementToken()] -= payout;
+        }
+        bondToken.burn(holder, bondAmount);
+        if (payout > 0) {
+            IERC20(bondToken.settlementToken()).safeTransfer(recipient, payout);
+        }
+        emit ForceRedemption(bondTokenAddress, holder, recipient, bondAmount, payout, msg.sender);
+        _autoReleaseExcessIfFullyRedeemed(bondToken, state);
+    }
+
+    /// @dev AUDIT-FIX(N6): when the bond reaches totalSupply==0 after a claim/force-redeem, atomically
+    ///      transfer any over-funded remainder back to the issuer. Centralised here so _claimFor and
+    ///      forceRedeem stay in sync and cannot drift.
+    function _autoReleaseExcessIfFullyRedeemed(IBondToken bondToken, RedemptionState storage state) internal {
+        if (IERC20(address(bondToken)).totalSupply() != 0) return;
+        uint256 excess = state.fundedAmount - state.claimedAmount;
+        if (excess == 0) return;
+        _refundExcessToIssuer(bondToken, state, excess);
+    }
+
+    /// @dev AUDIT-FIX(N6): perform the actual safeTransfer of excess funds back to the issuer and
+    ///      keep accounting in lock-step with the asset move.
+    function _refundExcessToIssuer(IBondToken bondToken, RedemptionState storage state, uint256 excess) internal {
+        address settlement = bondToken.settlementToken();
+        address issuerAddress = bondToken.issuer();
+        _totalRedemptionLiability[settlement] -= excess;
+        state.fundedAmount -= excess;
+        emit ExcessRedemptionReleased(address(bondToken), settlement, excess);
+        IERC20(settlement).safeTransfer(issuerAddress, excess);
+        emit ExcessRedemptionRefunded(address(bondToken), settlement, issuerAddress, excess);
     }
 
     function _requireIssuerIdentity(IBondToken bondToken, address account) internal view {

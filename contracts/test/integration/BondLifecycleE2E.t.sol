@@ -59,15 +59,14 @@ contract BondLifecycleE2ETest is Test {
         complianceImplementation = new ComplianceModule();
         factory = new BondFactory(admin, address(issuance));
 
-        bytes32 approvalId = keccak256("approval");
+        // AUDIT-FIX(N11) revisited: contracts now grant only DEFAULT_ADMIN_ROLE at init; self-grant
+        // every secondary role exercised by this end-to-end lifecycle.
         vm.startPrank(admin);
-        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
-        factory.approveIssuance(
-            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, keccak256("metadata")
-        );
-        issuance.setSettlementTokenPolicy(address(usdc), true, false, true);
-        settlement.setSettlementTokenPolicy(address(usdc), true);
-        settlement.setFeeConfig(FeeConfig({ feeRecipient: feeRecipient, currentFeeBps: 50, maxFeeBps: 1_000 }));
+        factory.grantRole(keccak256("COMPLIANCE_ADMIN_ROLE"), admin);
+        factory.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
+        issuance.grantRole(keccak256("SETTLEMENT_ADMIN_ROLE"), admin);
+        issuance.grantRole(keccak256("ISSUANCE_APPROVER_ROLE"), admin);
+        settlement.grantRole(keccak256("SETTLEMENT_ADMIN_ROLE"), admin);
         vm.stopPrank();
 
         BondConfig memory config = BondConfig({
@@ -89,6 +88,18 @@ contract BondLifecycleE2ETest is Test {
             bondCategory: BondCategory.CORPORATE,
             isin: bytes12(0)
         });
+
+        bytes32 approvalId = keccak256("approval");
+        vm.startPrank(admin);
+        factory.registerComplianceImplementation(address(complianceImplementation), type(IComplianceModule).interfaceId);
+        // AUDIT-FIX(N3): bind metadataHash to the canonical config hash.
+        factory.approveIssuance(
+            approvalId, issuer, address(complianceImplementation), block.timestamp + 1 days, factory.hashBondConfig(config)
+        );
+        issuance.setSettlementTokenPolicy(address(usdc), true, true);
+        settlement.setSettlementTokenPolicy(address(usdc), true);
+        settlement.setFeeConfig(FeeConfig({ feeRecipient: feeRecipient, currentFeeBps: 50, maxFeeBps: 1_000 }));
+        vm.stopPrank();
 
         vm.prank(issuer);
         (address bondTokenAddress, address complianceModuleAddress) = factory.createBond(config, approvalId);
@@ -157,16 +168,18 @@ contract BondLifecycleE2ETest is Test {
 
         vm.warp(block.timestamp + 31 days);
 
-        usdc.mint(issuer, 10_038_356_160);
+        // AUDIT-FIX(N7): payout uses high-precision accruedInterestFor; new value = principal + 38_356_164.
+        uint256 expectedPayout = 10_038_356_164;
+        usdc.mint(issuer, expectedPayout);
         vm.prank(issuer);
         usdc.approve(address(issuance), type(uint256).max);
         vm.prank(issuer);
-        issuance.depositRedemption(bondTokenAddress, 10_038_356_160);
+        issuance.depositRedemption(bondTokenAddress, expectedPayout);
 
         vm.prank(investor);
         issuance.claim(bondTokenAddress);
 
-        assertEq(usdc.balanceOf(investor), 499_538_356_160);
+        assertEq(usdc.balanceOf(investor), 499_538_356_164);
         assertEq(bondToken.balanceOf(investor), 0);
         assertEq(usdc.balanceOf(feeRecipient), 52_500_000);
     }

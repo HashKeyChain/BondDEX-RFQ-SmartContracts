@@ -73,6 +73,7 @@ abstract contract RFQSettlementFixtures is Test {
                 couponRateBps: 500,
                 maturityTimestamp: block.timestamp + 30 days,
                 settlementToken: address(usdc),
+                settlementTokenDecimals: 6,
                 complianceModule: address(complianceModule),
                 issuanceController: issuanceController,
                 issueDate: block.timestamp,
@@ -86,7 +87,13 @@ abstract contract RFQSettlementFixtures is Test {
         vm.prank(factory);
         complianceModule.bindBondToken(address(bondToken));
 
+        // AUDIT-FIX(N11) revisited: contracts now grant only DEFAULT_ADMIN_ROLE to admin at init.
+        // Self-grant the secondary roles this fixture exercises so existing test bodies (which
+        // still vm.prank(admin) for setBondTokenRegistration / setFeeConfig / pauseDomain / etc.)
+        // keep working.
         vm.startPrank(admin);
+        settlement.grantRole(keccak256("SETTLEMENT_ADMIN_ROLE"), admin);
+        settlement.grantRole(keccak256("PAUSER_ROLE"), admin);
         complianceModule.setWhitelist(maker, true);
         complianceModule.setWhitelist(investor, true);
         complianceModule.setWhitelist(otherMaker, true);

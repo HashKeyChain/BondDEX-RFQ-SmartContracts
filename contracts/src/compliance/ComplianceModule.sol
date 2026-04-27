@@ -67,7 +67,9 @@ contract ComplianceModule is
         external
         initializer
     {
-        if (admin == address(0) || factory == address(0)) revert ZeroAddress();
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(admin);
+        _ensureNonZero(factory);
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(COMPLIANCE_ADMIN_ROLE, admin);
@@ -79,7 +81,8 @@ contract ComplianceModule is
     }
 
     function bindBondToken(address bondToken_) external onlyRole(BOND_FACTORY_ROLE) {
-        if (bondToken_ == address(0)) revert ZeroAddress();
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(bondToken_);
         if (bondToken != address(0)) revert BondTokenAlreadyBound(bondToken);
         bondToken = bondToken_;
         emit BondTokenBound(bondToken_, address(this));
@@ -87,7 +90,8 @@ contract ComplianceModule is
 
     function setWhitelist(address account, bool allowed) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
-        if (account == address(0)) revert ZeroAddress();
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(account);
         _whitelist[account] = allowed;
         emit WhitelistUpdated(bondToken, account, address(this), allowed, msg.sender);
     }
@@ -102,14 +106,16 @@ contract ComplianceModule is
             revert InvalidBatchSize(accounts.length, MAX_BATCH_SIZE);
         }
         for (uint256 i = 0; i < accounts.length; i++) {
-            if (accounts[i] == address(0)) revert ZeroAddress();
+            // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+            _ensureNonZero(accounts[i]);
             _whitelist[accounts[i]] = allowed[i];
             emit WhitelistUpdated(bondToken, accounts[i], address(this), allowed[i], msg.sender);
         }
     }
 
     function setRole(address account, Role role) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
-        if (account == address(0)) revert ZeroAddress();
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(account);
         if (uint8(role) > uint8(Role.INVESTOR)) revert InvalidParticipantRole(account, Role.INVESTOR, role);
         _requireDomainActive(PauseDomain.COMPLIANCE_ADMIN);
         _roles[account] = role;
@@ -123,7 +129,8 @@ contract ComplianceModule is
             revert InvalidBatchSize(accounts.length, MAX_BATCH_SIZE);
         }
         for (uint256 i = 0; i < accounts.length; i++) {
-            if (accounts[i] == address(0)) revert ZeroAddress();
+            // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+            _ensureNonZero(accounts[i]);
             if (uint8(roles[i]) > uint8(Role.INVESTOR)) {
                 revert InvalidParticipantRole(accounts[i], Role.INVESTOR, roles[i]);
             }
@@ -144,7 +151,8 @@ contract ComplianceModule is
     }
 
     function setTransferOperator(address operator, bool authorized) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
-        if (operator == address(0)) revert ZeroAddress();
+        // AUDIT-FIX(N18): use RoleManaged._ensureNonZero for consistent zero-address checks.
+        _ensureNonZero(operator);
         _authorizedOperators[operator] = authorized;
         emit TransferOperatorUpdated(bondToken, operator, authorized, msg.sender);
     }

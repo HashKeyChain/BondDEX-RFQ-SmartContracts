@@ -16,7 +16,7 @@
 
 - `US1 - Launch and Subscribe`：平台审批发行，发行人创建债券（含 issueDate、dayCountConvention、couponFrequency、bondCategory、ISIN 等完整属性），配置合规模块，管理员审批认购窗口，做市商或合格参与方完成一级认购
 - `US2 - RFQ Settlement`：做市商或投资者签名 EIP-712 订单（含 accruedInterest 字段），对手方按单成交，合约在链上验证应计利息合理性，支持批量成交、订单取消、nonce 管理和手续费收取（基于 dirty amount）。交易方向限制为做市商↔投资者和做市商↔做市商，禁止投资者↔投资者。手续费始终由做市商侧承担，做市商之间交易免手续费
-- `US3 - Redemption and Claims`：债券到期后由发行人注入赎回资金（按年化利率 + 日期折算，平台链下流程强制要求全额存入），持有人直接领取或通过代理人代领（持有人须仍在白名单中）；超额赎回负债在全部赎回后自动释放，或由管理员主动释放（`releaseExcessRedemption`），释放后可通过 `rescueTokens` 取回多余资金
+- `US3 - Redemption and Claims`：债券到期后由发行人注入赎回资金（按年化利率 + 日期折算，平台链下流程强制要求全额存入），持有人直接领取或通过代理人代领（持有人须仍在白名单中）；超额赎回资金在全部赎回完成后由合约**自动转回发行人**，或由管理员调 `releaseExcessRedemption` 主动转回；对受制裁/被永久移出白名单的持有人，管理员可通过 `forceRedeem` 路径强制销毁其债券并把资金转入指定监管托管地址；`rescueTokens` 仅用于救援误转入合约的代币，不再承担退还赎回超额的职责
 
 这 3 条主流程分别在 `contracts/test/integration/US1_LaunchAndSubscribe.t.sol`、`contracts/test/integration/US2_RfqSettlement.t.sol` 和 `contracts/test/integration/US3_RedemptionAndClaims.t.sol` 中有对应的集成测试覆盖，并由 `contracts/test/integration/BondLifecycleE2E.t.sol` 串成完整生命周期。
 
@@ -27,8 +27,8 @@
 | `BondFactory` | 负责发行审批、合规实现注册，以及创建 `BondToken` 和每只债对应的 `ComplianceModule` 实例；`createBond` 现接收含完整债券属性（issueDate、dayCountConvention、couponFrequency、bondCategory、isin）的 `BondConfig` 结构体 |
 | `BondToken` | 债券 ERC-20 资产本体，记录发行人、面值、年化票息率、发行日、计息惯例、到期时间和结算币；构造器通过 `ConstructorParams` 结构体传参；转账限制委托给合规模块判断 |
 | `ComplianceModule` | 负责白名单、角色矩阵、授权转账 operator、策略元数据与暂停域控制；限制债券转账方向（禁止投资者↔投资者）和参与方身份；强制所有用户间转账必须通过授权 operator（如 RFQSettlement）执行 |
-| `BondIssuance` | 负责一级市场认购审批、认购窗口管理、赎回资金注入（赎回利息按年化利率 × 日期折算）、直接领取与代理领取（含持有人白名单校验）、超额赎回负债释放（`releaseExcessRedemption`）、资金救援（`rescueTokens`）与结算代币策略查询（`getSettlementTokenPolicy`） |
-| `RFQSettlement` | 负责二级市场 RFQ 订单的 EIP-712 签名校验、应计利息链上验证（含容差配置 `setAiToleranceSeconds`）、撮合成交、批量成交、取消、nonce floor、手续费策略（基于 dirty amount）与 `quoteFee` 查询 |
+| `BondIssuance` | 负责一级市场认购审批、认购窗口管理、赎回资金注入（赎回利息按年化利率 × 日期折算）、直接领取与代理领取（含持有人白名单校验）、超额赎回自动转回发行人（`releaseExcessRedemption` + 全员赎回触发的自动释放分支）、强制赎回受制裁持有人（`forceRedeem`）、误转资金救援（`rescueTokens`）与结算代币策略查询（`getSettlementTokenPolicy`） |
+| `RFQSettlement` | 负责二级市场 RFQ 订单的 EIP-712 签名校验、应计利息链上验证（基于高精度 `BondToken.accruedInterestFor`，容差通过 `setAiToleranceSeconds` 配置）、强制 `order.quoteToken == bondToken.settlementToken()`、撮合成交、批量成交、取消、nonce floor、手续费策略（基于 dirty amount）、`quoteFee` 查询、UUPS 升级后 EIP-712 缓存刷新（`refreshDomainSeparator`） |
 | `BondMath` | 基点计算与精度缩放工具库，供手续费计算和金额换算使用 |
 
 ## 手续费模型
@@ -51,7 +51,7 @@ RFQ 二级市场交易的手续费始终由做市商侧承担，投资者侧不�
 - `BondToken` 将合规限制外部化到 `ComplianceModule`，便于按债券实例独立配置白名单、角色和授权 operator；构造器通过 `ConstructorParams` 结构体传参，支持完整债券属性
 - `ComplianceModule` 的授权 operator 机制强制所有用户间债券转账必须通过平台合约（RFQSettlement）执行，防止私下转账绕过手续费和应计利息验证
 - 二级结算使用 EIP-712 typed data，订单结构含 `accruedInterest` 字段，对订单哈希、签名与 nonce 作严格校验
-- `BondToken` 支持完整债券属性：`issueDate`、`dayCountConvention`（ACT_365 / ACT_360）、`couponFrequency`（BULLET / ANNUAL / SEMI_ANNUAL / QUARTERLY）、`bondCategory`（CORPORATE / GOVERNMENT / CONVERTIBLE / ABS）、`isin`（bytes12）
+- `BondToken` 支持完整债券属性：`issueDate`、`dayCountConvention`（ACT_365 / ACT_360）、`couponFrequency`（BULLET / ANNUAL）、`bondCategory`（CORPORATE / GOVERNMENT / CONVERTIBLE / ABS）、`isin`（bytes12）
 - 赎回利息按年化利率 + 日期折算（ACT_365 / ACT_360 两种计息惯例）；`couponRateBps` 语义为年化利率
 - RFQ 应计利息链上验证，容差通过 `setAiToleranceSeconds` 可调，防止恶意篡改同时容忍合理时间延迟
 - 手续费路由根据参与方角色自动判断，做市商之间免手续费；手续费基于 dirty amount（含应计利息）计算

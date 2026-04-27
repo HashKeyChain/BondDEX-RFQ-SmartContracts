@@ -787,6 +787,13 @@
   },
   {
     "type": "function",
+    "name": "refreshDomainSeparator",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "renounceRole",
     "inputs": [
       {
@@ -1012,6 +1019,31 @@
         "name": "operator",
         "type": "address",
         "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DomainSeparatorRefreshed",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "domainSeparator",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "operator",
+        "type": "address",
+        "indexed": true,
         "internalType": "address"
       }
     ],
@@ -1727,6 +1759,22 @@
         "name": "orderHash",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "QuoteTokenMismatch",
+    "inputs": [
+      {
+        "name": "quoteToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "settlementToken",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
